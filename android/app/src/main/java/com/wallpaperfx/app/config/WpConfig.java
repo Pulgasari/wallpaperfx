@@ -36,12 +36,29 @@ public class WpConfig {
     public float imageOffsetX = 0f;
     public float imageOffsetY = 0f;
 
-    // filter: "none" | "duotone" | "scanlines"
+    // filter: none | duotone | grayscale | sepia | gradientmap | posterize |
+    //         pixelate | halftone | scanlines | crt | vignette | chromatic | invert
     public String filterType = "none";
-    public int[] duotoneShadow = {18, 20, 42};      // rgb 0..255, maps to dark tones
-    public int[] duotoneHighlight = {240, 186, 72};  // rgb 0..255, maps to bright tones
+
+    // shared color endpoints for duotone / gradientmap / halftone (rgb 0..255)
+    public int[] duotoneShadow = {18, 20, 42};      // dark tones / halftone ink
+    public int[] duotoneHighlight = {240, 186, 72};  // bright tones / halftone paper
+    public int[] gradientMid = {120, 84, 168};       // gradientmap midtone
+
+    // scanlines / crt
     public float scanCount = 320f;    // number of scanlines across the height
     public float scanStrength = 0.35f; // 0..1 darkening amount
+    public float crtMask = 0.30f;     // 0..1 rgb aperture-mask strength
+
+    // per-filter params
+    public float grayAmount = 1.0f;      // grayscale blend 0..1
+    public float sepiaAmount = 1.0f;     // sepia blend 0..1
+    public float posterizeLevels = 6f;   // color steps per channel (2..16)
+    public float pixelSize = 12f;        // pixelate block size in px
+    public float halftoneScale = 90f;    // halftone dots across the height
+    public float vignetteStrength = 0.6f; // 0..1 edge darkening
+    public float vignetteRadius = 0.6f;   // 0..1 where the falloff starts
+    public float chromaticAmount = 0.006f; // rgb split in uv units
 
     // parallax: shift the wallpaper as the user swipes between home screens.
     // amount is the fraction of headroom to zoom in / pan across (cover mode only).
@@ -100,8 +117,18 @@ public class WpConfig {
         o.put("filterType", filterType);
         o.put("duotoneShadow", intArray(duotoneShadow));
         o.put("duotoneHighlight", intArray(duotoneHighlight));
+        o.put("gradientMid", intArray(gradientMid));
         o.put("scanCount", scanCount);
         o.put("scanStrength", scanStrength);
+        o.put("crtMask", crtMask);
+        o.put("grayAmount", grayAmount);
+        o.put("sepiaAmount", sepiaAmount);
+        o.put("posterizeLevels", posterizeLevels);
+        o.put("pixelSize", pixelSize);
+        o.put("halftoneScale", halftoneScale);
+        o.put("vignetteStrength", vignetteStrength);
+        o.put("vignetteRadius", vignetteRadius);
+        o.put("chromaticAmount", chromaticAmount);
 
         o.put("parallaxEnabled", parallaxEnabled);
         o.put("parallaxAmount", parallaxAmount);
@@ -134,8 +161,18 @@ public class WpConfig {
         filterType = o.optString("filterType", filterType);
         duotoneShadow = readColor(o.optJSONArray("duotoneShadow"), duotoneShadow);
         duotoneHighlight = readColor(o.optJSONArray("duotoneHighlight"), duotoneHighlight);
+        gradientMid = readColor(o.optJSONArray("gradientMid"), gradientMid);
         scanCount = (float) o.optDouble("scanCount", scanCount);
         scanStrength = (float) o.optDouble("scanStrength", scanStrength);
+        crtMask = (float) o.optDouble("crtMask", crtMask);
+        grayAmount = (float) o.optDouble("grayAmount", grayAmount);
+        sepiaAmount = (float) o.optDouble("sepiaAmount", sepiaAmount);
+        posterizeLevels = (float) o.optDouble("posterizeLevels", posterizeLevels);
+        pixelSize = (float) o.optDouble("pixelSize", pixelSize);
+        halftoneScale = (float) o.optDouble("halftoneScale", halftoneScale);
+        vignetteStrength = (float) o.optDouble("vignetteStrength", vignetteStrength);
+        vignetteRadius = (float) o.optDouble("vignetteRadius", vignetteRadius);
+        chromaticAmount = (float) o.optDouble("chromaticAmount", chromaticAmount);
 
         parallaxEnabled = o.optBoolean("parallaxEnabled", parallaxEnabled);
         parallaxAmount = (float) o.optDouble("parallaxAmount", parallaxAmount);

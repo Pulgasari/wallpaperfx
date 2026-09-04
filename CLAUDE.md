@@ -28,6 +28,17 @@ add a config field, touch all three: `WpConfig` (model + toJson/fromJson),
   texture matrix; video uses the `SurfaceTexture` transform matrix.
 - All GL calls must run on the render thread (the one with the EGL context).
 
+## Second invariant: the two filter shaders
+
+The fragment filter source exists twice, once per renderer, and they must stay
+identical in logic: `wallpaper/FilterGlsl.java` (the wallpaper) and
+`www/preview.js` `FRAGMENT_SRC` (the ui preview). The filter index mapping
+(`0 none … 12 invert`) is defined in three places that must agree:
+`SceneRenderer.filterIndex`, `FilterGlsl` header comment, and `preview.js`
+`FILTER_INDEX`. Change a filter -> change all of them. Screen-space effects use
+the `vScreenCoord` varying (0..1 across the screen); color effects sample with
+`vTexCoord` (content uv).
+
 ## Conventions
 
 - Code comments: english, all lowercase, technical, no emojis.

@@ -24,8 +24,15 @@ kann kein Live-Wallpaper sein. Deshalb der Split:
    (einpassen), plus x/y-Offset zum Verschieben des Ausschnitts (nur `cover`).
 2. **Bilder** — ein oder mehrere, geloopt, Modi `normal` / `random`, einstellbare
    Anzeigedauer und Überblendzeit, gleiche Skalierungs-/Offset-Optionen.
-3. **Filter** — `none`, `duotone` (zwei Farben), `scanlines` (Linienzahl +
-   Stärke). Wirken auf Video und Bilder gleichermaßen.
+3. **Filter** — 12 Effekte, wirken auf Video und Bilder gleichermaßen (alle
+   single-pass, keine erzwungene Animation):
+   - farbe: `duotone`, `gradientmap` (tritone), `grayscale`, `sepia`,
+     `posterize`, `invert`
+   - retro/screen-space: `pixelate`, `halftone`, `scanlines`, `crt`,
+     `vignette`, `chromatic`
+   Die UI zeigt nur die Parameter des aktiven Filters. Die Filter-Shader liegen
+   doppelt (nativ in `FilterGlsl.java`, preview in `www/preview.js`) und müssen
+   logisch identisch bleiben.
 4. **Parallax** — optionale Verschiebung beim Homescreen-Wischen
    (`onOffsetsChanged`), mit einstellbarer Stärke (cover-modus).
 5. **Live-Preview** — WebGL-Canvas in der UI, spiegelt dieselben Shader
@@ -93,5 +100,6 @@ pfade anpassen (bzw. das Android-Projekt mit neuer appId neu generieren).
 
 - v0.1: Video- und Bild-Wallpaper, Cover/Fit + Offset, Duotone/Scanlines, CI.
 - v0.2: WebGL-Live-Preview und Parallax beim Homescreen-Wischen.
-- Ideen: weitere Filter, Slideshow-Vorschau mit Cross-Fade, Signierung für
-  Release-APKs.
+- v0.3: 12 Filter (color + retro/screen-space), preview zeigt sie live.
+- Ideen: opt-in animierte Filter (film grain, glitch), bloom/blur (multi-pass),
+  Slideshow-Vorschau mit Cross-Fade, Signierung für Release-APKs.

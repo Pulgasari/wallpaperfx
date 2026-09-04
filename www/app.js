@@ -46,8 +46,18 @@ const state = {
     filterType: 'none',
     duotoneShadow: [18, 20, 42],
     duotoneHighlight: [240, 186, 72],
+    gradientMid: [120, 84, 168],
     scanCount: 320,
     scanStrength: 0.35,
+    crtMask: 0.3,
+    grayAmount: 1,
+    sepiaAmount: 1,
+    posterizeLevels: 6,
+    pixelSize: 12,
+    halftoneScale: 90,
+    vignetteStrength: 0.6,
+    vignetteRadius: 0.6,
+    chromaticAmount: 0.006,
     parallaxEnabled: false,
     parallaxAmount: 0.15
 };
@@ -103,7 +113,10 @@ function renderMode() {
 }
 
 function renderFilterParams() {
-    $$('.filter-params').forEach((g) => (g.hidden = g.dataset.filter !== state.filterType));
+    // data-filter may list several filters (space separated) that share a group
+    $$('.filter-params').forEach((g) => {
+        g.hidden = !g.dataset.filter.split(' ').includes(state.filterType);
+    });
 }
 
 function renderImageList() {
@@ -157,10 +170,29 @@ function renderAll() {
     $('#filterType').value = state.filterType;
     $('#duotoneShadow').value = rgbToHex(state.duotoneShadow);
     $('#duotoneHighlight').value = rgbToHex(state.duotoneHighlight);
+    $('#gradientMid').value = rgbToHex(state.gradientMid);
     $('#scanCount').value = state.scanCount;
     $('#scanStrength').value = state.scanStrength;
+    $('#crtMask').value = state.crtMask;
+    $('#grayAmount').value = state.grayAmount;
+    $('#sepiaAmount').value = state.sepiaAmount;
+    $('#posterizeLevels').value = state.posterizeLevels;
+    $('#pixelSize').value = state.pixelSize;
+    $('#halftoneScale').value = state.halftoneScale;
+    $('#vignetteStrength').value = state.vignetteStrength;
+    $('#vignetteRadius').value = state.vignetteRadius;
+    $('#chromaticAmount').value = state.chromaticAmount;
     setOut('scanCount', String(state.scanCount));
     setOut('scanStrength', state.scanStrength.toFixed(2));
+    setOut('crtMask', state.crtMask.toFixed(2));
+    setOut('grayAmount', state.grayAmount.toFixed(2));
+    setOut('sepiaAmount', state.sepiaAmount.toFixed(2));
+    setOut('posterizeLevels', String(state.posterizeLevels));
+    setOut('pixelSize', String(state.pixelSize));
+    setOut('halftoneScale', String(state.halftoneScale));
+    setOut('vignetteStrength', state.vignetteStrength.toFixed(2));
+    setOut('vignetteRadius', state.vignetteRadius.toFixed(2));
+    setOut('chromaticAmount', state.chromaticAmount.toFixed(3));
 
     $('#parallaxEnabled').checked = state.parallaxEnabled;
     $('#parallaxAmount').value = state.parallaxAmount;
@@ -235,6 +267,25 @@ function bind() {
         state.scanStrength = Number(e.target.value);
         setOut('scanStrength', state.scanStrength.toFixed(2));
     });
+
+    // generic range + color binders; data-out id matches the input id
+    const rng = (id, key, digits) =>
+        $(id).addEventListener('input', (e) => {
+            state[key] = Number(e.target.value);
+            setOut(id.slice(1), digits === undefined ? String(state[key]) : state[key].toFixed(digits));
+        });
+    const colr = (id, key) => $(id).addEventListener('input', (e) => (state[key] = hexToRgb(e.target.value)));
+
+    colr('#gradientMid', 'gradientMid');
+    rng('#crtMask', 'crtMask', 2);
+    rng('#grayAmount', 'grayAmount', 2);
+    rng('#sepiaAmount', 'sepiaAmount', 2);
+    rng('#posterizeLevels', 'posterizeLevels');
+    rng('#pixelSize', 'pixelSize');
+    rng('#halftoneScale', 'halftoneScale');
+    rng('#vignetteStrength', 'vignetteStrength', 2);
+    rng('#vignetteRadius', 'vignetteRadius', 2);
+    rng('#chromaticAmount', 'chromaticAmount', 3);
 
     $('#parallaxEnabled').addEventListener('change', (e) => (state.parallaxEnabled = e.target.checked));
     $('#parallaxAmount').addEventListener('input', (e) => {

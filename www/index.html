@@ -108,22 +108,75 @@
             <select id="filterType">
                 <option value="none">Kein</option>
                 <option value="duotone">Duotone</option>
+                <option value="gradientmap">Gradient Map</option>
+                <option value="grayscale">Graustufen</option>
+                <option value="sepia">Sepia</option>
+                <option value="posterize">Posterize</option>
+                <option value="invert">Invertieren</option>
+                <option value="pixelate">Pixelate</option>
+                <option value="halftone">Halftone</option>
                 <option value="scanlines">Scanlines</option>
+                <option value="crt">CRT</option>
+                <option value="vignette">Vignette</option>
+                <option value="chromatic">Chromatic</option>
             </select>
         </label>
 
-        <div class="filter-params" data-filter="duotone" hidden>
+        <!-- shared color endpoints (duotone / gradient map / halftone) -->
+        <div class="filter-params" data-filter="duotone gradientmap halftone" hidden>
             <label class="field">
-                <span>Schatten</span>
+                <span data-label="dark">Schatten / Ink</span>
                 <input id="duotoneShadow" type="color" value="#12142a" />
             </label>
             <label class="field">
-                <span>Lichter</span>
+                <span data-label="light">Lichter / Paper</span>
                 <input id="duotoneHighlight" type="color" value="#f0ba48" />
             </label>
         </div>
 
-        <div class="filter-params" data-filter="scanlines" hidden>
+        <div class="filter-params" data-filter="gradientmap" hidden>
+            <label class="field">
+                <span>Mitte</span>
+                <input id="gradientMid" type="color" value="#7854a8" />
+            </label>
+        </div>
+
+        <div class="filter-params" data-filter="grayscale" hidden>
+            <label class="field">
+                <span>Stärke <em data-out="grayAmount">1.00</em></span>
+                <input id="grayAmount" type="range" min="0" max="1" step="0.01" value="1" />
+            </label>
+        </div>
+
+        <div class="filter-params" data-filter="sepia" hidden>
+            <label class="field">
+                <span>Stärke <em data-out="sepiaAmount">1.00</em></span>
+                <input id="sepiaAmount" type="range" min="0" max="1" step="0.01" value="1" />
+            </label>
+        </div>
+
+        <div class="filter-params" data-filter="posterize" hidden>
+            <label class="field">
+                <span>Stufen <em data-out="posterizeLevels">6</em></span>
+                <input id="posterizeLevels" type="range" min="2" max="16" step="1" value="6" />
+            </label>
+        </div>
+
+        <div class="filter-params" data-filter="pixelate" hidden>
+            <label class="field">
+                <span>Blockgröße <em data-out="pixelSize">12</em> px</span>
+                <input id="pixelSize" type="range" min="2" max="64" step="1" value="12" />
+            </label>
+        </div>
+
+        <div class="filter-params" data-filter="halftone" hidden>
+            <label class="field">
+                <span>Raster <em data-out="halftoneScale">90</em></span>
+                <input id="halftoneScale" type="range" min="20" max="240" step="5" value="90" />
+            </label>
+        </div>
+
+        <div class="filter-params" data-filter="scanlines crt" hidden>
             <label class="field">
                 <span>Linien <em data-out="scanCount">320</em></span>
                 <input id="scanCount" type="range" min="60" max="900" step="10" value="320" />
@@ -131,6 +184,31 @@
             <label class="field">
                 <span>Stärke <em data-out="scanStrength">0.35</em></span>
                 <input id="scanStrength" type="range" min="0" max="1" step="0.01" value="0.35" />
+            </label>
+        </div>
+
+        <div class="filter-params" data-filter="crt" hidden>
+            <label class="field">
+                <span>Maske <em data-out="crtMask">0.30</em></span>
+                <input id="crtMask" type="range" min="0" max="1" step="0.01" value="0.3" />
+            </label>
+        </div>
+
+        <div class="filter-params" data-filter="vignette" hidden>
+            <label class="field">
+                <span>Stärke <em data-out="vignetteStrength">0.60</em></span>
+                <input id="vignetteStrength" type="range" min="0" max="1" step="0.01" value="0.6" />
+            </label>
+            <label class="field">
+                <span>Radius <em data-out="vignetteRadius">0.60</em></span>
+                <input id="vignetteRadius" type="range" min="0" max="1" step="0.01" value="0.6" />
+            </label>
+        </div>
+
+        <div class="filter-params" data-filter="chromatic" hidden>
+            <label class="field">
+                <span>Versatz <em data-out="chromaticAmount">0.006</em></span>
+                <input id="chromaticAmount" type="range" min="0" max="0.03" step="0.001" value="0.006" />
             </label>
         </div>
     </section>

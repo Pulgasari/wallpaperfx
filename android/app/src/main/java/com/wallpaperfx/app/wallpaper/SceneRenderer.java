@@ -38,37 +38,18 @@ class SceneRenderer implements GLRenderThread.Renderer {
             "attribute vec2 aPosition;\n" +
             "attribute vec2 aTexCoord;\n" +
             "varying vec2 vTexCoord;\n" +
+            "varying vec2 vScreenCoord;\n" +
             "void main() {\n" +
             "  vec2 uv = (aTexCoord - 0.5) * uUvScale + 0.5 + uUvOffset;\n" +
             "  vTexCoord = (uTexMatrix * vec4(uv, 0.0, 1.0)).xy;\n" +
+            "  vScreenCoord = aTexCoord;\n" + // 0..1 across the screen (fullscreen quad)
             "  gl_Position = vec4(aPosition * uPosScale, 0.0, 1.0);\n" +
             "}\n";
 
-    // shared fragment body; only the sampler declaration and header differ per target.
-    private static final String FRAG_BODY =
-            "varying vec2 vTexCoord;\n" +
-            "uniform int uFilter;\n" +
-            "uniform vec3 uColorA;\n" +
-            "uniform vec3 uColorB;\n" +
-            "uniform float uScanCount;\n" +
-            "uniform float uScanStrength;\n" +
-            "uniform float uAlpha;\n" +
-            "vec4 applyFilter(vec4 c) {\n" +
-            "  if (uFilter == 1) {\n" +
-            "    float l = dot(c.rgb, vec3(0.299, 0.587, 0.114));\n" +
-            "    c.rgb = mix(uColorA, uColorB, l);\n" +
-            "  } else if (uFilter == 2) {\n" +
-            "    float s = 0.5 + 0.5 * cos(vTexCoord.y * uScanCount * 6.2831853);\n" +
-            "    c.rgb *= (1.0 - uScanStrength * s);\n" +
-            "  }\n" +
-            "  return c;\n" +
-            "}\n" +
-            "void main() {\n" +
-            "  vec4 c = texture2D(uTexture, vTexCoord);\n" +
-            "  c = applyFilter(c);\n" +
-            "  c.a *= uAlpha;\n" +
-            "  gl_FragColor = c;\n" +
-            "}\n";
+    // shared fragment body: same for the 2d and oes programs, only the sampler
+    // declaration in the prefix differs. filter index mapping is documented in
+    // SceneRenderer.filterIndex and mirrored in www/preview.js.
+    private static final String FRAG_BODY = FilterGlsl.SOURCE;
 
     private static final String FRAG_2D =
             "precision mediump float;\n" +
@@ -490,12 +471,22 @@ class SceneRenderer implements GLRenderThread.Renderer {
         GLES20.glUniform2f(p.uPosScale, s[4], s[5]);
         GLES20.glUniform1f(p.uAlpha, alpha);
 
-        int filter = "duotone".equals(cfg.filterType) ? 1 : ("scanlines".equals(cfg.filterType) ? 2 : 0);
+        int filter = filterIndex(cfg.filterType);
         GLES20.glUniform1i(p.uFilter, filter);
-        GLES20.glUniform3f(p.uColorA, cfg.duotoneShadow[0] / 255f, cfg.duotoneShadow[1] / 255f, cfg.duotoneShadow[2] / 255f);
-        GLES20.glUniform3f(p.uColorB, cfg.duotoneHighlight[0] / 255f, cfg.duotoneHighlight[1] / 255f, cfg.duotoneHighlight[2] / 255f);
+        color(p.uColorA, cfg.duotoneShadow);
+        color(p.uColorB, cfg.duotoneHighlight);
+        color(p.uColorC, cfg.gradientMid);
         GLES20.glUniform1f(p.uScanCount, cfg.scanCount);
         GLES20.glUniform1f(p.uScanStrength, cfg.scanStrength);
+        GLES20.glUniform1f(p.uCrtMask, cfg.crtMask);
+        GLES20.glUniform1f(p.uAmount, "grayscale".equals(cfg.filterType) ? cfg.grayAmount : cfg.sepiaAmount);
+        GLES20.glUniform1f(p.uLevels, cfg.posterizeLevels);
+        GLES20.glUniform1f(p.uPixelSize, cfg.pixelSize);
+        GLES20.glUniform1f(p.uHalftone, cfg.halftoneScale);
+        GLES20.glUniform1f(p.uVignette, cfg.vignetteStrength);
+        GLES20.glUniform1f(p.uVignetteRadius, cfg.vignetteRadius);
+        GLES20.glUniform1f(p.uChromatic, cfg.chromaticAmount);
+        GLES20.glUniform2f(p.uResolution, screenW, screenH);
 
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
         GLES20.glBindTexture(target, texId);
@@ -505,6 +496,29 @@ class SceneRenderer implements GLRenderThread.Renderer {
 
         GLES20.glDisableVertexAttribArray(p.aPosition);
         GLES20.glDisableVertexAttribArray(p.aTexCoord);
+    }
+
+    private static void color(int loc, int[] rgb) {
+        GLES20.glUniform3f(loc, rgb[0] / 255f, rgb[1] / 255f, rgb[2] / 255f);
+    }
+
+    // string -> shader filter index; must match FilterGlsl and www/preview.js
+    private static int filterIndex(String type) {
+        switch (type) {
+            case "duotone": return 1;
+            case "scanlines": return 2;
+            case "grayscale": return 3;
+            case "sepia": return 4;
+            case "gradientmap": return 5;
+            case "posterize": return 6;
+            case "pixelate": return 7;
+            case "halftone": return 8;
+            case "vignette": return 9;
+            case "chromatic": return 10;
+            case "crt": return 11;
+            case "invert": return 12;
+            default: return 0;
+        }
     }
 
     private static FloatBuffer toBuffer(float[] data) {
@@ -520,7 +534,9 @@ class SceneRenderer implements GLRenderThread.Renderer {
         final int id;
         final int aPosition, aTexCoord;
         final int uTexMatrix, uUvScale, uUvOffset, uPosScale;
-        final int uFilter, uColorA, uColorB, uScanCount, uScanStrength, uAlpha, uTexture;
+        final int uFilter, uColorA, uColorB, uColorC, uScanCount, uScanStrength, uCrtMask;
+        final int uAmount, uLevels, uPixelSize, uHalftone, uVignette, uVignetteRadius, uChromatic;
+        final int uResolution, uAlpha, uTexture;
 
         Prog(String vs, String fs) {
             id = GLUtil.compileProgram(vs, fs);
@@ -533,8 +549,18 @@ class SceneRenderer implements GLRenderThread.Renderer {
             uFilter = GLES20.glGetUniformLocation(id, "uFilter");
             uColorA = GLES20.glGetUniformLocation(id, "uColorA");
             uColorB = GLES20.glGetUniformLocation(id, "uColorB");
+            uColorC = GLES20.glGetUniformLocation(id, "uColorC");
             uScanCount = GLES20.glGetUniformLocation(id, "uScanCount");
             uScanStrength = GLES20.glGetUniformLocation(id, "uScanStrength");
+            uCrtMask = GLES20.glGetUniformLocation(id, "uCrtMask");
+            uAmount = GLES20.glGetUniformLocation(id, "uAmount");
+            uLevels = GLES20.glGetUniformLocation(id, "uLevels");
+            uPixelSize = GLES20.glGetUniformLocation(id, "uPixelSize");
+            uHalftone = GLES20.glGetUniformLocation(id, "uHalftone");
+            uVignette = GLES20.glGetUniformLocation(id, "uVignette");
+            uVignetteRadius = GLES20.glGetUniformLocation(id, "uVignetteRadius");
+            uChromatic = GLES20.glGetUniformLocation(id, "uChromatic");
+            uResolution = GLES20.glGetUniformLocation(id, "uResolution");
             uAlpha = GLES20.glGetUniformLocation(id, "uAlpha");
             uTexture = GLES20.glGetUniformLocation(id, "uTexture");
         }
