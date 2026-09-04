@@ -21,7 +21,8 @@ kann kein Live-Wallpaper sein. Deshalb der Split:
 ## Features
 
 1. **Video** — geloopt, `cover` (ausfüllen + beschneiden) oder `fit`
-   (einpassen), plus x/y-Offset zum Verschieben des Ausschnitts (nur `cover`).
+   (einpassen), plus x/y-Offset zum Verschieben des Ausschnitts (nur `cover`),
+   einstellbare Abspielgeschwindigkeit (0.25x–3x).
 2. **Bilder** — ein oder mehrere, geloopt, Modi `normal` / `random`, einstellbare
    Anzeigedauer und Überblendzeit, gleiche Skalierungs-/Offset-Optionen.
 3. **Filter** — 12 Effekte, wirken auf Video und Bilder gleichermaßen (alle
@@ -30,6 +31,8 @@ kann kein Live-Wallpaper sein. Deshalb der Split:
      `posterize`, `invert`
    - retro/screen-space: `pixelate`, `halftone`, `scanlines`, `crt`,
      `vignette`, `chromatic`
+   - animiert (brauchen `uTime`, rendern kontinuierlich solange sichtbar):
+     `filmgrain`, `glitch`, `vhs`
    Die UI zeigt nur die Parameter des aktiven Filters. Die Filter-Shader liegen
    doppelt (nativ in `FilterGlsl.java`, preview in `www/preview.js`) und müssen
    logisch identisch bleiben.

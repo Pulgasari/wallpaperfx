@@ -75,6 +75,9 @@ class SceneRenderer implements GLRenderThread.Renderer {
     // home-screen swipe position (0..1, 0.5 = centered), drives parallax
     private volatile float xOffset = 0.5f;
 
+    // wall clock for animated filters (uTime uniform)
+    private final long startTimeMs = SystemClock.uptimeMillis();
+
     private WpConfig cfg = new WpConfig();
 
     // video state
@@ -149,10 +152,12 @@ class SceneRenderer implements GLRenderThread.Renderer {
         GLES20.glViewport(0, 0, screenW, screenH);
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT);
 
-        if ("images".equals(cfg.mode)) {
-            return drawImages();
+        long next = "images".equals(cfg.mode) ? drawImages() : drawVideo();
+        // animated filters redraw every frame so uTime keeps advancing
+        if (isAnimated() && contentPresent()) {
+            return 0L;
         }
-        return drawVideo();
+        return next;
     }
 
     @Override
@@ -214,6 +219,11 @@ class SceneRenderer implements GLRenderThread.Renderer {
                 }
                 try {
                     mp.start();
+                    // playback speed; some codecs reject non-default rates, hence the guard
+                    float speed = clamp(cfg.videoSpeed, 0.25f, 3f);
+                    if (Math.abs(speed - 1f) > 0.001f) {
+                        mp.setPlaybackParams(mp.getPlaybackParams().setSpeed(speed));
+                    }
                 } catch (Exception ignored) {
                 }
                 videoReady = true;
@@ -486,6 +496,10 @@ class SceneRenderer implements GLRenderThread.Renderer {
         GLES20.glUniform1f(p.uVignette, cfg.vignetteStrength);
         GLES20.glUniform1f(p.uVignetteRadius, cfg.vignetteRadius);
         GLES20.glUniform1f(p.uChromatic, cfg.chromaticAmount);
+        GLES20.glUniform1f(p.uGrain, cfg.grainAmount);
+        GLES20.glUniform1f(p.uGlitch, cfg.glitchAmount);
+        GLES20.glUniform1f(p.uVhs, cfg.vhsAmount);
+        GLES20.glUniform1f(p.uTime, (SystemClock.uptimeMillis() - startTimeMs) / 1000f);
         GLES20.glUniform2f(p.uResolution, screenW, screenH);
 
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
@@ -517,8 +531,23 @@ class SceneRenderer implements GLRenderThread.Renderer {
             case "chromatic": return 10;
             case "crt": return 11;
             case "invert": return 12;
+            case "filmgrain": return 13;
+            case "glitch": return 14;
+            case "vhs": return 15;
             default: return 0;
         }
+    }
+
+    // animated filters need continuous redraws so uTime advances
+    private boolean isAnimated() {
+        return "filmgrain".equals(cfg.filterType)
+                || "glitch".equals(cfg.filterType)
+                || "vhs".equals(cfg.filterType);
+    }
+
+    private boolean contentPresent() {
+        if ("images".equals(cfg.mode)) return texA != 0;
+        return videoReady;
     }
 
     private static FloatBuffer toBuffer(float[] data) {
@@ -536,7 +565,7 @@ class SceneRenderer implements GLRenderThread.Renderer {
         final int uTexMatrix, uUvScale, uUvOffset, uPosScale;
         final int uFilter, uColorA, uColorB, uColorC, uScanCount, uScanStrength, uCrtMask;
         final int uAmount, uLevels, uPixelSize, uHalftone, uVignette, uVignetteRadius, uChromatic;
-        final int uResolution, uAlpha, uTexture;
+        final int uGrain, uGlitch, uVhs, uTime, uResolution, uAlpha, uTexture;
 
         Prog(String vs, String fs) {
             id = GLUtil.compileProgram(vs, fs);
@@ -560,6 +589,10 @@ class SceneRenderer implements GLRenderThread.Renderer {
             uVignette = GLES20.glGetUniformLocation(id, "uVignette");
             uVignetteRadius = GLES20.glGetUniformLocation(id, "uVignetteRadius");
             uChromatic = GLES20.glGetUniformLocation(id, "uChromatic");
+            uGrain = GLES20.glGetUniformLocation(id, "uGrain");
+            uGlitch = GLES20.glGetUniformLocation(id, "uGlitch");
+            uVhs = GLES20.glGetUniformLocation(id, "uVhs");
+            uTime = GLES20.glGetUniformLocation(id, "uTime");
             uResolution = GLES20.glGetUniformLocation(id, "uResolution");
             uAlpha = GLES20.glGetUniformLocation(id, "uAlpha");
             uTexture = GLES20.glGetUniformLocation(id, "uTexture");

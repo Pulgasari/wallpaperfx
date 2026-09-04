@@ -8,7 +8,9 @@ package com.wallpaperfx.app.wallpaper;
 // filter index mapping (see SceneRenderer.filterIndex):
 //   0 none      1 duotone    2 scanlines  3 grayscale  4 sepia
 //   5 gradientmap 6 posterize 7 pixelate  8 halftone   9 vignette
-//   10 chromatic 11 crt       12 invert
+//   10 chromatic 11 crt       12 invert   13 filmgrain 14 glitch  15 vhs
+// filters 13..15 are animated: they read uTime and require the render loop to
+// draw continuously (see SceneRenderer.isAnimated).
 final class FilterGlsl {
 
     private FilterGlsl() {}
@@ -30,9 +32,14 @@ final class FilterGlsl {
             "uniform float uVignette;\n" +
             "uniform float uVignetteRadius;\n" +
             "uniform float uChromatic;\n" +
+            "uniform float uGrain;\n" +
+            "uniform float uGlitch;\n" +
+            "uniform float uVhs;\n" +
+            "uniform float uTime;\n" +
             "uniform vec2 uResolution;\n" +
             "uniform float uAlpha;\n" +
             "float luma(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }\n" +
+            "float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }\n" +
             "void main() {\n" +
             "  vec2 uv = vTexCoord;\n" +
             "  if (uFilter == 7) {\n" + // pixelate: snap to a grid before sampling
@@ -84,6 +91,32 @@ final class FilterGlsl {
             "    vec2 off = (vScreenCoord - 0.5) * uChromatic;\n" +
             "    c.r = texture2D(uTexture, uv + off).r;\n" +
             "    c.b = texture2D(uTexture, uv - off).b;\n" +
+            "  } else if (uFilter == 13) {\n" + // film grain (animated)
+            "    float g = hash(vScreenCoord * uResolution + uTime * 60.0);\n" +
+            "    c.rgb += (g - 0.5) * uGrain;\n" +
+            "  } else if (uFilter == 14) {\n" + // glitch (animated)
+            "    float band = floor(vScreenCoord.y * 24.0);\n" +
+            "    float seed = floor(uTime * 12.0);\n" +
+            "    float n = hash(vec2(band, seed));\n" +
+            "    float shift = 0.0;\n" +
+            "    if (n > 1.0 - 0.5 * uGlitch) { shift = (hash(vec2(band, seed + 1.0)) - 0.5) * 0.15 * uGlitch; }\n" +
+            "    vec2 guv = vec2(uv.x + shift, uv.y);\n" +
+            "    float amt = 0.006 * uGlitch;\n" +
+            "    c.r = texture2D(uTexture, guv + vec2(amt, 0.0)).r;\n" +
+            "    c.g = texture2D(uTexture, guv).g;\n" +
+            "    c.b = texture2D(uTexture, guv - vec2(amt, 0.0)).b;\n" +
+            "  } else if (uFilter == 15) {\n" + // vhs (animated): wobble + chroma + scanlines + grain
+            "    vec2 guv = vec2(uv.x + sin(uv.y * 120.0 + uTime * 5.0) * 0.0015 * uVhs, uv.y);\n" +
+            "    float amt = 0.004 * uVhs;\n" +
+            "    c.r = texture2D(uTexture, guv + vec2(amt, 0.0)).r;\n" +
+            "    c.g = texture2D(uTexture, guv).g;\n" +
+            "    c.b = texture2D(uTexture, guv - vec2(amt, 0.0)).b;\n" +
+            "    float s = 0.5 + 0.5 * cos(vScreenCoord.y * 380.0 * 6.2831853);\n" +
+            "    c.rgb *= (1.0 - 0.15 * uVhs * s);\n" +
+            "    float g = hash(vScreenCoord * uResolution + uTime * 60.0);\n" +
+            "    c.rgb += (g - 0.5) * 0.08 * uVhs;\n" +
+            "    float track = fract(vScreenCoord.y - uTime * 0.2);\n" +
+            "    c.rgb += smoothstep(0.97, 0.99, track) * 0.25 * uVhs;\n" +
             "  }\n" +
             "  c.a *= uAlpha;\n" +
             "  gl_FragColor = c;\n" +

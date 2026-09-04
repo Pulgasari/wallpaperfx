@@ -26,6 +26,7 @@ public class WpConfig {
     public String videoScale = "cover"; // cover | fit
     public float videoOffsetX = 0f;     // -1..1, pan within cropped area (cover only)
     public float videoOffsetY = 0f;
+    public float videoSpeed = 1.0f;     // playback rate, 0.25..3
 
     // images
     public List<String> imagePaths = new ArrayList<>();
@@ -59,6 +60,11 @@ public class WpConfig {
     public float vignetteStrength = 0.6f; // 0..1 edge darkening
     public float vignetteRadius = 0.6f;   // 0..1 where the falloff starts
     public float chromaticAmount = 0.006f; // rgb split in uv units
+
+    // animated filters (drive continuous rendering while active), 0..1 intensity
+    public float grainAmount = 0.15f;
+    public float glitchAmount = 0.5f;
+    public float vhsAmount = 0.6f;
 
     // parallax: shift the wallpaper as the user swipes between home screens.
     // amount is the fraction of headroom to zoom in / pan across (cover mode only).
@@ -103,6 +109,7 @@ public class WpConfig {
         o.put("videoScale", videoScale);
         o.put("videoOffsetX", videoOffsetX);
         o.put("videoOffsetY", videoOffsetY);
+        o.put("videoSpeed", videoSpeed);
 
         JSONArray imgs = new JSONArray();
         for (String p : imagePaths) imgs.put(p);
@@ -129,6 +136,9 @@ public class WpConfig {
         o.put("vignetteStrength", vignetteStrength);
         o.put("vignetteRadius", vignetteRadius);
         o.put("chromaticAmount", chromaticAmount);
+        o.put("grainAmount", grainAmount);
+        o.put("glitchAmount", glitchAmount);
+        o.put("vhsAmount", vhsAmount);
 
         o.put("parallaxEnabled", parallaxEnabled);
         o.put("parallaxAmount", parallaxAmount);
@@ -142,6 +152,7 @@ public class WpConfig {
         videoScale = o.optString("videoScale", videoScale);
         videoOffsetX = (float) o.optDouble("videoOffsetX", videoOffsetX);
         videoOffsetY = (float) o.optDouble("videoOffsetY", videoOffsetY);
+        videoSpeed = (float) o.optDouble("videoSpeed", videoSpeed);
 
         JSONArray imgs = o.optJSONArray("imagePaths");
         if (imgs != null) {
@@ -173,6 +184,9 @@ public class WpConfig {
         vignetteStrength = (float) o.optDouble("vignetteStrength", vignetteStrength);
         vignetteRadius = (float) o.optDouble("vignetteRadius", vignetteRadius);
         chromaticAmount = (float) o.optDouble("chromaticAmount", chromaticAmount);
+        grainAmount = (float) o.optDouble("grainAmount", grainAmount);
+        glitchAmount = (float) o.optDouble("glitchAmount", glitchAmount);
+        vhsAmount = (float) o.optDouble("vhsAmount", vhsAmount);
 
         parallaxEnabled = o.optBoolean("parallaxEnabled", parallaxEnabled);
         parallaxAmount = (float) o.optDouble("parallaxAmount", parallaxAmount);

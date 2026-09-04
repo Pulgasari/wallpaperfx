@@ -36,6 +36,7 @@ const state = {
     videoScale: 'cover',
     videoOffsetX: 0,
     videoOffsetY: 0,
+    videoSpeed: 1,
     imagePaths: [],
     imageOrder: 'normal',
     imageDurationMs: 8000,
@@ -58,6 +59,9 @@ const state = {
     vignetteStrength: 0.6,
     vignetteRadius: 0.6,
     chromaticAmount: 0.006,
+    grainAmount: 0.15,
+    glitchAmount: 0.5,
+    vhsAmount: 0.6,
     parallaxEnabled: false,
     parallaxAmount: 0.15
 };
@@ -112,11 +116,15 @@ function renderMode() {
     $$('.panel').forEach((p) => (p.hidden = p.dataset.panel !== state.mode));
 }
 
+const ANIMATED_FILTERS = ['filmgrain', 'glitch', 'vhs'];
+
 function renderFilterParams() {
     // data-filter may list several filters (space separated) that share a group
     $$('.filter-params').forEach((g) => {
         g.hidden = !g.dataset.filter.split(' ').includes(state.filterType);
     });
+    const note = document.querySelector('[data-filter-note]');
+    if (note) note.hidden = !ANIMATED_FILTERS.includes(state.filterType);
 }
 
 function renderImageList() {
@@ -153,8 +161,10 @@ function renderAll() {
     $('#videoScale').value = state.videoScale;
     $('#videoOffsetX').value = state.videoOffsetX;
     $('#videoOffsetY').value = state.videoOffsetY;
+    $('#videoSpeed').value = state.videoSpeed;
     setOut('videoOffsetX', state.videoOffsetX.toFixed(2));
     setOut('videoOffsetY', state.videoOffsetY.toFixed(2));
+    setOut('videoSpeed', state.videoSpeed.toFixed(2));
 
     $('#imageOrder').value = state.imageOrder;
     $('#imageDurationMs').value = state.imageDurationMs;
@@ -193,6 +203,12 @@ function renderAll() {
     setOut('vignetteStrength', state.vignetteStrength.toFixed(2));
     setOut('vignetteRadius', state.vignetteRadius.toFixed(2));
     setOut('chromaticAmount', state.chromaticAmount.toFixed(3));
+    $('#grainAmount').value = state.grainAmount;
+    $('#glitchAmount').value = state.glitchAmount;
+    $('#vhsAmount').value = state.vhsAmount;
+    setOut('grainAmount', state.grainAmount.toFixed(2));
+    setOut('glitchAmount', state.glitchAmount.toFixed(2));
+    setOut('vhsAmount', state.vhsAmount.toFixed(2));
 
     $('#parallaxEnabled').checked = state.parallaxEnabled;
     $('#parallaxAmount').value = state.parallaxAmount;
@@ -245,6 +261,7 @@ function bind() {
     $('#videoScale').addEventListener('change', (e) => (state.videoScale = e.target.value));
     num('#videoOffsetX', 'videoOffsetX', 'videoOffsetX');
     num('#videoOffsetY', 'videoOffsetY', 'videoOffsetY');
+    num('#videoSpeed', 'videoSpeed', 'videoSpeed');
 
     $('#imageOrder').addEventListener('change', (e) => (state.imageOrder = e.target.value));
     $('#imageScale').addEventListener('change', (e) => (state.imageScale = e.target.value));
@@ -286,6 +303,9 @@ function bind() {
     rng('#vignetteStrength', 'vignetteStrength', 2);
     rng('#vignetteRadius', 'vignetteRadius', 2);
     rng('#chromaticAmount', 'chromaticAmount', 3);
+    rng('#grainAmount', 'grainAmount', 2);
+    rng('#glitchAmount', 'glitchAmount', 2);
+    rng('#vhsAmount', 'vhsAmount', 2);
 
     $('#parallaxEnabled').addEventListener('change', (e) => (state.parallaxEnabled = e.target.checked));
     $('#parallaxAmount').addEventListener('input', (e) => {

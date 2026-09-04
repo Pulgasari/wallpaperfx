@@ -38,8 +38,13 @@ const Preview = (function () {
         uniform float uVignette;
         uniform float uVignetteRadius;
         uniform float uChromatic;
+        uniform float uGrain;
+        uniform float uGlitch;
+        uniform float uVhs;
+        uniform float uTime;
         uniform vec2 uResolution;
         float luma(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }
+        float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
         void main() {
             vec2 uv = vTexCoord;
             if (uFilter == 7) {
@@ -91,6 +96,32 @@ const Preview = (function () {
                 vec2 off = (vScreenCoord - 0.5) * uChromatic;
                 c.r = texture2D(uTexture, uv + off).r;
                 c.b = texture2D(uTexture, uv - off).b;
+            } else if (uFilter == 13) {
+                float g = hash(vScreenCoord * uResolution + uTime * 60.0);
+                c.rgb += (g - 0.5) * uGrain;
+            } else if (uFilter == 14) {
+                float band = floor(vScreenCoord.y * 24.0);
+                float seed = floor(uTime * 12.0);
+                float n = hash(vec2(band, seed));
+                float shift = 0.0;
+                if (n > 1.0 - 0.5 * uGlitch) { shift = (hash(vec2(band, seed + 1.0)) - 0.5) * 0.15 * uGlitch; }
+                vec2 guv = vec2(uv.x + shift, uv.y);
+                float amt = 0.006 * uGlitch;
+                c.r = texture2D(uTexture, guv + vec2(amt, 0.0)).r;
+                c.g = texture2D(uTexture, guv).g;
+                c.b = texture2D(uTexture, guv - vec2(amt, 0.0)).b;
+            } else if (uFilter == 15) {
+                vec2 guv = vec2(uv.x + sin(uv.y * 120.0 + uTime * 5.0) * 0.0015 * uVhs, uv.y);
+                float amt = 0.004 * uVhs;
+                c.r = texture2D(uTexture, guv + vec2(amt, 0.0)).r;
+                c.g = texture2D(uTexture, guv).g;
+                c.b = texture2D(uTexture, guv - vec2(amt, 0.0)).b;
+                float s = 0.5 + 0.5 * cos(vScreenCoord.y * 380.0 * 6.2831853);
+                c.rgb *= (1.0 - 0.15 * uVhs * s);
+                float g = hash(vScreenCoord * uResolution + uTime * 60.0);
+                c.rgb += (g - 0.5) * 0.08 * uVhs;
+                float track = fract(vScreenCoord.y - uTime * 0.2);
+                c.rgb += smoothstep(0.97, 0.99, track) * 0.25 * uVhs;
             }
             gl_FragColor = c;
         }`;
@@ -148,7 +179,8 @@ const Preview = (function () {
         [
             'uUvScale', 'uUvOffset', 'uPosScale', 'uFilter', 'uColorA', 'uColorB', 'uColorC',
             'uScanCount', 'uScanStrength', 'uCrtMask', 'uAmount', 'uLevels', 'uPixelSize',
-            'uHalftone', 'uVignette', 'uVignetteRadius', 'uChromatic', 'uResolution', 'uTexture'
+            'uHalftone', 'uVignette', 'uVignetteRadius', 'uChromatic', 'uGrain', 'uGlitch',
+            'uVhs', 'uTime', 'uResolution', 'uTexture'
         ].forEach((n) => (loc[n] = gl.getUniformLocation(program, n)));
 
         // positions (-1..1) and texcoords (0..1), triangle strip
@@ -299,7 +331,8 @@ const Preview = (function () {
     // must match SceneRenderer.filterIndex / FilterGlsl
     const FILTER_INDEX = {
         none: 0, duotone: 1, scanlines: 2, grayscale: 3, sepia: 4, gradientmap: 5,
-        posterize: 6, pixelate: 7, halftone: 8, vignette: 9, chromatic: 10, crt: 11, invert: 12
+        posterize: 6, pixelate: 7, halftone: 8, vignette: 9, chromatic: 10, crt: 11, invert: 12,
+        filmgrain: 13, glitch: 14, vhs: 15
     };
     function filterIndex(type) {
         return FILTER_INDEX[type] || 0;
@@ -317,6 +350,8 @@ const Preview = (function () {
 
         if (!state || !sourceEl) return;
         if (sourceType === 'video') {
+            const rate = state.videoSpeed || 1;
+            if (sourceEl.playbackRate !== rate) sourceEl.playbackRate = rate;
             if (sourceEl.readyState >= 2) {
                 contentW = sourceEl.videoWidth || contentW;
                 contentH = sourceEl.videoHeight || contentH;
@@ -352,6 +387,10 @@ const Preview = (function () {
         gl.uniform1f(loc.uVignette, state.vignetteStrength);
         gl.uniform1f(loc.uVignetteRadius, state.vignetteRadius);
         gl.uniform1f(loc.uChromatic, state.chromaticAmount);
+        gl.uniform1f(loc.uGrain, state.grainAmount);
+        gl.uniform1f(loc.uGlitch, state.glitchAmount);
+        gl.uniform1f(loc.uVhs, state.vhsAmount);
+        gl.uniform1f(loc.uTime, performance.now() / 1000);
         gl.uniform2f(loc.uResolution, canvas.width, canvas.height);
 
         gl.activeTexture(gl.TEXTURE0);

@@ -37,7 +37,10 @@ identical in logic: `wallpaper/FilterGlsl.java` (the wallpaper) and
 `SceneRenderer.filterIndex`, `FilterGlsl` header comment, and `preview.js`
 `FILTER_INDEX`. Change a filter -> change all of them. Screen-space effects use
 the `vScreenCoord` varying (0..1 across the screen); color effects sample with
-`vTexCoord` (content uv).
+`vTexCoord` (content uv). Animated filters (`filmgrain`/`glitch`/`vhs`) read the
+`uTime` uniform; `SceneRenderer.isAnimated` forces the loop to return `0` (draw
+continuously) while one is active and content is present, so keep that list in
+sync with the animated indices too.
 
 ## Conventions
 

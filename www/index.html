@@ -44,6 +44,11 @@
             </select>
         </label>
 
+        <label class="field">
+            <span>Geschwindigkeit <em data-out="videoSpeed">1.00</em>x</span>
+            <input id="videoSpeed" type="range" min="0.25" max="3" step="0.05" value="1" />
+        </label>
+
         <div class="offset-group" data-for="video">
             <label class="field">
                 <span>Offset X <em data-out="videoOffsetX">0.00</em></span>
@@ -119,6 +124,9 @@
                 <option value="crt">CRT</option>
                 <option value="vignette">Vignette</option>
                 <option value="chromatic">Chromatic</option>
+                <option value="filmgrain">Film Grain</option>
+                <option value="glitch">Glitch</option>
+                <option value="vhs">VHS</option>
             </select>
         </label>
 
@@ -211,6 +219,31 @@
                 <input id="chromaticAmount" type="range" min="0" max="0.03" step="0.001" value="0.006" />
             </label>
         </div>
+
+        <div class="filter-params" data-filter="filmgrain" hidden>
+            <label class="field">
+                <span>Körnung <em data-out="grainAmount">0.15</em></span>
+                <input id="grainAmount" type="range" min="0" max="0.6" step="0.01" value="0.15" />
+            </label>
+        </div>
+
+        <div class="filter-params" data-filter="glitch" hidden>
+            <label class="field">
+                <span>Stärke <em data-out="glitchAmount">0.50</em></span>
+                <input id="glitchAmount" type="range" min="0" max="1" step="0.01" value="0.5" />
+            </label>
+        </div>
+
+        <div class="filter-params" data-filter="vhs" hidden>
+            <label class="field">
+                <span>Stärke <em data-out="vhsAmount">0.60</em></span>
+                <input id="vhsAmount" type="range" min="0" max="1" step="0.01" value="0.6" />
+            </label>
+        </div>
+
+        <p class="muted filter-note" data-filter-note hidden>
+            animierter filter: läuft nur solange sichtbar, verbraucht mehr akku.
+        </p>
     </section>
 
     <!-- parallax panel -->
