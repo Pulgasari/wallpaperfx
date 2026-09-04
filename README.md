@@ -26,7 +26,11 @@ kann kein Live-Wallpaper sein. Deshalb der Split:
    Anzeigedauer und Überblendzeit, gleiche Skalierungs-/Offset-Optionen.
 3. **Filter** — `none`, `duotone` (zwei Farben), `scanlines` (Linienzahl +
    Stärke). Wirken auf Video und Bilder gleichermaßen.
-4. **CI** — GitHub Actions baut bei jedem Push ein Debug-APK
+4. **Parallax** — optionale Verschiebung beim Homescreen-Wischen
+   (`onOffsetsChanged`), mit einstellbarer Stärke (cover-modus).
+5. **Live-Preview** — WebGL-Canvas in der UI, spiegelt dieselben Shader
+   (Skalierung, Offset, Filter) live auf dem gewählten Medium.
+6. **CI** — GitHub Actions baut bei jedem Push ein Debug-APK
    (`.github/workflows/android.yml`, Artefakt `wallpaperfx-debug-apk`).
 
 ## Projektstruktur
@@ -88,5 +92,6 @@ pfade anpassen (bzw. das Android-Projekt mit neuer appId neu generieren).
 ## Stand / nächste Schritte
 
 - v0.1: Video- und Bild-Wallpaper, Cover/Fit + Offset, Duotone/Scanlines, CI.
-- Ideen: Live-Preview in der UI, Parallax über `onOffsetsChanged`, weitere
-  Filter, Signierung für Release-APKs.
+- v0.2: WebGL-Live-Preview und Parallax beim Homescreen-Wischen.
+- Ideen: weitere Filter, Slideshow-Vorschau mit Cross-Fade, Signierung für
+  Release-APKs.

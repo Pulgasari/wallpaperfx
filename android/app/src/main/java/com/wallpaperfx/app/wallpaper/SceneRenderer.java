@@ -91,6 +91,9 @@ class SceneRenderer implements GLRenderThread.Renderer {
     private int screenW, screenH;
     private volatile boolean needsReload = true;
 
+    // home-screen swipe position (0..1, 0.5 = centered), drives parallax
+    private volatile float xOffset = 0.5f;
+
     private WpConfig cfg = new WpConfig();
 
     // video state
@@ -128,6 +131,13 @@ class SceneRenderer implements GLRenderThread.Renderer {
     void requestReload() {
         needsReload = true;
         if (thread != null) thread.requestRender();
+    }
+
+    // called from the engine on home-screen swipe; only redraw when parallax is on.
+    void setXOffset(float x) {
+        if (x == xOffset) return;
+        xOffset = x;
+        if (cfg.parallaxEnabled && thread != null) thread.requestRender();
     }
 
     @Override
@@ -440,10 +450,21 @@ class SceneRenderer implements GLRenderThread.Renderer {
         } else { // cover
             uvScaleX = Math.min(1f, 1f / r);
             uvScaleY = Math.min(1f, r);
+            if (cfg.parallaxEnabled) {
+                // zoom in uniformly so there is headroom to pan into on swipe
+                float room = clamp(cfg.parallaxAmount, 0f, 0.9f);
+                uvScaleX *= (1f - room);
+                uvScaleY *= (1f - room);
+            }
             float maxPanX = (1f - uvScaleX) * 0.5f;
             float maxPanY = (1f - uvScaleY) * 0.5f;
             uvOffX = clamp(offX, -1f, 1f) * maxPanX;
             uvOffY = clamp(offY, -1f, 1f) * maxPanY;
+            if (cfg.parallaxEnabled) {
+                // pan horizontally with the swipe position across the added headroom
+                float room = clamp(cfg.parallaxAmount, 0f, 0.9f);
+                uvOffX += (xOffset - 0.5f) * room;
+            }
         }
         return new float[]{uvScaleX, uvScaleY, uvOffX, uvOffY, posScaleX, posScaleY};
     }

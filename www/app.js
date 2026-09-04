@@ -47,7 +47,9 @@ const state = {
     duotoneShadow: [18, 20, 42],
     duotoneHighlight: [240, 186, 72],
     scanCount: 320,
-    scanStrength: 0.35
+    scanStrength: 0.35,
+    parallaxEnabled: false,
+    parallaxAmount: 0.15
 };
 
 // ---- helpers ----
@@ -72,6 +74,18 @@ function rgbToHex(rgb) {
 function hexToRgb(hex) {
     const m = hex.replace('#', '');
     return [parseInt(m.slice(0, 2), 16), parseInt(m.slice(2, 4), 16), parseInt(m.slice(4, 6), 16)];
+}
+
+function hasMedia() {
+    return (state.mode === 'video' && !!state.videoPath) ||
+        (state.mode === 'images' && state.imagePaths.length > 0);
+}
+
+// refresh the preview source and toggle the "no media" hint
+function syncPreview() {
+    if (typeof Preview !== 'undefined') Preview.refreshMedia();
+    const card = document.querySelector('.preview-card');
+    if (card) card.classList.toggle('has-media', hasMedia());
 }
 
 let statusTimer = null;
@@ -105,6 +119,7 @@ function renderImageList() {
         rm.addEventListener('click', () => {
             state.imagePaths.splice(i, 1);
             renderImageList();
+            syncPreview();
         });
         li.append(span, rm);
         ul.append(li);
@@ -146,6 +161,10 @@ function renderAll() {
     $('#scanStrength').value = state.scanStrength;
     setOut('scanCount', String(state.scanCount));
     setOut('scanStrength', state.scanStrength.toFixed(2));
+
+    $('#parallaxEnabled').checked = state.parallaxEnabled;
+    $('#parallaxAmount').value = state.parallaxAmount;
+    setOut('parallaxAmount', state.parallaxAmount.toFixed(2));
 }
 
 // ---- wiring controls -> state ----
@@ -155,6 +174,7 @@ function bind() {
         b.addEventListener('click', () => {
             state.mode = b.dataset.mode;
             renderMode();
+            syncPreview();
         })
     );
 
@@ -164,6 +184,7 @@ function bind() {
             if (res.paths && res.paths.length) {
                 state.videoPath = res.paths[0];
                 $('#videoName').textContent = basename(state.videoPath);
+                syncPreview();
             }
         } catch (e) {
             setStatus('auswahl abgebrochen');
@@ -176,6 +197,7 @@ function bind() {
             if (res.paths && res.paths.length) {
                 state.imagePaths.push(...res.paths);
                 renderImageList();
+                syncPreview();
             }
         } catch (e) {
             setStatus('auswahl abgebrochen');
@@ -212,6 +234,12 @@ function bind() {
     $('#scanStrength').addEventListener('input', (e) => {
         state.scanStrength = Number(e.target.value);
         setOut('scanStrength', state.scanStrength.toFixed(2));
+    });
+
+    $('#parallaxEnabled').addEventListener('change', (e) => (state.parallaxEnabled = e.target.checked));
+    $('#parallaxAmount').addEventListener('input', (e) => {
+        state.parallaxAmount = Number(e.target.value);
+        setOut('parallaxAmount', state.parallaxAmount.toFixed(2));
     });
 
     $('#save').addEventListener('click', save);
@@ -259,6 +287,12 @@ async function init() {
     }
     bind();
     renderAll();
+
+    // live preview mirrors the same shaders on the selected media
+    if (typeof Preview !== 'undefined' && Preview.init()) {
+        Preview.attach(state);
+        syncPreview();
+    }
 }
 
 document.addEventListener('DOMContentLoaded', init);

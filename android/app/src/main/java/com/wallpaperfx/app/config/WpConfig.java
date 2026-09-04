@@ -43,6 +43,11 @@ public class WpConfig {
     public float scanCount = 320f;    // number of scanlines across the height
     public float scanStrength = 0.35f; // 0..1 darkening amount
 
+    // parallax: shift the wallpaper as the user swipes between home screens.
+    // amount is the fraction of headroom to zoom in / pan across (cover mode only).
+    public boolean parallaxEnabled = false;
+    public float parallaxAmount = 0.15f;
+
     public static File file(Context ctx) {
         return new File(ctx.getFilesDir(), FILE_NAME);
     }
@@ -97,6 +102,9 @@ public class WpConfig {
         o.put("duotoneHighlight", intArray(duotoneHighlight));
         o.put("scanCount", scanCount);
         o.put("scanStrength", scanStrength);
+
+        o.put("parallaxEnabled", parallaxEnabled);
+        o.put("parallaxAmount", parallaxAmount);
         return o;
     }
 
@@ -128,6 +136,9 @@ public class WpConfig {
         duotoneHighlight = readColor(o.optJSONArray("duotoneHighlight"), duotoneHighlight);
         scanCount = (float) o.optDouble("scanCount", scanCount);
         scanStrength = (float) o.optDouble("scanStrength", scanStrength);
+
+        parallaxEnabled = o.optBoolean("parallaxEnabled", parallaxEnabled);
+        parallaxAmount = (float) o.optDouble("parallaxAmount", parallaxAmount);
     }
 
     private static JSONArray intArray(int[] v) {
