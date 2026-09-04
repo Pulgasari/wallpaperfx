@@ -193,7 +193,9 @@ const Preview = (function () {
             1, 1, 1, 1
         ]), gl.STATIC_DRAW);
 
-        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+        // our quad maps screen-top to tex v=1, so no upload flip is needed;
+        // flipping here would render images/video upside down
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
         gl.clearColor(0, 0, 0, 1);
 
         resize();
@@ -204,17 +206,15 @@ const Preview = (function () {
 
     function resize() {
         if (!canvas) return;
-        // draw at the device's screen aspect (portrait) so the framing matches
-        const sw = window.screen && screen.width ? screen.width : 9;
-        const sh = window.screen && screen.height ? screen.height : 19.5;
-        const ratio = sw / sh;
-        const cssH = Math.min(340, Math.round(window.innerHeight * 0.4));
-        const cssW = Math.round(cssH * ratio);
-        const dpr = window.devicePixelRatio || 1;
-        canvas.style.width = cssW + 'px';
-        canvas.style.height = cssH + 'px';
-        canvas.width = Math.round(cssW * dpr);
-        canvas.height = Math.round(cssH * dpr);
+        // the preview is the fullscreen app background; match the viewport (which
+        // equals the device screen), capped dpr to keep animated filters cheap
+        const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        canvas.style.width = w + 'px';
+        canvas.style.height = h + 'px';
+        canvas.width = Math.max(1, Math.round(w * dpr));
+        canvas.height = Math.max(1, Math.round(h * dpr));
     }
 
     function attach(sharedState) {

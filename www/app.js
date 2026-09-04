@@ -95,11 +95,11 @@ function hasMedia() {
         (state.mode === 'images' && state.imagePaths.length > 0);
 }
 
-// refresh the preview source and toggle the "no media" hint
+// refresh the preview source and toggle the "no media" hint over the background
 function syncPreview() {
     if (typeof Preview !== 'undefined') Preview.refreshMedia();
-    const card = document.querySelector('.preview-card');
-    if (card) card.classList.toggle('has-media', hasMedia());
+    const hint = document.getElementById('previewHint');
+    if (hint) hint.hidden = hasMedia();
 }
 
 let statusTimer = null;
@@ -358,12 +358,73 @@ async function init() {
     }
     bind();
     renderAll();
+    initSheet();
 
     // live preview mirrors the same shaders on the selected media
     if (typeof Preview !== 'undefined' && Preview.init()) {
         Preview.attach(state);
         syncPreview();
     }
+}
+
+// bottom-sheet: drag the top edge to resize, collapse button hides it, and
+// tapping the preview background (or the pill) brings it back.
+function initSheet() {
+    const sheet = $('#sheet');
+    const handle = $('#sheetHandle');
+    const collapseBtn = $('#collapseUi');
+    const showBtn = $('#showUi');
+    const canvas = $('#preview');
+    if (!sheet || !handle) return;
+
+    const MIN = 84;
+    const maxH = () => Math.round(window.innerHeight * 0.94);
+
+    let stored = null;
+    try {
+        stored = parseInt(localStorage.getItem('wpfx_sheet_h'), 10);
+    } catch (e) {}
+    if (stored && stored > MIN) sheet.style.height = Math.min(stored, maxH()) + 'px';
+
+    let dragging = false;
+    let startY = 0;
+    let startH = 0;
+    handle.addEventListener('pointerdown', (e) => {
+        // let the buttons in the header work without starting a resize
+        if (e.target.closest('button, input, select')) return;
+        dragging = true;
+        startY = e.clientY;
+        startH = sheet.getBoundingClientRect().height;
+        handle.setPointerCapture(e.pointerId);
+    });
+    handle.addEventListener('pointermove', (e) => {
+        if (!dragging) return;
+        const h = Math.max(MIN, Math.min(maxH(), startH + (startY - e.clientY)));
+        sheet.style.height = h + 'px';
+    });
+    const endDrag = () => {
+        if (!dragging) return;
+        dragging = false;
+        try {
+            localStorage.setItem('wpfx_sheet_h', String(Math.round(sheet.getBoundingClientRect().height)));
+        } catch (e) {}
+    };
+    handle.addEventListener('pointerup', endDrag);
+    handle.addEventListener('pointercancel', endDrag);
+
+    const collapse = () => {
+        sheet.classList.add('collapsed');
+        showBtn.hidden = false;
+    };
+    const expand = () => {
+        sheet.classList.remove('collapsed');
+        showBtn.hidden = true;
+    };
+    collapseBtn.addEventListener('click', collapse);
+    showBtn.addEventListener('click', expand);
+    if (canvas) canvas.addEventListener('click', () => {
+        if (sheet.classList.contains('collapsed')) expand();
+    });
 }
 
 document.addEventListener('DOMContentLoaded', init);

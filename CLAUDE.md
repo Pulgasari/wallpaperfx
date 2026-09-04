@@ -24,8 +24,11 @@ add a config field, touch all three: `WpConfig` (model + toJson/fromJson),
   `Long.MAX_VALUE` = idle until `requestRender()`. Keep it battery-friendly:
   static images idle, video wakes on `onFrameAvailable`, transitions animate.
 - Video = external OES texture; images = `GL_TEXTURE_2D`. Both share the vertex
-  shader (cover/fit + pan) and the filter fragment code. Images use a flip-Y
-  texture matrix; video uses the `SurfaceTexture` transform matrix.
+  shader (cover/fit + pan) and the filter fragment code. The quad maps screen-top
+  to texture `v=1`, so images need no vertical flip (identity `uTexMatrix`, and the
+  preview sets `UNPACK_FLIP_Y_WEBGL=false`); video uses the `SurfaceTexture`
+  transform matrix. If you change the quad or texcoords, re-check orientation in
+  both renderers.
 - All GL calls must run on the render thread (the one with the EGL context).
 
 ## Second invariant: the two filter shaders

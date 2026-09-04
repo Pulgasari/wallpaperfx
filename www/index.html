@@ -8,20 +8,25 @@
     <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-<header class="topbar">
-    <h1>WallpaperFX</h1>
-    <span id="status" class="status"></span>
-</header>
+<!-- fullscreen live preview background -->
+<canvas id="preview"></canvas>
+<p id="previewHint" class="preview-hint">Vorschau erscheint nach Medienauswahl</p>
 
-<main>
-    <!-- live preview -->
-    <section class="card preview-card">
-        <div class="preview-frame">
-            <canvas id="preview"></canvas>
-            <p class="preview-hint">Vorschau erscheint nach Medienauswahl</p>
+<!-- shown when the sheet is collapsed; tapping the preview also restores it -->
+<button id="showUi" class="show-ui" hidden>Bedienung</button>
+
+<!-- config as a resizable bottom sheet over the preview -->
+<section id="sheet" class="sheet">
+    <div id="sheetHandle" class="sheet-handle">
+        <span class="grip"></span>
+        <div class="sheet-head">
+            <button id="collapseUi" class="icon-btn" aria-label="ui ausblenden">✕</button>
+            <span class="sheet-title">WallpaperFX</span>
+            <span id="status" class="status"></span>
         </div>
-    </section>
+    </div>
 
+    <div class="sheet-body">
     <!-- mode switch -->
     <section class="card">
         <div class="seg" role="tablist">
@@ -258,12 +263,13 @@
             <input id="parallaxAmount" type="range" min="0" max="0.5" step="0.01" value="0.15" />
         </label>
     </section>
-</main>
+    </div>
 
-<footer class="actions">
-    <button id="save" class="btn ghost">Speichern</button>
-    <button id="apply" class="btn primary">Als Wallpaper setzen</button>
-</footer>
+    <footer class="sheet-actions">
+        <button id="save" class="btn ghost">Speichern</button>
+        <button id="apply" class="btn primary">Als Wallpaper setzen</button>
+    </footer>
+</section>
 
 <script src="preview.js"></script>
 <script src="app.js"></script>
