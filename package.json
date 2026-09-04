@@ -1,0 +1,29 @@
+{
+  "name": "wallpaperfx",
+  "version": "0.1.0",
+  "description": "video and image live wallpaper for android with gl filters",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "sync": "cap sync android",
+    "copy": "cap copy android",
+    "open": "cap open android",
+    "build:apk": "cap sync android && cd android && ./gradlew assembleDebug"
+  },
+  "keywords": [
+    "android",
+    "wallpaper",
+    "live-wallpaper",
+    "capacitor",
+    "opengl"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@capacitor/android": "^7.0.0",
+    "@capacitor/core": "^7.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^7.0.0"
+  }
+}

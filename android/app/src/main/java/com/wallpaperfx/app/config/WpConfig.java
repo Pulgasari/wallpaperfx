@@ -1,0 +1,143 @@
+package com.wallpaperfx.app.config;
+
+import android.content.Context;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.RandomAccessFile;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+
+// shared configuration model. the capacitor plugin (activity process) writes this
+// file and the wallpaper service reads it. plain json, no external deps.
+public class WpConfig {
+
+    public static final String FILE_NAME = "wallpaperfx_config.json";
+
+    // mode: "video" | "images"
+    public String mode = "video";
+
+    // video
+    public String videoPath = null;
+    public String videoScale = "cover"; // cover | fit
+    public float videoOffsetX = 0f;     // -1..1, pan within cropped area (cover only)
+    public float videoOffsetY = 0f;
+
+    // images
+    public List<String> imagePaths = new ArrayList<>();
+    public String imageOrder = "normal"; // normal | random
+    public int imageDurationMs = 8000;
+    public int imageTransitionMs = 800;
+    public String imageScale = "cover"; // cover | fit
+    public float imageOffsetX = 0f;
+    public float imageOffsetY = 0f;
+
+    // filter: "none" | "duotone" | "scanlines"
+    public String filterType = "none";
+    public int[] duotoneShadow = {18, 20, 42};      // rgb 0..255, maps to dark tones
+    public int[] duotoneHighlight = {240, 186, 72};  // rgb 0..255, maps to bright tones
+    public float scanCount = 320f;    // number of scanlines across the height
+    public float scanStrength = 0.35f; // 0..1 darkening amount
+
+    public static File file(Context ctx) {
+        return new File(ctx.getFilesDir(), FILE_NAME);
+    }
+
+    public static WpConfig load(Context ctx) {
+        WpConfig cfg = new WpConfig();
+        File f = file(ctx);
+        if (!f.exists()) {
+            return cfg;
+        }
+        try {
+            RandomAccessFile raf = new RandomAccessFile(f, "r");
+            byte[] buf = new byte[(int) raf.length()];
+            raf.readFully(buf);
+            raf.close();
+            cfg.fromJson(new JSONObject(new String(buf, StandardCharsets.UTF_8)));
+        } catch (Exception e) {
+            // on any read/parse error fall back to defaults so the wallpaper still renders
+        }
+        return cfg;
+    }
+
+    public void save(Context ctx) throws Exception {
+        byte[] out = toJson().toString().getBytes(StandardCharsets.UTF_8);
+        FileOutputStream fos = new FileOutputStream(file(ctx));
+        fos.write(out);
+        fos.flush();
+        fos.close();
+    }
+
+    public JSONObject toJson() throws Exception {
+        JSONObject o = new JSONObject();
+        o.put("mode", mode);
+
+        o.put("videoPath", videoPath == null ? JSONObject.NULL : videoPath);
+        o.put("videoScale", videoScale);
+        o.put("videoOffsetX", videoOffsetX);
+        o.put("videoOffsetY", videoOffsetY);
+
+        JSONArray imgs = new JSONArray();
+        for (String p : imagePaths) imgs.put(p);
+        o.put("imagePaths", imgs);
+        o.put("imageOrder", imageOrder);
+        o.put("imageDurationMs", imageDurationMs);
+        o.put("imageTransitionMs", imageTransitionMs);
+        o.put("imageScale", imageScale);
+        o.put("imageOffsetX", imageOffsetX);
+        o.put("imageOffsetY", imageOffsetY);
+
+        o.put("filterType", filterType);
+        o.put("duotoneShadow", intArray(duotoneShadow));
+        o.put("duotoneHighlight", intArray(duotoneHighlight));
+        o.put("scanCount", scanCount);
+        o.put("scanStrength", scanStrength);
+        return o;
+    }
+
+    public void fromJson(JSONObject o) {
+        mode = o.optString("mode", mode);
+
+        videoPath = o.isNull("videoPath") ? null : o.optString("videoPath", null);
+        videoScale = o.optString("videoScale", videoScale);
+        videoOffsetX = (float) o.optDouble("videoOffsetX", videoOffsetX);
+        videoOffsetY = (float) o.optDouble("videoOffsetY", videoOffsetY);
+
+        JSONArray imgs = o.optJSONArray("imagePaths");
+        if (imgs != null) {
+            imagePaths = new ArrayList<>();
+            for (int i = 0; i < imgs.length(); i++) {
+                String p = imgs.optString(i, null);
+                if (p != null && !p.isEmpty()) imagePaths.add(p);
+            }
+        }
+        imageOrder = o.optString("imageOrder", imageOrder);
+        imageDurationMs = o.optInt("imageDurationMs", imageDurationMs);
+        imageTransitionMs = o.optInt("imageTransitionMs", imageTransitionMs);
+        imageScale = o.optString("imageScale", imageScale);
+        imageOffsetX = (float) o.optDouble("imageOffsetX", imageOffsetX);
+        imageOffsetY = (float) o.optDouble("imageOffsetY", imageOffsetY);
+
+        filterType = o.optString("filterType", filterType);
+        duotoneShadow = readColor(o.optJSONArray("duotoneShadow"), duotoneShadow);
+        duotoneHighlight = readColor(o.optJSONArray("duotoneHighlight"), duotoneHighlight);
+        scanCount = (float) o.optDouble("scanCount", scanCount);
+        scanStrength = (float) o.optDouble("scanStrength", scanStrength);
+    }
+
+    private static JSONArray intArray(int[] v) {
+        JSONArray a = new JSONArray();
+        for (int x : v) a.put(x);
+        return a;
+    }
+
+    private static int[] readColor(JSONArray a, int[] fallback) {
+        if (a == null || a.length() < 3) return fallback;
+        return new int[]{a.optInt(0, fallback[0]), a.optInt(1, fallback[1]), a.optInt(2, fallback[2])};
+    }
+}
