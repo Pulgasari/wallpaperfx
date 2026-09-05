@@ -29,3 +29,12 @@
 
 - [ ] man sollte auch mehrere videos wählen können
 - [ ] modi: loop | loop-random | single/random
+
+---
+
+# ui-umbau
+
+- [ ] leiste oben, linke seite: appname + settings-icon zum togglen der app-settings
+- [ ] leiste oben, rechte seite: buttons für: (saved) configs/presets, sources, wallpapers, save
+- [ ] leiste unten 1: config, filters, motion, parallaxe (klickt man auf eins davon öffnet sich darüber dessen panel/tab, auf den selben button nochma klicken = geht wieder zu, während panel offen is, kann man dort nach links/rechts swipen um zwischen den tabs zu wechseln. und handle um das panel in der höhe einzustellen)
+- [ ] leiste unten 2: '+'-icon/quadrat (kann man neue quellen hinzufügen, einzeiliges grid mit squares der sources, horizontal scrollbar, mit mechanismus um das panel fullscreen zu machen, dann isses mehrzeilig usw (mir fällt grade ein: evtl sollte der erste square actually aus 4 icons bestehen: add, clear, fullscreen, save)
