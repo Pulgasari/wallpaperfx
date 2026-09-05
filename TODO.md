@@ -8,6 +8,7 @@
 
 - [ ] filters alphabetisch sortieren
 - [ ] farbe einstellbar bei `vignette`
+- [ ] add filter: `fisheye`
 
 ## bugs
 
