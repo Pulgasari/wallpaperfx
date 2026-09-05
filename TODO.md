@@ -1,6 +1,5 @@
 # todo
 
-- [ ] die preview sollte pausierbar sein
 - [ ] anmerkung/hinweis: `iconify` für icons nutzen (es sei denn wir bekämen alle nötigen icons via unicode-symbole hin)
 
 ## app-settings
@@ -8,10 +7,6 @@
 - [ ] add: regler für scaling der generellen größe (beeinflusst quasi alles?)
 - [ ] add: evtl. regler für fontsize (is aber quasi auch iconsize)
 - [ ] add: evtl. regeler für scaling von spacings (padding/gaps)
-
-## bugs
-
-- [ ] live-vorschau bei den bildern funktioniert erst nachdem man video importierte und zum bildmodus zurückwechselt
 
 ## filters
 
@@ -21,6 +16,11 @@
 - [ ] add filter: `noise`
 - [ ] add filter: `duotone-2`: (weiss nich wie mans nennen soll. aber man könnte bei der fg auch mehrere farben angeben + zeitdauer, dann wechselt die farbe dazwischen allmählich hin und her)
 - [ ] enhance filter `vignette`: farbe einstellbar (default: black)
+
+## preview
+
+- [ ] die preview sollte pausierbar sein
+- [ ] falls möglich: qualität der preview einstellbar
 
 ## wallpapers
 
