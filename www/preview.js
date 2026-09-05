@@ -10,10 +10,13 @@ const Preview = (function () {
         uniform vec2 uUvScale;
         uniform vec2 uUvOffset;
         uniform vec2 uPosScale;
+        uniform vec2 uFlip;
         varying vec2 vTexCoord;
         varying vec2 vScreenCoord;
         void main() {
-            vTexCoord = (aTexCoord - 0.5) * uUvScale + 0.5 + uUvOffset;
+            vec2 uv = (aTexCoord - 0.5) * uUvScale + 0.5 + uUvOffset;
+            uv = (uv - 0.5) * uFlip + 0.5;
+            vTexCoord = uv;
             vScreenCoord = aTexCoord;
             gl_Position = vec4(aPosition * uPosScale, 0.0, 1.0);
         }`;
@@ -193,6 +196,7 @@ const Preview = (function () {
     // ping-pong fbos for the filter chain
     let fboA = null, fboB = null, fboW = 0, fboH = 0;
     const FULL = [1, 1, 0, 0, 1, 1];
+    const NO_FLIP = [1, 1];
 
     function toSrc(path) {
         if (window.Capacitor && typeof window.Capacitor.convertFileSrc === 'function') {
@@ -234,7 +238,7 @@ const Preview = (function () {
             aTexCoord: gl.getAttribLocation(program, 'aTexCoord')
         };
         [
-            'uUvScale', 'uUvOffset', 'uPosScale', 'uFilter', 'uColorA', 'uColorB', 'uColorC',
+            'uUvScale', 'uUvOffset', 'uPosScale', 'uFlip', 'uFilter', 'uColorA', 'uColorB', 'uColorC',
             'uScanCount', 'uScanStrength', 'uCrtMask', 'uAmount', 'uLevels', 'uPixelSize',
             'uHalftone', 'uVignette', 'uVignetteRadius', 'uChromatic', 'uGrain', 'uGlitch',
             'uVhs', 'uVignetteColor', 'uBloom', 'uBloomThreshold', 'uBlurRadius', 'uFisheye',
@@ -498,8 +502,9 @@ const Preview = (function () {
         fboB = createFbo(fboW, fboH);
     }
 
-    // one pass: draw srcTex into targetFb (null = screen) with scale s and filter fe
-    function drawPass(targetFb, srcTex, s, fe) {
+    // one pass: draw srcTex into targetFb (null = screen) with scale s and filter fe.
+    // flip is applied on the content pass only; chain passes pass NO_FLIP.
+    function drawPass(targetFb, srcTex, s, fe, flip) {
         gl.bindFramebuffer(gl.FRAMEBUFFER, targetFb);
         gl.viewport(0, 0, canvas.width, canvas.height);
         gl.useProgram(program);
@@ -512,6 +517,7 @@ const Preview = (function () {
         gl.uniform2f(loc.uUvScale, s[0], s[1]);
         gl.uniform2f(loc.uUvOffset, s[2], s[3]);
         gl.uniform2f(loc.uPosScale, s[4], s[5]);
+        gl.uniform2f(loc.uFlip, flip[0], flip[1]);
         gl.uniform1f(loc.uTime, performance.now() / 1000);
         gl.uniform2f(loc.uResolution, canvas.width, canvas.height);
 
@@ -577,16 +583,17 @@ const Preview = (function () {
 
         ensureFbos();
 
-        // pass 0: source (scaled + motion) into fbo a, unfiltered
+        // pass 0: source (scaled + motion + mirror) into fbo a, unfiltered
+        const flip = [state.flipX ? -1 : 1, state.flipY ? -1 : 1];
         gl.bindFramebuffer(gl.FRAMEBUFFER, fboA.fb);
         gl.viewport(0, 0, canvas.width, canvas.height);
         gl.clear(gl.COLOR_BUFFER_BIT);
-        drawPass(fboA.fb, texture, computeScale(), null);
+        drawPass(fboA.fb, texture, computeScale(), null, flip);
 
         // filter chain, last pass to the screen
         const active = (state.filters || []).filter((f) => f.enabled && f.type !== 'none');
         if (active.length === 0) {
-            drawPass(null, fboA.tex, FULL, null);
+            drawPass(null, fboA.tex, FULL, null, NO_FLIP);
             return;
         }
         let readTex = fboA.tex;
@@ -594,7 +601,7 @@ const Preview = (function () {
         for (let i = 0; i < active.length; i++) {
             const last = i === active.length - 1;
             const writeFbo = readFbo === fboA ? fboB : fboA;
-            drawPass(last ? null : writeFbo.fb, readTex, FULL, active[i]);
+            drawPass(last ? null : writeFbo.fb, readTex, FULL, active[i], NO_FLIP);
             if (!last) {
                 readTex = writeFbo.tex;
                 readFbo = writeFbo;

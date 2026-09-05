@@ -37,6 +37,10 @@ public class WpConfig {
     public float imageOffsetX = 0f;
     public float imageOffsetY = 0f;
 
+    // mirror the source content on the x / y axis (applies to video and images)
+    public boolean flipX = false;
+    public boolean flipY = false;
+
     // ordered filter chain, applied top to bottom in separate gl passes
     public List<FilterEntry> filters = new ArrayList<>();
 
@@ -224,6 +228,9 @@ public class WpConfig {
         o.put("imageOffsetX", imageOffsetX);
         o.put("imageOffsetY", imageOffsetY);
 
+        o.put("flipX", flipX);
+        o.put("flipY", flipY);
+
         JSONArray fs = new JSONArray();
         for (FilterEntry f : filters) fs.put(f.toJson());
         o.put("filters", fs);
@@ -274,6 +281,9 @@ public class WpConfig {
         imageScale = o.optString("imageScale", imageScale);
         imageOffsetX = (float) o.optDouble("imageOffsetX", imageOffsetX);
         imageOffsetY = (float) o.optDouble("imageOffsetY", imageOffsetY);
+
+        flipX = o.optBoolean("flipX", flipX);
+        flipY = o.optBoolean("flipY", flipY);
 
         JSONArray fs = o.optJSONArray("filters");
         if (fs != null) {

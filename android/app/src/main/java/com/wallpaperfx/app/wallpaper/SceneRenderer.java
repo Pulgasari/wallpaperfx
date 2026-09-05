@@ -37,12 +37,14 @@ class SceneRenderer implements GLRenderThread.Renderer {
             "uniform vec2 uUvScale;\n" +
             "uniform vec2 uUvOffset;\n" +
             "uniform vec2 uPosScale;\n" +
+            "uniform vec2 uFlip;\n" + // (-1,1)=flip x, (1,-1)=flip y; content pass only
             "attribute vec2 aPosition;\n" +
             "attribute vec2 aTexCoord;\n" +
             "varying vec2 vTexCoord;\n" +
             "varying vec2 vScreenCoord;\n" +
             "void main() {\n" +
             "  vec2 uv = (aTexCoord - 0.5) * uUvScale + 0.5 + uUvOffset;\n" +
+            "  uv = (uv - 0.5) * uFlip + 0.5;\n" +
             "  vTexCoord = (uTexMatrix * vec4(uv, 0.0, 1.0)).xy;\n" +
             "  vScreenCoord = aTexCoord;\n" + // 0..1 across the screen (fullscreen quad)
             "  gl_Position = vec4(aPosition * uPosScale, 0.0, 1.0);\n" +
@@ -110,6 +112,10 @@ class SceneRenderer implements GLRenderThread.Renderer {
     private final float[] identityMatrix = new float[16];
     // full-screen 1:1 uv transform used by chain passes
     private static final float[] FULL = {1f, 1f, 0f, 0f, 1f, 1f};
+    // uFlip values: chain passes never flip (fbo already holds flipped content),
+    // content passes use contentFlip derived from cfg.flipX / cfg.flipY
+    private static final float[] NO_FLIP = {1f, 1f};
+    private final float[] contentFlip = {1f, 1f};
 
     // ping-pong offscreen targets for the filter chain
     private Fbo fboA, fboB;
@@ -197,7 +203,7 @@ class SceneRenderer implements GLRenderThread.Renderer {
         if (total == 0) {
             // passthrough: copy the source to the screen
             bindTarget(0);
-            drawQuad(prog2d, GLES20.GL_TEXTURE_2D, fboA.tex, identityMatrix, FULL, 1f, null);
+            drawQuad(prog2d, GLES20.GL_TEXTURE_2D, fboA.tex, identityMatrix, FULL, 1f, null, NO_FLIP);
             return;
         }
         for (WpConfig.FilterEntry f : cfg.filters) {
@@ -205,7 +211,7 @@ class SceneRenderer implements GLRenderThread.Renderer {
             boolean last = (drawn == total - 1);
             Fbo writeFbo = (readFbo == fboA) ? fboB : fboA;
             bindTarget(last ? 0 : writeFbo.fb);
-            drawQuad(prog2d, GLES20.GL_TEXTURE_2D, readTex, identityMatrix, FULL, 1f, f);
+            drawQuad(prog2d, GLES20.GL_TEXTURE_2D, readTex, identityMatrix, FULL, 1f, f, NO_FLIP);
             if (!last) {
                 readTex = writeFbo.tex;
                 readFbo = writeFbo;
@@ -262,7 +268,7 @@ class SceneRenderer implements GLRenderThread.Renderer {
         }
         if (videoW > 0 && videoH > 0) {
             float[] s = computeScale(videoW, videoH, cfg.videoScale, cfg.videoOffsetX, cfg.videoOffsetY);
-            drawQuad(progOes, GLES11Ext.GL_TEXTURE_EXTERNAL_OES, oesTexId, videoMatrix, s, 1f, null);
+            drawQuad(progOes, GLES11Ext.GL_TEXTURE_EXTERNAL_OES, oesTexId, videoMatrix, s, 1f, null, contentFlip);
         }
         // demand-driven: redraw only when a new decoded frame arrives
         return Long.MAX_VALUE;
@@ -353,7 +359,7 @@ class SceneRenderer implements GLRenderThread.Renderer {
         int count = activeImagePaths.size();
 
         float[] sa = computeScale(texAw, texAh, cfg.imageScale, cfg.imageOffsetX, cfg.imageOffsetY);
-        drawQuad(prog2d, GLES20.GL_TEXTURE_2D, texA, imageMatrix, sa, 1f, null);
+        drawQuad(prog2d, GLES20.GL_TEXTURE_2D, texA, imageMatrix, sa, 1f, null, contentFlip);
 
         if (count > 1) {
             if (!transitioning && now - lastShownAt >= cfg.imageDurationMs) {
@@ -387,7 +393,7 @@ class SceneRenderer implements GLRenderThread.Renderer {
                     float[] sb = computeScale(texBw, texBh, cfg.imageScale, cfg.imageOffsetX, cfg.imageOffsetY);
                     GLES20.glEnable(GLES20.GL_BLEND);
                     GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA);
-                    drawQuad(prog2d, GLES20.GL_TEXTURE_2D, texB, imageMatrix, sb, t, null);
+                    drawQuad(prog2d, GLES20.GL_TEXTURE_2D, texB, imageMatrix, sb, t, null, contentFlip);
                     GLES20.glDisable(GLES20.GL_BLEND);
                 }
             }
@@ -439,6 +445,8 @@ class SceneRenderer implements GLRenderThread.Renderer {
         releaseVideo();
         releaseImages();
         cfg = WpConfig.load(context);
+        contentFlip[0] = cfg.flipX ? -1f : 1f;
+        contentFlip[1] = cfg.flipY ? -1f : 1f;
         activeImagePaths = cfg.enabledImagePaths();
         if ("images".equals(cfg.mode)) {
             setupImages();
@@ -590,7 +598,7 @@ class SceneRenderer implements GLRenderThread.Renderer {
 
     // draws the quad with the given source texture. fe == null means no filter
     // (used for the source pass); otherwise fe supplies the filter and its params.
-    private void drawQuad(Prog p, int target, int texId, float[] texMatrix, float[] s, float alpha, WpConfig.FilterEntry fe) {
+    private void drawQuad(Prog p, int target, int texId, float[] texMatrix, float[] s, float alpha, WpConfig.FilterEntry fe, float[] flip) {
         if (p == null || p.id == 0) return;
         GLES20.glUseProgram(p.id);
 
@@ -605,6 +613,7 @@ class SceneRenderer implements GLRenderThread.Renderer {
         GLES20.glUniform2f(p.uUvScale, s[0], s[1]);
         GLES20.glUniform2f(p.uUvOffset, s[2], s[3]);
         GLES20.glUniform2f(p.uPosScale, s[4], s[5]);
+        GLES20.glUniform2f(p.uFlip, flip[0], flip[1]);
         GLES20.glUniform1f(p.uAlpha, alpha);
         GLES20.glUniform1f(p.uTime, (SystemClock.uptimeMillis() - startTimeMs) / 1000f);
         GLES20.glUniform2f(p.uResolution, screenW, screenH);
@@ -706,7 +715,7 @@ class SceneRenderer implements GLRenderThread.Renderer {
     private static final class Prog {
         final int id;
         final int aPosition, aTexCoord;
-        final int uTexMatrix, uUvScale, uUvOffset, uPosScale;
+        final int uTexMatrix, uUvScale, uUvOffset, uPosScale, uFlip;
         final int uFilter, uColorA, uColorB, uColorC, uScanCount, uScanStrength, uCrtMask;
         final int uAmount, uLevels, uPixelSize, uHalftone, uVignette, uVignetteRadius, uChromatic;
         final int uGrain, uGlitch, uVhs, uVignetteColor, uBloom, uBloomThreshold, uBlurRadius;
@@ -720,6 +729,7 @@ class SceneRenderer implements GLRenderThread.Renderer {
             uUvScale = GLES20.glGetUniformLocation(id, "uUvScale");
             uUvOffset = GLES20.glGetUniformLocation(id, "uUvOffset");
             uPosScale = GLES20.glGetUniformLocation(id, "uPosScale");
+            uFlip = GLES20.glGetUniformLocation(id, "uFlip");
             uFilter = GLES20.glGetUniformLocation(id, "uFilter");
             uColorA = GLES20.glGetUniformLocation(id, "uColorA");
             uColorB = GLES20.glGetUniformLocation(id, "uColorB");

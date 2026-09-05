@@ -44,6 +44,8 @@ const state = {
     imageScale: 'cover',
     imageOffsetX: 0,
     imageOffsetY: 0,
+    flipX: false,
+    flipY: false,
     filters: [], // ordered chain of filter entries (see newFilter)
     parallaxEnabled: false,
     parallaxAmount: 0.15,
@@ -459,6 +461,7 @@ function initTheme() {
 const SOURCE_KEYS = ['mode', 'videoPath', 'images'];
 const CONFIG_KEYS = ['videoScale', 'videoOffsetX', 'videoOffsetY', 'videoSpeed',
     'imageOrder', 'imageDurationMs', 'imageTransitionMs', 'imageScale', 'imageOffsetX', 'imageOffsetY',
+    'flipX', 'flipY',
     'filters', 'parallaxEnabled', 'parallaxAmount', 'motionType', 'motionAmount', 'motionSpeed'];
 const PRESET_KEYS = { source: SOURCE_KEYS, config: CONFIG_KEYS, wallpaper: SOURCE_KEYS.concat(CONFIG_KEYS) };
 
@@ -670,6 +673,9 @@ function renderAll() {
     setOut('imageOffsetX', state.imageOffsetX.toFixed(2));
     setOut('imageOffsetY', state.imageOffsetY.toFixed(2));
 
+    $('#flipX').checked = state.flipX;
+    $('#flipY').checked = state.flipY;
+
     $('#parallaxEnabled').checked = state.parallaxEnabled;
     $('#parallaxAmount').value = state.parallaxAmount;
     setOut('parallaxAmount', state.parallaxAmount.toFixed(2));
@@ -737,6 +743,9 @@ function bind() {
             state[key] = Number(e.target.value);
             setOut(id.slice(1), digits === undefined ? String(state[key]) : state[key].toFixed(digits));
         });
+
+    $('#flipX').addEventListener('change', (e) => { state.flipX = e.target.checked; syncPreview(); });
+    $('#flipY').addEventListener('change', (e) => { state.flipY = e.target.checked; syncPreview(); });
 
     $('#parallaxEnabled').addEventListener('change', (e) => (state.parallaxEnabled = e.target.checked));
     $('#parallaxAmount').addEventListener('input', (e) => {
