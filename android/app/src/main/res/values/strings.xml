@@ -1,0 +1,9 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">WallpaperFX</string>
+    <string name="title_activity_main">WallpaperFX</string>
+    <string name="package_name">com.wallpaperfx.app</string>
+    <string name="custom_url_scheme">com.wallpaperfx.app</string>
+    <string name="wallpaper_label">WallpaperFX</string>
+    <string name="wallpaper_description">video and image live wallpaper with gl filters</string>
+</resources>

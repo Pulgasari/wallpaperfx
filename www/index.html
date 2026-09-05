@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="de">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark" />
+    <title>WallpaperFX</title>
+    <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<!-- fullscreen live preview background -->
+<canvas id="preview"></canvas>
+<p id="previewHint" class="preview-hint">Vorschau erscheint nach Medienauswahl</p>
+
+<!-- shown when the sheet is collapsed; tapping the preview also restores it -->
+<button id="showUi" class="show-ui" hidden>Bedienung</button>
+
+<!-- config as a resizable bottom sheet over the preview -->
+<section id="sheet" class="sheet">
+    <div id="sheetHandle" class="sheet-handle">
+        <span class="grip"></span>
+        <div class="sheet-head">
+            <button id="collapseUi" class="icon-btn" aria-label="ui ausblenden">✕</button>
+            <span class="sheet-title">WallpaperFX</span>
+            <span id="status" class="status"></span>
+        </div>
+    </div>
+
+    <div class="sheet-body">
+    <!-- mode switch -->
+    <section class="card">
+        <div class="seg" role="tablist">
+            <button class="seg-btn" data-mode="video" role="tab">Video</button>
+            <button class="seg-btn" data-mode="images" role="tab">Bilder</button>
+        </div>
+    </section>
+
+    <!-- video panel -->
+    <section class="card panel" data-panel="video">
+        <h2>Video</h2>
+        <button id="pickVideo" class="btn">Video auswählen</button>
+        <p id="videoName" class="muted">kein video gewählt</p>
+
+        <label class="field">
+            <span>Skalierung</span>
+            <select id="videoScale">
+                <option value="cover">Cover (ausfüllen, beschneiden)</option>
+                <option value="fit">Fit (einpassen, ränder)</option>
+            </select>
+        </label>
+
+        <label class="field">
+            <span>Geschwindigkeit <em data-out="videoSpeed">1.00</em>x</span>
+            <input id="videoSpeed" type="range" min="0.25" max="3" step="0.05" value="1" />
+        </label>
+
+        <div class="offset-group" data-for="video">
+            <label class="field">
+                <span>Offset X <em data-out="videoOffsetX">0.00</em></span>
+                <input id="videoOffsetX" type="range" min="-1" max="1" step="0.01" value="0" />
+            </label>
+            <label class="field">
+                <span>Offset Y <em data-out="videoOffsetY">0.00</em></span>
+                <input id="videoOffsetY" type="range" min="-1" max="1" step="0.01" value="0" />
+            </label>
+        </div>
+    </section>
+
+    <!-- images panel -->
+    <section class="card panel" data-panel="images" hidden>
+        <h2>Bilder</h2>
+        <div id="imageGrid" class="tile-grid"></div>
+
+        <label class="field">
+            <span>Reihenfolge</span>
+            <select id="imageOrder">
+                <option value="normal">Normal</option>
+                <option value="random">Zufall</option>
+            </select>
+        </label>
+
+        <label class="field">
+            <span>Anzeigedauer <em data-out="imageDurationMs">8.0</em> s</span>
+            <input id="imageDurationMs" type="range" min="100" max="60000" step="100" value="8000" />
+        </label>
+
+        <label class="field">
+            <span>Überblendung <em data-out="imageTransitionMs">0.8</em> s</span>
+            <input id="imageTransitionMs" type="range" min="0" max="3000" step="100" value="800" />
+        </label>
+
+        <label class="field">
+            <span>Skalierung</span>
+            <select id="imageScale">
+                <option value="cover">Cover (ausfüllen, beschneiden)</option>
+                <option value="fit">Fit (einpassen, ränder)</option>
+            </select>
+        </label>
+
+        <div class="offset-group" data-for="images">
+            <label class="field">
+                <span>Offset X <em data-out="imageOffsetX">0.00</em></span>
+                <input id="imageOffsetX" type="range" min="-1" max="1" step="0.01" value="0" />
+            </label>
+            <label class="field">
+                <span>Offset Y <em data-out="imageOffsetY">0.00</em></span>
+                <input id="imageOffsetY" type="range" min="-1" max="1" step="0.01" value="0" />
+            </label>
+        </div>
+    </section>
+
+    <!-- filter chain -->
+    <section class="card">
+        <h2>Filter</h2>
+        <div id="filterGrid" class="tile-grid"></div>
+        <div id="filterEditor" class="tile-editor" hidden></div>
+    </section>
+
+    <!-- parallax panel -->
+    <section class="card">
+        <h2>Parallax</h2>
+        <label class="field row">
+            <span>Beim Wischen bewegen</span>
+            <input id="parallaxEnabled" type="checkbox" />
+        </label>
+        <label class="field" data-for="parallax">
+            <span>Stärke <em data-out="parallaxAmount">0.15</em></span>
+            <input id="parallaxAmount" type="range" min="0" max="0.5" step="0.01" value="0.15" />
+        </label>
+    </section>
+
+    <!-- motion panel -->
+    <section class="card">
+        <h2>Bewegung</h2>
+        <label class="field">
+            <span>Typ</span>
+            <select id="motionType">
+                <option value="none">Kein</option>
+                <option value="zoom">Zoom (rein/raus)</option>
+                <option value="breathe">Atmen</option>
+                <option value="drift">Drift</option>
+                <option value="sway">Schaukeln</option>
+                <option value="shake">Wackeln</option>
+            </select>
+        </label>
+        <div data-motion hidden>
+            <label class="field">
+                <span>Stärke <em data-out="motionAmount">0.50</em></span>
+                <input id="motionAmount" type="range" min="0" max="1" step="0.01" value="0.5" />
+            </label>
+            <label class="field">
+                <span>Tempo <em data-out="motionSpeed">0.50</em></span>
+                <input id="motionSpeed" type="range" min="0" max="1" step="0.01" value="0.5" />
+            </label>
+        </div>
+        <p class="muted" hidden data-motion>
+            bewegung rendert kontinuierlich solange sichtbar, verbraucht mehr akku.
+        </p>
+    </section>
+
+    <!-- app settings panel -->
+    <section class="card">
+        <h2>App</h2>
+        <label class="field">
+            <span>Theme</span>
+            <select id="themeMode">
+                <option value="system">System</option>
+                <option value="dark">Dunkel</option>
+                <option value="light">Hell</option>
+            </select>
+        </label>
+        <label class="field">
+            <span>Akzentfarbe</span>
+            <input id="accentColor" type="color" value="#f0ba48" />
+        </label>
+        <label class="field row">
+            <span>Abgerundet</span>
+            <input id="rounded" type="checkbox" checked />
+        </label>
+        <label class="field">
+            <span>Kachelgröße <em data-out="gridSize">84</em> px</span>
+            <input id="gridSize" type="range" min="56" max="140" step="4" value="84" />
+        </label>
+    </section>
+
+    <!-- presets: source / config / wallpaper -->
+    <section class="card">
+        <h2>Presets</h2>
+        <div class="preset-group" data-kind="source">
+            <h3>Quelle</h3>
+            <div class="preset-add">
+                <input class="preset-name" type="text" placeholder="name…" />
+                <button class="btn preset-save" type="button">Speichern</button>
+            </div>
+            <ul class="preset-list"></ul>
+        </div>
+        <div class="preset-group" data-kind="config">
+            <h3>Config</h3>
+            <div class="preset-add">
+                <input class="preset-name" type="text" placeholder="name…" />
+                <button class="btn preset-save" type="button">Speichern</button>
+            </div>
+            <ul class="preset-list"></ul>
+        </div>
+        <div class="preset-group" data-kind="wallpaper">
+            <h3>Wallpaper</h3>
+            <div class="preset-add">
+                <input class="preset-name" type="text" placeholder="name…" />
+                <button class="btn preset-save" type="button">Speichern</button>
+            </div>
+            <ul class="preset-list"></ul>
+        </div>
+    </section>
+    </div>
+
+    <footer class="sheet-actions">
+        <button id="save" class="btn ghost">Speichern</button>
+        <button id="apply" class="btn primary">Als Wallpaper setzen</button>
+    </footer>
+</section>
+
+<script src="preview.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

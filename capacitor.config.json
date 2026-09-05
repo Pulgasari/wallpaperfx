@@ -1,0 +1,8 @@
+{
+  "appId": "com.wallpaperfx.app",
+  "appName": "WallpaperFX",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": true
+  }
+}
