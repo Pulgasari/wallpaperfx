@@ -1,5 +1,21 @@
 # todo
 
+- [ ] die preview sollte pausierbar sein
+- [ ] `iconify` für icons nutzen
+
+## bugs
+
+- [ ] live-vorschau bei den bildern funktioniert erst nachdem man video importierte und zum bildmodus zurückwechselt
+
+## filters
+
+- [ ] filters alphabetisch sortieren
+- [ ] add filter: `fisheye`
+- [ ] add filter: `grain`
+- [ ] add filter: `noise`
+- [ ] add filter: `duotone-2`: (weiss nich wie mans nennen soll. aber man könnte bei der fg auch mehrere farben angeben + zeitdauer, dann wechselt die farbe dazwischen allmählich hin und her)
+- [ ] enhance filter `vignette`: farbe einstellbar (default: black)
+
 ## wallpapers
 
 - [ ] wallpaper sollte auf x- und y-achse gespiegelt werden können
@@ -13,16 +29,3 @@
 
 - [ ] man sollte auch mehrere videos wählen können
 - [ ] modi: loop | loop-random | single/random
-
-## filters
-
-- [ ] filters alphabetisch sortieren
-- [ ] add filter: `fisheye`
-- [ ] add filter: `grain`
-- [ ] add filter: `noise`
-- [ ] add filter: `duotone-2`: (weiss nich wie mans nennen soll. aber man könnte bei der fg auch mehrere farben angeben + zeitdauer, dann wechselt die farbe dazwischen allmählich hin und her)
-- [ ] enhance filter `vignette`: farbe einstellbar (default: black)
-
-## bugs
-
-- [ ] live-vorschau bei den bildern funktioniert erst nachdem man video importierte und zum bildmodus zurückwechselt
