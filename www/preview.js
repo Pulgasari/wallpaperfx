@@ -177,6 +177,11 @@ const Preview = (function () {
     let gl, canvas, program, loc, quad;
     let state = null;
 
+    // preview controls: pause freezes the raf loop (and the video element);
+    // qualityCap bounds the device-pixel-ratio the canvas renders at
+    let paused = false;
+    let qualityCap = 1.5;
+
     // media source
     let sourceType = null; // 'image' | 'video' | null
     let sourceEl = null;
@@ -260,7 +265,7 @@ const Preview = (function () {
         if (!canvas) return;
         // the preview is the fullscreen app background; match the viewport (which
         // equals the device screen), capped dpr to keep animated filters cheap
-        const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+        const dpr = Math.min(window.devicePixelRatio || 1, qualityCap);
         const w = window.innerWidth;
         const h = window.innerHeight;
         canvas.style.width = w + 'px';
@@ -319,7 +324,7 @@ const Preview = (function () {
                 contentW = v.videoWidth || 1;
                 contentH = v.videoHeight || 1;
             });
-            v.play().catch(() => {});
+            if (!paused) v.play().catch(() => {});
             sourceEl = v;
         }
     }
@@ -434,8 +439,34 @@ const Preview = (function () {
     }
 
     function loop() {
-        render();
+        if (!paused) render();
         requestAnimationFrame(loop);
+    }
+
+    // freeze/resume the preview: stop the raf render and the video element too
+    function setPaused(value) {
+        paused = !!value;
+        if (sourceType === 'video' && sourceEl) {
+            if (paused) {
+                try { sourceEl.pause(); } catch (e) {}
+            } else {
+                sourceEl.play().catch(() => {});
+            }
+        }
+    }
+
+    function togglePaused() {
+        setPaused(!paused);
+        return paused;
+    }
+
+    // bound the render dpr; re-sizes the canvas backing store at the new cap
+    function setQuality(cap) {
+        const v = Number(cap);
+        if (v > 0) {
+            qualityCap = v;
+            resize();
+        }
     }
 
     function createFbo(w, h) {
@@ -571,5 +602,5 @@ const Preview = (function () {
         }
     }
 
-    return { init, attach, refreshMedia };
+    return { init, attach, refreshMedia, setPaused, togglePaused, setQuality, isPaused: () => paused };
 })();

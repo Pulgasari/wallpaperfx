@@ -809,6 +809,35 @@ async function init() {
         Preview.attach(state);
         syncPreview();
     }
+    initPreviewControls();
+}
+
+// pause toggle + quality select for the live preview. quality persists; pause
+// is transient (starts running each time the ui opens).
+function initPreviewControls() {
+    if (typeof Preview === 'undefined') return;
+    const pause = $('#previewPause');
+    const quality = $('#previewQuality');
+
+    let storedQuality = '1.5';
+    try {
+        storedQuality = localStorage.getItem('wpfx_preview_quality') || '1.5';
+    } catch (e) {}
+    if (quality) {
+        quality.value = storedQuality;
+        quality.addEventListener('change', (e) => {
+            Preview.setQuality(Number(e.target.value));
+            try { localStorage.setItem('wpfx_preview_quality', e.target.value); } catch (err) {}
+        });
+    }
+    Preview.setQuality(Number(storedQuality));
+
+    if (pause) pause.addEventListener('click', () => {
+        const now = Preview.togglePaused();
+        pause.classList.toggle('paused', now);
+        pause.textContent = now ? '▶' : '⏸';
+        pause.setAttribute('aria-label', now ? 'Vorschau fortsetzen' : 'Vorschau pausieren');
+    });
 }
 
 // bottom-sheet: drag the top edge to resize, collapse button hides it, and

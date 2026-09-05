@@ -56,6 +56,30 @@ body {
     pointer-events: none;
 }
 
+.preview-pause {
+    position: fixed;
+    top: calc(env(safe-area-inset-top) + 12px);
+    right: 12px;
+    z-index: 4;
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    background: var(--sheet-bg);
+    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(16px);
+    color: var(--text);
+    font-size: 16px;
+    line-height: 1;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+}
+
+.preview-pause.paused {
+    background: var(--accent);
+    color: var(--accent-ink);
+    border-color: var(--accent);
+}
+
 .show-ui {
     position: fixed;
     left: 50%;
