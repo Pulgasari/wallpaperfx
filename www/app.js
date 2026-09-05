@@ -78,20 +78,25 @@ function hexToRgb(hex) {
 
 // ---- filter chain model + list ui ----
 
+// filter list, sorted alphabetically by label (drives the dropdown/order only;
+// the shader index mapping lives in preview.js FILTER_INDEX and is independent).
 const FILTER_TYPES = [
-    ['duotone', 'Duotone'], ['gradientmap', 'Gradient Map'], ['grayscale', 'Graustufen'],
-    ['sepia', 'Sepia'], ['posterize', 'Posterize'], ['invert', 'Invertieren'],
-    ['pixelate', 'Pixelate'], ['halftone', 'Halftone'], ['scanlines', 'Scanlines'],
-    ['crt', 'CRT'], ['vignette', 'Vignette'], ['chromatic', 'Chromatic'],
-    ['filmgrain', 'Film Grain'], ['glitch', 'Glitch'], ['vhs', 'VHS']
+    ['bloom', 'Bloom'], ['blur', 'Blur'], ['chromatic', 'Chromatic'], ['crt', 'CRT'],
+    ['duotone', 'Duotone'], ['duotone2', 'Duotone Cycle'], ['filmgrain', 'Film Grain'],
+    ['fisheye', 'Fisheye'], ['glitch', 'Glitch'], ['gradientmap', 'Gradient Map'],
+    ['grain', 'Grain'], ['grayscale', 'Graustufen'], ['halftone', 'Halftone'],
+    ['invert', 'Invertieren'], ['noise', 'Noise'], ['pixelate', 'Pixelate'],
+    ['posterize', 'Posterize'], ['scanlines', 'Scanlines'], ['sepia', 'Sepia'],
+    ['vhs', 'VHS'], ['vignette', 'Vignette']
 ];
 const FILTER_LABEL = Object.fromEntries(FILTER_TYPES);
-const ANIMATED_FILTERS = ['filmgrain', 'glitch', 'vhs'];
+const ANIMATED_FILTERS = ['filmgrain', 'glitch', 'vhs', 'duotone2'];
 
 // per-type editable params. color rows: [key, label, 'color'].
 // range rows: [key, label, min, max, step, decimals].
 const FILTER_PARAMS = {
     duotone: [['colorA', 'Schatten', 'color'], ['colorB', 'Lichter', 'color']],
+    duotone2: [['colorA', 'Schatten', 'color'], ['colorB', 'Licht A', 'color'], ['colorC', 'Licht B', 'color'], ['cycleSec', 'Dauer', 0.5, 20, 0.5, 1]],
     gradientmap: [['colorA', 'Dunkel', 'color'], ['colorC', 'Mitte', 'color'], ['colorB', 'Hell', 'color']],
     grayscale: [['amount', 'Stärke', 0, 1, 0.01, 2]],
     sepia: [['amount', 'Stärke', 0, 1, 0.01, 2]],
@@ -101,11 +106,16 @@ const FILTER_PARAMS = {
     halftone: [['colorA', 'Ink', 'color'], ['colorB', 'Paper', 'color'], ['halftone', 'Raster', 20, 240, 5, 0]],
     scanlines: [['scanCount', 'Linien', 60, 900, 10, 0], ['scanStrength', 'Stärke', 0, 1, 0.01, 2]],
     crt: [['scanCount', 'Linien', 60, 900, 10, 0], ['scanStrength', 'Stärke', 0, 1, 0.01, 2], ['crtMask', 'Maske', 0, 1, 0.01, 2]],
-    vignette: [['vignette', 'Stärke', 0, 1, 0.01, 2], ['vignetteRadius', 'Radius', 0, 1, 0.01, 2]],
+    vignette: [['vignette', 'Stärke', 0, 1, 0.01, 2], ['vignetteRadius', 'Radius', 0, 1, 0.01, 2], ['vignetteColor', 'Farbe', 'color']],
     chromatic: [['chromatic', 'Versatz', 0, 0.03, 0.001, 3]],
     filmgrain: [['grain', 'Körnung', 0, 0.6, 0.01, 2]],
     glitch: [['glitch', 'Stärke', 0, 1, 0.01, 2]],
-    vhs: [['vhs', 'Stärke', 0, 1, 0.01, 2]]
+    vhs: [['vhs', 'Stärke', 0, 1, 0.01, 2]],
+    bloom: [['bloom', 'Stärke', 0, 2, 0.01, 2], ['bloomThreshold', 'Schwelle', 0, 1, 0.01, 2]],
+    blur: [['blurRadius', 'Radius', 0.5, 8, 0.1, 1]],
+    fisheye: [['fisheye', 'Stärke', -1, 1, 0.01, 2]],
+    grain: [['grain', 'Körnung', 0, 0.6, 0.01, 2]],
+    noise: [['noise', 'Stärke', 0, 0.6, 0.01, 2]]
 };
 
 // a filter entry with the full param superset (mirrors WpConfig.FilterEntry)
@@ -115,8 +125,9 @@ function newFilter(type) {
         colorA: [18, 20, 42], colorB: [240, 186, 72], colorC: [120, 84, 168],
         scanCount: 320, scanStrength: 0.35, crtMask: 0.3,
         amount: 1, levels: 6, pixelSize: 12, halftone: 90,
-        vignette: 0.6, vignetteRadius: 0.6, chromatic: 0.006,
-        grain: 0.15, glitch: 0.5, vhs: 0.6
+        vignette: 0.6, vignetteRadius: 0.6, vignetteColor: [0, 0, 0], chromatic: 0.006,
+        grain: 0.15, glitch: 0.5, vhs: 0.6,
+        bloom: 0.6, bloomThreshold: 0.7, blurRadius: 2, fisheye: 0.5, noise: 0.15, cycleSec: 6
     };
 }
 

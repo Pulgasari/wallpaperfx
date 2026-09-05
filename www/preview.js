@@ -41,6 +41,13 @@ const Preview = (function () {
         uniform float uGrain;
         uniform float uGlitch;
         uniform float uVhs;
+        uniform vec3 uVignetteColor;
+        uniform float uBloom;
+        uniform float uBloomThreshold;
+        uniform float uBlurRadius;
+        uniform float uFisheye;
+        uniform float uNoise;
+        uniform float uCycleSec;
         uniform float uTime;
         uniform vec2 uResolution;
         float luma(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }
@@ -50,6 +57,10 @@ const Preview = (function () {
             if (uFilter == 7) {
                 vec2 grid = uResolution / max(1.0, uPixelSize);
                 uv = (floor(uv * grid) + 0.5) / grid;
+            } else if (uFilter == 18) {
+                vec2 cc = (uv - 0.5) * 2.0;
+                float r2 = dot(cc, cc);
+                uv = (cc * (1.0 + uFisheye * r2)) * 0.5 + 0.5;
             }
             vec4 c = texture2D(uTexture, uv);
             if (uFilter == 1) {
@@ -91,7 +102,8 @@ const Preview = (function () {
                 c.rgb *= 1.0 - 0.4 * smoothstep(0.6, 1.0, dv);
             } else if (uFilter == 9) {
                 float dv = length(vScreenCoord - 0.5) * 1.4142136;
-                c.rgb *= 1.0 - uVignette * smoothstep(uVignetteRadius, 1.0, dv);
+                float v = uVignette * smoothstep(uVignetteRadius, 1.0, dv);
+                c.rgb = mix(c.rgb, uVignetteColor, v);
             } else if (uFilter == 10) {
                 vec2 off = (vScreenCoord - 0.5) * uChromatic;
                 c.r = texture2D(uTexture, uv + off).r;
@@ -122,6 +134,42 @@ const Preview = (function () {
                 c.rgb += (g - 0.5) * 0.08 * uVhs;
                 float track = fract(vScreenCoord.y - uTime * 0.2);
                 c.rgb += smoothstep(0.97, 0.99, track) * 0.25 * uVhs;
+            } else if (uFilter == 16) {
+                vec2 px = 2.5 / uResolution;
+                vec3 b = vec3(0.0); vec3 t;
+                t = texture2D(uTexture, uv + px * vec2(-1.0, -1.0)).rgb; b += t * max(0.0, luma(t) - uBloomThreshold);
+                t = texture2D(uTexture, uv + px * vec2( 0.0, -1.0)).rgb; b += t * max(0.0, luma(t) - uBloomThreshold);
+                t = texture2D(uTexture, uv + px * vec2( 1.0, -1.0)).rgb; b += t * max(0.0, luma(t) - uBloomThreshold);
+                t = texture2D(uTexture, uv + px * vec2(-1.0,  0.0)).rgb; b += t * max(0.0, luma(t) - uBloomThreshold);
+                t = texture2D(uTexture, uv + px * vec2( 0.0,  0.0)).rgb; b += t * max(0.0, luma(t) - uBloomThreshold);
+                t = texture2D(uTexture, uv + px * vec2( 1.0,  0.0)).rgb; b += t * max(0.0, luma(t) - uBloomThreshold);
+                t = texture2D(uTexture, uv + px * vec2(-1.0,  1.0)).rgb; b += t * max(0.0, luma(t) - uBloomThreshold);
+                t = texture2D(uTexture, uv + px * vec2( 0.0,  1.0)).rgb; b += t * max(0.0, luma(t) - uBloomThreshold);
+                t = texture2D(uTexture, uv + px * vec2( 1.0,  1.0)).rgb; b += t * max(0.0, luma(t) - uBloomThreshold);
+                c.rgb += (b / 9.0) * uBloom * 4.0;
+            } else if (uFilter == 17) {
+                vec2 px = uBlurRadius / uResolution;
+                vec3 s = texture2D(uTexture, uv).rgb * 4.0;
+                s += texture2D(uTexture, uv + vec2( px.x, 0.0)).rgb * 2.0;
+                s += texture2D(uTexture, uv + vec2(-px.x, 0.0)).rgb * 2.0;
+                s += texture2D(uTexture, uv + vec2(0.0,  px.y)).rgb * 2.0;
+                s += texture2D(uTexture, uv + vec2(0.0, -px.y)).rgb * 2.0;
+                s += texture2D(uTexture, uv + vec2( px.x,  px.y)).rgb;
+                s += texture2D(uTexture, uv + vec2( px.x, -px.y)).rgb;
+                s += texture2D(uTexture, uv + vec2(-px.x,  px.y)).rgb;
+                s += texture2D(uTexture, uv + vec2(-px.x, -px.y)).rgb;
+                c.rgb = s / 16.0;
+            } else if (uFilter == 19) {
+                float g = hash(vScreenCoord * uResolution);
+                c.rgb += (g - 0.5) * uGrain;
+            } else if (uFilter == 20) {
+                vec2 sp = vScreenCoord * uResolution;
+                vec3 n = vec3(hash(sp + 1.0), hash(sp + 2.0), hash(sp + 3.0));
+                c.rgb += (n - 0.5) * uNoise;
+            } else if (uFilter == 21) {
+                float ph = 0.5 + 0.5 * sin(uTime * 6.2831853 / max(0.5, uCycleSec));
+                vec3 hi = mix(uColorB, uColorC, ph);
+                c.rgb = mix(uColorA, hi, luma(c.rgb));
             }
             gl_FragColor = c;
         }`;
@@ -184,7 +232,8 @@ const Preview = (function () {
             'uUvScale', 'uUvOffset', 'uPosScale', 'uFilter', 'uColorA', 'uColorB', 'uColorC',
             'uScanCount', 'uScanStrength', 'uCrtMask', 'uAmount', 'uLevels', 'uPixelSize',
             'uHalftone', 'uVignette', 'uVignetteRadius', 'uChromatic', 'uGrain', 'uGlitch',
-            'uVhs', 'uTime', 'uResolution', 'uTexture'
+            'uVhs', 'uVignetteColor', 'uBloom', 'uBloomThreshold', 'uBlurRadius', 'uFisheye',
+            'uNoise', 'uCycleSec', 'uTime', 'uResolution', 'uTexture'
         ].forEach((n) => (loc[n] = gl.getUniformLocation(program, n)));
 
         // positions (-1..1) and texcoords (0..1), triangle strip
@@ -377,7 +426,8 @@ const Preview = (function () {
     const FILTER_INDEX = {
         none: 0, duotone: 1, scanlines: 2, grayscale: 3, sepia: 4, gradientmap: 5,
         posterize: 6, pixelate: 7, halftone: 8, vignette: 9, chromatic: 10, crt: 11, invert: 12,
-        filmgrain: 13, glitch: 14, vhs: 15
+        filmgrain: 13, glitch: 14, vhs: 15, bloom: 16, blur: 17, fisheye: 18,
+        grain: 19, noise: 20, duotone2: 21
     };
     function filterIndex(type) {
         return FILTER_INDEX[type] || 0;
@@ -450,10 +500,17 @@ const Preview = (function () {
             gl.uniform1f(loc.uHalftone, fe.halftone);
             gl.uniform1f(loc.uVignette, fe.vignette);
             gl.uniform1f(loc.uVignetteRadius, fe.vignetteRadius);
+            gl.uniform3f(loc.uVignetteColor, rgb(fe.vignetteColor, 0), rgb(fe.vignetteColor, 1), rgb(fe.vignetteColor, 2));
             gl.uniform1f(loc.uChromatic, fe.chromatic);
             gl.uniform1f(loc.uGrain, fe.grain);
             gl.uniform1f(loc.uGlitch, fe.glitch);
             gl.uniform1f(loc.uVhs, fe.vhs);
+            gl.uniform1f(loc.uBloom, fe.bloom);
+            gl.uniform1f(loc.uBloomThreshold, fe.bloomThreshold);
+            gl.uniform1f(loc.uBlurRadius, fe.blurRadius);
+            gl.uniform1f(loc.uFisheye, fe.fisheye);
+            gl.uniform1f(loc.uNoise, fe.noise);
+            gl.uniform1f(loc.uCycleSec, fe.cycleSec);
         }
 
         gl.activeTexture(gl.TEXTURE0);

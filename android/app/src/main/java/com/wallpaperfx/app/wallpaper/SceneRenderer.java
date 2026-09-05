@@ -625,10 +625,17 @@ class SceneRenderer implements GLRenderThread.Renderer {
             GLES20.glUniform1f(p.uHalftone, fe.halftone);
             GLES20.glUniform1f(p.uVignette, fe.vignette);
             GLES20.glUniform1f(p.uVignetteRadius, fe.vignetteRadius);
+            color(p.uVignetteColor, fe.vignetteColor);
             GLES20.glUniform1f(p.uChromatic, fe.chromatic);
             GLES20.glUniform1f(p.uGrain, fe.grain);
             GLES20.glUniform1f(p.uGlitch, fe.glitch);
             GLES20.glUniform1f(p.uVhs, fe.vhs);
+            GLES20.glUniform1f(p.uBloom, fe.bloom);
+            GLES20.glUniform1f(p.uBloomThreshold, fe.bloomThreshold);
+            GLES20.glUniform1f(p.uBlurRadius, fe.blurRadius);
+            GLES20.glUniform1f(p.uFisheye, fe.fisheye);
+            GLES20.glUniform1f(p.uNoise, fe.noise);
+            GLES20.glUniform1f(p.uCycleSec, fe.cycleSec);
         }
 
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
@@ -663,6 +670,12 @@ class SceneRenderer implements GLRenderThread.Renderer {
             case "filmgrain": return 13;
             case "glitch": return 14;
             case "vhs": return 15;
+            case "bloom": return 16;
+            case "blur": return 17;
+            case "fisheye": return 18;
+            case "grain": return 19;
+            case "noise": return 20;
+            case "duotone2": return 21;
             default: return 0;
         }
     }
@@ -696,7 +709,8 @@ class SceneRenderer implements GLRenderThread.Renderer {
         final int uTexMatrix, uUvScale, uUvOffset, uPosScale;
         final int uFilter, uColorA, uColorB, uColorC, uScanCount, uScanStrength, uCrtMask;
         final int uAmount, uLevels, uPixelSize, uHalftone, uVignette, uVignetteRadius, uChromatic;
-        final int uGrain, uGlitch, uVhs, uTime, uResolution, uAlpha, uTexture;
+        final int uGrain, uGlitch, uVhs, uVignetteColor, uBloom, uBloomThreshold, uBlurRadius;
+        final int uFisheye, uNoise, uCycleSec, uTime, uResolution, uAlpha, uTexture;
 
         Prog(String vs, String fs) {
             id = GLUtil.compileProgram(vs, fs);
@@ -723,6 +737,13 @@ class SceneRenderer implements GLRenderThread.Renderer {
             uGrain = GLES20.glGetUniformLocation(id, "uGrain");
             uGlitch = GLES20.glGetUniformLocation(id, "uGlitch");
             uVhs = GLES20.glGetUniformLocation(id, "uVhs");
+            uVignetteColor = GLES20.glGetUniformLocation(id, "uVignetteColor");
+            uBloom = GLES20.glGetUniformLocation(id, "uBloom");
+            uBloomThreshold = GLES20.glGetUniformLocation(id, "uBloomThreshold");
+            uBlurRadius = GLES20.glGetUniformLocation(id, "uBlurRadius");
+            uFisheye = GLES20.glGetUniformLocation(id, "uFisheye");
+            uNoise = GLES20.glGetUniformLocation(id, "uNoise");
+            uCycleSec = GLES20.glGetUniformLocation(id, "uCycleSec");
             uTime = GLES20.glGetUniformLocation(id, "uTime");
             uResolution = GLES20.glGetUniformLocation(id, "uResolution");
             uAlpha = GLES20.glGetUniformLocation(id, "uAlpha");

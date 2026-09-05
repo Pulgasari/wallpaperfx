@@ -9,8 +9,10 @@ package com.wallpaperfx.app.wallpaper;
 //   0 none      1 duotone    2 scanlines  3 grayscale  4 sepia
 //   5 gradientmap 6 posterize 7 pixelate  8 halftone   9 vignette
 //   10 chromatic 11 crt       12 invert   13 filmgrain 14 glitch  15 vhs
-// filters 13..15 are animated: they read uTime and require the render loop to
-// draw continuously (see SceneRenderer.isAnimated).
+//   16 bloom     17 blur      18 fisheye  19 grain     20 noise   21 duotone2
+// animated filters read uTime and require the render loop to draw continuously
+// (see SceneRenderer.isAnimated): 13 filmgrain, 14 glitch, 15 vhs, 21 duotone2.
+// filters 7 pixelate and 18 fisheye remap the sampling uv before the color pass.
 final class FilterGlsl {
 
     private FilterGlsl() {}
@@ -35,6 +37,13 @@ final class FilterGlsl {
             "uniform float uGrain;\n" +
             "uniform float uGlitch;\n" +
             "uniform float uVhs;\n" +
+            "uniform vec3 uVignetteColor;\n" + // vignette tint (default black)
+            "uniform float uBloom;\n" +
+            "uniform float uBloomThreshold;\n" +
+            "uniform float uBlurRadius;\n" +
+            "uniform float uFisheye;\n" +
+            "uniform float uNoise;\n" +
+            "uniform float uCycleSec;\n" +   // duotone2 color-cycle period
             "uniform float uTime;\n" +
             "uniform vec2 uResolution;\n" +
             "uniform float uAlpha;\n" +
@@ -45,6 +54,10 @@ final class FilterGlsl {
             "  if (uFilter == 7) {\n" + // pixelate: snap to a grid before sampling
             "    vec2 grid = uResolution / max(1.0, uPixelSize);\n" +
             "    uv = (floor(uv * grid) + 0.5) / grid;\n" +
+            "  } else if (uFilter == 18) {\n" + // fisheye: radial lens distortion around center
+            "    vec2 cc = (uv - 0.5) * 2.0;\n" +
+            "    float r2 = dot(cc, cc);\n" +
+            "    uv = (cc * (1.0 + uFisheye * r2)) * 0.5 + 0.5;\n" +
             "  }\n" +
             "  vec4 c = texture2D(uTexture, uv);\n" +
             "  if (uFilter == 1) {\n" + // duotone
@@ -84,9 +97,10 @@ final class FilterGlsl {
             "    c.rgb *= mask;\n" +
             "    float dv = length(vScreenCoord - 0.5) * 1.4142136;\n" +
             "    c.rgb *= 1.0 - 0.4 * smoothstep(0.6, 1.0, dv);\n" +
-            "  } else if (uFilter == 9) {\n" + // vignette
+            "  } else if (uFilter == 9) {\n" + // vignette: darken toward a tint color
             "    float dv = length(vScreenCoord - 0.5) * 1.4142136;\n" +
-            "    c.rgb *= 1.0 - uVignette * smoothstep(uVignetteRadius, 1.0, dv);\n" +
+            "    float v = uVignette * smoothstep(uVignetteRadius, 1.0, dv);\n" +
+            "    c.rgb = mix(c.rgb, uVignetteColor, v);\n" +
             "  } else if (uFilter == 10) {\n" + // chromatic aberration
             "    vec2 off = (vScreenCoord - 0.5) * uChromatic;\n" +
             "    c.r = texture2D(uTexture, uv + off).r;\n" +
@@ -117,6 +131,42 @@ final class FilterGlsl {
             "    c.rgb += (g - 0.5) * 0.08 * uVhs;\n" +
             "    float track = fract(vScreenCoord.y - uTime * 0.2);\n" +
             "    c.rgb += smoothstep(0.97, 0.99, track) * 0.25 * uVhs;\n" +
+            "  } else if (uFilter == 16) {\n" + // bloom: soft glow from a thresholded 3x3 bright-pass
+            "    vec2 px = 2.5 / uResolution;\n" +
+            "    vec3 b = vec3(0.0); vec3 t;\n" +
+            "    t = texture2D(uTexture, uv + px * vec2(-1.0, -1.0)).rgb; b += t * max(0.0, luma(t) - uBloomThreshold);\n" +
+            "    t = texture2D(uTexture, uv + px * vec2( 0.0, -1.0)).rgb; b += t * max(0.0, luma(t) - uBloomThreshold);\n" +
+            "    t = texture2D(uTexture, uv + px * vec2( 1.0, -1.0)).rgb; b += t * max(0.0, luma(t) - uBloomThreshold);\n" +
+            "    t = texture2D(uTexture, uv + px * vec2(-1.0,  0.0)).rgb; b += t * max(0.0, luma(t) - uBloomThreshold);\n" +
+            "    t = texture2D(uTexture, uv + px * vec2( 0.0,  0.0)).rgb; b += t * max(0.0, luma(t) - uBloomThreshold);\n" +
+            "    t = texture2D(uTexture, uv + px * vec2( 1.0,  0.0)).rgb; b += t * max(0.0, luma(t) - uBloomThreshold);\n" +
+            "    t = texture2D(uTexture, uv + px * vec2(-1.0,  1.0)).rgb; b += t * max(0.0, luma(t) - uBloomThreshold);\n" +
+            "    t = texture2D(uTexture, uv + px * vec2( 0.0,  1.0)).rgb; b += t * max(0.0, luma(t) - uBloomThreshold);\n" +
+            "    t = texture2D(uTexture, uv + px * vec2( 1.0,  1.0)).rgb; b += t * max(0.0, luma(t) - uBloomThreshold);\n" +
+            "    c.rgb += (b / 9.0) * uBloom * 4.0;\n" +
+            "  } else if (uFilter == 17) {\n" + // blur: 3x3 gaussian, radius in px; stack for a stronger blur
+            "    vec2 px = uBlurRadius / uResolution;\n" +
+            "    vec3 s = texture2D(uTexture, uv).rgb * 4.0;\n" +
+            "    s += texture2D(uTexture, uv + vec2( px.x, 0.0)).rgb * 2.0;\n" +
+            "    s += texture2D(uTexture, uv + vec2(-px.x, 0.0)).rgb * 2.0;\n" +
+            "    s += texture2D(uTexture, uv + vec2(0.0,  px.y)).rgb * 2.0;\n" +
+            "    s += texture2D(uTexture, uv + vec2(0.0, -px.y)).rgb * 2.0;\n" +
+            "    s += texture2D(uTexture, uv + vec2( px.x,  px.y)).rgb;\n" +
+            "    s += texture2D(uTexture, uv + vec2( px.x, -px.y)).rgb;\n" +
+            "    s += texture2D(uTexture, uv + vec2(-px.x,  px.y)).rgb;\n" +
+            "    s += texture2D(uTexture, uv + vec2(-px.x, -px.y)).rgb;\n" +
+            "    c.rgb = s / 16.0;\n" +
+            "  } else if (uFilter == 19) {\n" + // grain: static monochrome grain overlay
+            "    float g = hash(vScreenCoord * uResolution);\n" +
+            "    c.rgb += (g - 0.5) * uGrain;\n" +
+            "  } else if (uFilter == 20) {\n" + // noise: static rgb noise
+            "    vec2 sp = vScreenCoord * uResolution;\n" +
+            "    vec3 n = vec3(hash(sp + 1.0), hash(sp + 2.0), hash(sp + 3.0));\n" +
+            "    c.rgb += (n - 0.5) * uNoise;\n" +
+            "  } else if (uFilter == 21) {\n" + // duotone2 (animated): highlight cycles between two colors
+            "    float ph = 0.5 + 0.5 * sin(uTime * 6.2831853 / max(0.5, uCycleSec));\n" +
+            "    vec3 hi = mix(uColorB, uColorC, ph);\n" +
+            "    c.rgb = mix(uColorA, hi, luma(c.rgb));\n" +
             "  }\n" +
             "  c.a *= uAlpha;\n" +
             "  gl_FragColor = c;\n" +

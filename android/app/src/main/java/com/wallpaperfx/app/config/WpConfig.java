@@ -74,13 +74,14 @@ public class WpConfig {
     // multiple times with different settings.
     // type: none | duotone | grayscale | sepia | gradientmap | posterize |
     //       pixelate | halftone | scanlines | crt | vignette | chromatic |
-    //       invert | filmgrain | glitch | vhs
+    //       invert | filmgrain | glitch | vhs | bloom | blur | fisheye |
+    //       grain | noise | duotone2
     public static class FilterEntry {
         public String type = "none";
         public boolean enabled = true;
         public int[] colorA = {18, 20, 42};      // duotone/gradient dark, halftone ink
         public int[] colorB = {240, 186, 72};    // duotone/gradient light, halftone paper
-        public int[] colorC = {120, 84, 168};    // gradientmap midtone
+        public int[] colorC = {120, 84, 168};    // gradientmap midtone, duotone2 second highlight
         public float scanCount = 320f;
         public float scanStrength = 0.35f;
         public float crtMask = 0.30f;
@@ -90,13 +91,21 @@ public class WpConfig {
         public float halftone = 90f;
         public float vignette = 0.6f;
         public float vignetteRadius = 0.6f;
+        public int[] vignetteColor = {0, 0, 0};  // vignette tint (default black)
         public float chromatic = 0.006f;
         public float grain = 0.15f;
         public float glitch = 0.5f;
         public float vhs = 0.6f;
+        public float bloom = 0.6f;               // bloom intensity
+        public float bloomThreshold = 0.7f;
+        public float blurRadius = 2.0f;          // blur tap spacing in px
+        public float fisheye = 0.5f;             // -1..1 lens distortion
+        public float noise = 0.15f;
+        public float cycleSec = 6.0f;            // duotone2 color-cycle period
 
         public boolean isAnimated() {
-            return "filmgrain".equals(type) || "glitch".equals(type) || "vhs".equals(type);
+            return "filmgrain".equals(type) || "glitch".equals(type)
+                    || "vhs".equals(type) || "duotone2".equals(type);
         }
 
         JSONObject toJson() throws Exception {
@@ -115,10 +124,17 @@ public class WpConfig {
             o.put("halftone", halftone);
             o.put("vignette", vignette);
             o.put("vignetteRadius", vignetteRadius);
+            o.put("vignetteColor", intArray(vignetteColor));
             o.put("chromatic", chromatic);
             o.put("grain", grain);
             o.put("glitch", glitch);
             o.put("vhs", vhs);
+            o.put("bloom", bloom);
+            o.put("bloomThreshold", bloomThreshold);
+            o.put("blurRadius", blurRadius);
+            o.put("fisheye", fisheye);
+            o.put("noise", noise);
+            o.put("cycleSec", cycleSec);
             return o;
         }
 
@@ -138,10 +154,17 @@ public class WpConfig {
             f.halftone = (float) o.optDouble("halftone", f.halftone);
             f.vignette = (float) o.optDouble("vignette", f.vignette);
             f.vignetteRadius = (float) o.optDouble("vignetteRadius", f.vignetteRadius);
+            f.vignetteColor = readColor(o.optJSONArray("vignetteColor"), f.vignetteColor);
             f.chromatic = (float) o.optDouble("chromatic", f.chromatic);
             f.grain = (float) o.optDouble("grain", f.grain);
             f.glitch = (float) o.optDouble("glitch", f.glitch);
             f.vhs = (float) o.optDouble("vhs", f.vhs);
+            f.bloom = (float) o.optDouble("bloom", f.bloom);
+            f.bloomThreshold = (float) o.optDouble("bloomThreshold", f.bloomThreshold);
+            f.blurRadius = (float) o.optDouble("blurRadius", f.blurRadius);
+            f.fisheye = (float) o.optDouble("fisheye", f.fisheye);
+            f.noise = (float) o.optDouble("noise", f.noise);
+            f.cycleSec = (float) o.optDouble("cycleSec", f.cycleSec);
             return f;
         }
     }
