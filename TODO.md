@@ -46,13 +46,17 @@
 
 # ui-umbau
 
-status: eigener nächster meilenstein. der font-punkt ist erledigt; der restliche
-ground-up-umbau (neue leisten, tab-panels mit swipe, quellen-grid) strukturiert
-index.html/styles.css/app.js komplett um und wird als fokussierter schritt separat
-gemacht, damit er nicht mit den obigen feature-änderungen kollidiert.
+status: umgesetzt. neue shell aus top-bar, unterer tab-leiste mit swipe-baren
+höhenverstellbaren panels und einer sources-leiste. icons als monochrome inline-svg
+(feather-style, currentColor, kein iconify/emoji nötig). in hell + dunkel per
+headless-chromium geprüft.
 
 - [x] font: "Manrope" (selbst gehostet, latin-subset variable font)
-- [ ] leiste oben, linke seite: appname + settings-icon zum togglen der app-settings
-- [ ] leiste oben, rechte seite: buttons für: (saved) configs/presets, sources, wallpapers, save
-- [ ] leiste unten 1: config, filters, motion, parallaxe (klickt man auf eins davon öffnet sich darüber dessen panel/tab, auf den selben button nochma klicken = geht wieder zu, während panel offen is, kann man dort nach links/rechts swipen um zwischen den tabs zu wechseln. und handle um das panel in der höhe einzustellen)
-- [ ] leiste unten 2: '+'-icon/quadrat (kann man neue quellen hinzufügen, einzeiliges grid mit squares der sources, horizontal scrollbar, mit mechanismus um das panel fullscreen zu machen, dann isses mehrzeilig usw (mir fällt grade ein: evtl sollte der erste square actually aus 4 icons bestehen: add, clear, fullscreen, save)
+- [x] leiste oben, linke seite: appname + settings-icon zum togglen der app-settings
+- [x] leiste oben, rechte seite: buttons für: presets, sources, wallpaper (apply), save
+- [x] leiste unten 1: config, filters, motion, parallaxe
+      -> tap öffnet das panel darüber, erneuter tap auf denselben button schließt es;
+         bei offenem panel links/rechts swipen wechselt die tabs; handle oben stellt die höhe ein.
+- [x] leiste unten 2: '+'/quadrat zum quellen-hinzufügen, einzeiliges horizontal-scrollbares
+      grid der source-squares, fullscreen-mechanismus (dann mehrzeilig).
+      -> das erste quadrat besteht aus 4 icons: add, clear, fullscreen, save.

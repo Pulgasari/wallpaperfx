@@ -61,6 +61,33 @@ const state = {
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
+// monochrome inline icons (feather-style, currentColor). filled into any element
+// carrying data-icon="name" via applyIcons(). no emojis, themeable, scale with font.
+const ICONS = {
+    settings: '<line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>',
+    presets: '<path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>',
+    sources: '<polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>',
+    wallpaper: '<rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/>',
+    save: '<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>',
+    add: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
+    clear: '<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
+    expand: '<path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/>',
+    collapse: '<path d="M4 14h6v6"/><path d="M20 10h-6V4"/><path d="M14 10l7-7"/><path d="M3 21l7-7"/>',
+    close: '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
+    pause: '<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>',
+    play: '<polygon points="6 4 20 12 6 20 6 4"/>'
+};
+
+function svgIcon(name) {
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (ICONS[name] || '') + '</svg>';
+}
+
+function applyIcons(root) {
+    (root || document).querySelectorAll('[data-icon]').forEach((el) => {
+        el.innerHTML = svgIcon(el.getAttribute('data-icon'));
+    });
+}
+
 function basename(path) {
     if (!path) return '';
     const parts = path.split('/');
@@ -173,7 +200,9 @@ function tileToggle(on, onChange) {
 
 // pointer drag-to-reorder within a tile grid. tiles carry __item; the "+" tile
 // (.tile-add) always stays last. a tap without movement triggers onTap.
+// list may be an array or a function returning the array (sources depend on mode).
 function enableTileDrag(grid, list, onTap, commit) {
+    const resolveList = () => (typeof list === 'function' ? list() : list);
     grid.addEventListener('pointerdown', (e) => {
         const tile = e.target.closest('.tile');
         if (!tile || tile.classList.contains('tile-add')) return;
@@ -202,7 +231,8 @@ function enableTileDrag(grid, list, onTap, commit) {
             if (active) {
                 tile.classList.remove('dragging');
                 const order = Array.from(grid.querySelectorAll('.tile:not(.tile-add)')).map((t) => t.__item);
-                list.splice(0, list.length, ...order);
+                const arr = resolveList();
+                arr.splice(0, arr.length, ...order);
                 commit();
             } else if (onTap) {
                 onTap(item);
@@ -575,9 +605,12 @@ function syncPreview() {
 
 let statusTimer = null;
 function setStatus(text) {
-    $('#status').textContent = text;
+    const el = $('#status');
+    if (!el) return;
+    el.textContent = text;
+    el.classList.add('show');
     clearTimeout(statusTimer);
-    statusTimer = setTimeout(() => ($('#status').textContent = ''), 2500);
+    statusTimer = setTimeout(() => el.classList.remove('show'), 2200);
 }
 
 // ---- rendering state -> controls ----
@@ -604,7 +637,7 @@ async function pickImages() {
         const res = await plugin.pickMedia({ type: 'image' });
         if (res.paths && res.paths.length) {
             res.paths.forEach((p) => state.images.push({ path: p, enabled: true }));
-            renderImageGrid();
+            renderSources();
             syncPreview();
         }
     } catch (e) {
@@ -617,20 +650,12 @@ async function pickVideos() {
         const res = await plugin.pickMedia({ type: 'video' });
         if (res.paths && res.paths.length) {
             res.paths.forEach((p) => state.videos.push({ path: p, enabled: true }));
-            renderVideoGrid();
+            renderSources();
             syncPreview();
         }
     } catch (e) {
         setStatus('auswahl abgebrochen');
     }
-}
-
-function renderVideoGrid() {
-    const grid = $('#videoGrid');
-    if (!grid) return;
-    grid.innerHTML = '';
-    state.videos.forEach((v) => grid.append(buildVideoTile(v)));
-    grid.append(addTile('videos hinzufügen', pickVideos));
 }
 
 // video tiles are label-based (filename + play glyph); no cheap thumbnail without
@@ -653,18 +678,25 @@ function buildVideoTile(vid) {
     tile.append(tileX(() => {
         const i = state.videos.indexOf(vid);
         if (i > -1) state.videos.splice(i, 1);
-        renderVideoGrid();
+        renderSources();
         syncPreview();
     }));
     return tile;
 }
 
-function renderImageGrid() {
-    const grid = $('#imageGrid');
+// the active mode's media list; the sources strip shows this set
+function activeMediaList() {
+    return state.mode === 'video' ? state.videos : state.images;
+}
+
+// renders the source strip (bottom bar 2 / fullscreen) for the active mode
+function renderSources() {
+    const grid = $('#sourceStrip');
     if (!grid) return;
+    const isVideo = state.mode === 'video';
     grid.innerHTML = '';
-    state.images.forEach((img) => grid.append(buildImageTile(img)));
-    grid.append(addTile('bilder hinzufügen', pickImages));
+    activeMediaList().forEach((it) => grid.append(isVideo ? buildVideoTile(it) : buildImageTile(it)));
+    grid.append(addTile(isVideo ? 'videos hinzufügen' : 'bilder hinzufügen', isVideo ? pickVideos : pickImages));
 }
 
 function buildImageTile(img) {
@@ -686,7 +718,7 @@ function buildImageTile(img) {
     tile.append(tileX(() => {
         const i = state.images.indexOf(img);
         if (i > -1) state.images.splice(i, 1);
-        renderImageGrid();
+        renderSources();
         syncPreview();
     }));
     return tile;
@@ -700,8 +732,7 @@ function setOut(key, value) {
 function renderAll() {
     renderMode();
     renderFilterGrid();
-    renderImageGrid();
-    renderVideoGrid();
+    renderSources();
 
     $('#videoOrder').value = state.videoOrder;
     $('#resumeVideo').checked = state.resumeVideo;
@@ -746,19 +777,18 @@ function bind() {
         b.addEventListener('click', () => {
             state.mode = b.dataset.mode;
             renderMode();
+            renderSources();
             syncPreview();
         })
     );
 
-    // filter tiles: tap selects for editing; image/video tiles: tap toggles enabled.
-    // all three drag-reorder.
+    // filter tiles: tap selects for editing; source tiles: tap toggles enabled.
+    // both drag-reorder; the source strip commits to whichever mode's list is active.
     enableTileDrag($('#filterGrid'), state.filters,
         (f) => { selectedFilter = f; renderFilterGrid(); },
         () => renderFilterGrid());
-    enableTileDrag($('#imageGrid'), state.images, null,
-        () => { renderImageGrid(); syncPreview(); });
-    enableTileDrag($('#videoGrid'), state.videos, null,
-        () => { renderVideoGrid(); syncPreview(); });
+    enableTileDrag($('#sourceStrip'), activeMediaList, null,
+        () => { renderSources(); syncPreview(); });
 
     const num = (id, key, out, div) =>
         $(id).addEventListener('input', (e) => {
@@ -803,8 +833,8 @@ function bind() {
     rng('#motionAmount', 'motionAmount', 2);
     rng('#motionSpeed', 'motionSpeed', 2);
 
-    $('#save').addEventListener('click', save);
-    $('#apply').addEventListener('click', apply);
+    $('#saveBtn').addEventListener('click', save);
+    $('#applyBtn').addEventListener('click', apply);
 }
 
 async function save() {
@@ -857,10 +887,12 @@ async function init() {
     } catch (e) {
         // keep defaults
     }
+    applyIcons();
     bind();
     renderAll();
     initTheme();
-    initSheet();
+    initDock();
+    initOverlays();
     initPresets();
 
     // live preview mirrors the same shaders on the selected media
@@ -894,69 +926,209 @@ function initPreviewControls() {
     if (pause) pause.addEventListener('click', () => {
         const now = Preview.togglePaused();
         pause.classList.toggle('paused', now);
-        pause.textContent = now ? '▶' : '⏸';
+        pause.innerHTML = svgIcon(now ? 'play' : 'pause');
         pause.setAttribute('aria-label', now ? 'Vorschau fortsetzen' : 'Vorschau pausieren');
     });
 }
 
-// bottom-sheet: drag the top edge to resize, collapse button hides it, and
-// tapping the preview background (or the pill) brings it back.
-function initSheet() {
-    const sheet = $('#sheet');
-    const handle = $('#sheetHandle');
-    const collapseBtn = $('#collapseUi');
-    const showBtn = $('#showUi');
-    const canvas = $('#preview');
-    if (!sheet || !handle) return;
+// bottom dock: the tab bar opens a panel above it. tapping a tab opens its page,
+// tapping the same tab closes it; while open, tabs slide and can be swiped between.
+// a top handle resizes the panel height.
+const TABS = ['config', 'filters', 'motion', 'parallax'];
 
-    const MIN = 84;
-    const maxH = () => Math.round(window.innerHeight * 0.94);
+function initDock() {
+    const panel = $('#tabPanel');
+    const track = $('#tabTrack');
+    const handle = $('#tabHandle');
+    const btns = $$('.tab-btn');
+    if (!panel || !track) return;
 
-    let stored = null;
+    let active = null; // active tab index, or null when the panel is closed
+
+    // restore stored panel height
+    const maxH = () => Math.round(window.innerHeight * 0.78);
+    let storedH = null;
     try {
-        stored = parseInt(localStorage.getItem('wpfx_sheet_h'), 10);
+        storedH = parseInt(localStorage.getItem('wpfx_panel_h'), 10);
     } catch (e) {}
-    if (stored && stored > MIN) sheet.style.height = Math.min(stored, maxH()) + 'px';
+    if (storedH && storedH > 130) panel.style.height = Math.min(storedH, maxH()) + 'px';
 
-    let dragging = false;
-    let startY = 0;
-    let startH = 0;
+    const pageWidth = () => {
+        const p = track.querySelector('.tab-page');
+        return p ? p.getBoundingClientRect().width : panel.getBoundingClientRect().width;
+    };
+
+    // position the track on the active page (px so it is exact at any font scale)
+    function applyIndex(animate) {
+        if (active === null) return;
+        track.style.transition = animate ? 'transform 0.25s ease' : 'none';
+        track.style.transform = 'translateX(' + (-active * pageWidth()) + 'px)';
+        if (!animate) {
+            track.getBoundingClientRect(); // reflow so the next transition animates
+            track.style.transition = '';
+        }
+    }
+
+    function highlight() {
+        btns.forEach((b, i) => b.classList.toggle('active', i === active));
+    }
+
+    function openTab(i) {
+        active = i;
+        panel.hidden = false;
+        highlight();
+        requestAnimationFrame(() => applyIndex(false));
+    }
+
+    function closeTab() {
+        active = null;
+        panel.hidden = true;
+        highlight();
+    }
+
+    function selectTab(i) {
+        active = i;
+        highlight();
+        applyIndex(true);
+    }
+
+    btns.forEach((b, i) => b.addEventListener('click', () => {
+        if (active === i) closeTab();
+        else if (active === null) openTab(i);
+        else selectTab(i);
+    }));
+
+    // height handle (drag the top edge)
+    let rz = null;
     handle.addEventListener('pointerdown', (e) => {
-        // let the buttons in the header work without starting a resize
-        if (e.target.closest('button, input, select')) return;
-        dragging = true;
-        startY = e.clientY;
-        startH = sheet.getBoundingClientRect().height;
+        rz = { y: e.clientY, h: panel.getBoundingClientRect().height };
         handle.setPointerCapture(e.pointerId);
     });
     handle.addEventListener('pointermove', (e) => {
-        if (!dragging) return;
-        const h = Math.max(MIN, Math.min(maxH(), startH + (startY - e.clientY)));
-        sheet.style.height = h + 'px';
+        if (!rz) return;
+        const h = Math.max(130, Math.min(maxH(), rz.h + (rz.y - e.clientY)));
+        panel.style.height = h + 'px';
     });
-    const endDrag = () => {
-        if (!dragging) return;
-        dragging = false;
+    const endResize = () => {
+        if (!rz) return;
+        rz = null;
+        applyIndex(false);
         try {
-            localStorage.setItem('wpfx_sheet_h', String(Math.round(sheet.getBoundingClientRect().height)));
+            localStorage.setItem('wpfx_panel_h', String(Math.round(panel.getBoundingClientRect().height)));
         } catch (e) {}
     };
-    handle.addEventListener('pointerup', endDrag);
-    handle.addEventListener('pointercancel', endDrag);
+    handle.addEventListener('pointerup', endResize);
+    handle.addEventListener('pointercancel', endResize);
 
-    const collapse = () => {
-        sheet.classList.add('collapsed');
-        showBtn.hidden = false;
-    };
-    const expand = () => {
-        sheet.classList.remove('collapsed');
-        showBtn.hidden = true;
-    };
-    collapseBtn.addEventListener('click', collapse);
-    showBtn.addEventListener('click', expand);
-    if (canvas) canvas.addEventListener('click', () => {
-        if (sheet.classList.contains('collapsed')) expand();
+    // horizontal swipe between tabs. only starts on empty page area (not on
+    // controls/tiles, which own their gestures); vertical scroll stays native.
+    let sw = null;
+    track.addEventListener('pointerdown', (e) => {
+        if (active === null) return;
+        if (e.target.closest('input, select, textarea, button, a, .tile, .tile-editor')) return;
+        sw = { x: e.clientX, y: e.clientY, base: -active * pageWidth(), horiz: false, decided: false };
     });
+    track.addEventListener('pointermove', (e) => {
+        if (!sw) return;
+        const dx = e.clientX - sw.x;
+        const dy = e.clientY - sw.y;
+        if (!sw.decided) {
+            if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+            sw.horiz = Math.abs(dx) > Math.abs(dy);
+            sw.decided = true;
+            if (sw.horiz) track.classList.add('dragging');
+        }
+        if (!sw.horiz) return;
+        const pw = pageWidth();
+        const minX = -(TABS.length - 1) * pw;
+        let x = sw.base + dx;
+        if (x > 0) x *= 0.3; // rubber-band past the ends
+        else if (x < minX) x = minX + (x - minX) * 0.3;
+        track.style.transition = 'none';
+        track.style.transform = 'translateX(' + x + 'px)';
+    });
+    const endSwipe = (e) => {
+        if (!sw) return;
+        const horiz = sw.horiz;
+        const dx = (e ? e.clientX : sw.x) - sw.x;
+        sw = null;
+        track.classList.remove('dragging');
+        if (!horiz) return;
+        const pw = pageWidth();
+        let i = active;
+        if (dx < -pw * 0.25) i = Math.min(TABS.length - 1, active + 1);
+        else if (dx > pw * 0.25) i = Math.max(0, active - 1);
+        selectTab(i);
+    };
+    track.addEventListener('pointerup', endSwipe);
+    track.addEventListener('pointercancel', endSwipe);
+
+    window.addEventListener('resize', () => applyIndex(false));
+}
+
+// overlay sheets (settings / presets) and the sources fullscreen mode; only one
+// open at a time, dimmed by the backdrop. also wires the source-action square.
+function initOverlays() {
+    const backdrop = $('#backdrop');
+    const settings = $('#settingsPanel');
+    const presets = $('#presetsPanel');
+    const sourcesBar = $('#sourcesBar');
+    let openEl = null;
+
+    const fsBtn = () => $('.source-actions [data-act="fullscreen"]');
+    function setFsIcon(on) {
+        const b = fsBtn();
+        if (b) b.innerHTML = svgIcon(on ? 'collapse' : 'expand');
+    }
+
+    const pauseBtn = $('#previewPause');
+    const showPause = (show) => { if (pauseBtn) pauseBtn.hidden = !show; };
+
+    function closeAll() {
+        if (settings) settings.hidden = true;
+        if (presets) presets.hidden = true;
+        sourcesBar.classList.remove('fullscreen');
+        setFsIcon(false);
+        backdrop.hidden = true;
+        showPause(true);
+        openEl = null;
+    }
+
+    function openOverlay(el) {
+        closeAll();
+        el.hidden = false;
+        backdrop.hidden = false;
+        showPause(false);
+        openEl = el;
+    }
+
+    function toggleSourcesFs() {
+        const turnOn = !sourcesBar.classList.contains('fullscreen');
+        closeAll();
+        if (turnOn) {
+            sourcesBar.classList.add('fullscreen');
+            setFsIcon(true);
+            backdrop.hidden = false;
+            showPause(false);
+            openEl = sourcesBar;
+        }
+    }
+
+    $('#settingsToggle').addEventListener('click', () => (openEl === settings ? closeAll() : openOverlay(settings)));
+    $('#presetsToggle').addEventListener('click', () => (openEl === presets ? closeAll() : openOverlay(presets)));
+    $('#sourcesToggle').addEventListener('click', toggleSourcesFs);
+    backdrop.addEventListener('click', closeAll);
+    $$('[data-close]').forEach((b) => b.addEventListener('click', closeAll));
+
+    // the 4-icon source-actions square: add / clear / fullscreen / save
+    $$('.source-actions [data-act]').forEach((b) => b.addEventListener('click', () => {
+        switch (b.dataset.act) {
+            case 'add': state.mode === 'video' ? pickVideos() : pickImages(); break;
+            case 'clear': activeMediaList().length = 0; renderSources(); syncPreview(); break;
+            case 'fullscreen': toggleSourcesFs(); break;
+            case 'save': save(); break;
+        }
+    }));
 }
 
 document.addEventListener('DOMContentLoaded', init);

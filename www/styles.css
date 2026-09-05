@@ -15,14 +15,25 @@
     --line: rgba(255, 255, 255, 0.14);
     --accent: #f0ba48;
     --accent-ink: #221a06;
-    --sheet-bg: rgba(13, 15, 22, 0.82);
+    --sheet-bg: rgba(13, 15, 22, 0.86);
     --radius: 14px;
     --radius-lg: 18px;
+    --tile: 84px;
+    /* general size (font/controls) and spacing multipliers, set from app.js.
+       size scales font-size + em-based control metrics; widths stay 100% so
+       nothing overflows horizontally (keeps the swipe carousel exact). */
+    --ui-scale: 1;
+    --space-scale: 1;
     font-family: 'Manrope', system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
 * {
     box-sizing: border-box;
+}
+
+/* our display:flex/grid rules would otherwise beat the ua [hidden] rule */
+[hidden] {
+    display: none !important;
 }
 
 html,
@@ -53,7 +64,7 @@ body {
 
 .preview-hint {
     position: fixed;
-    top: 38%;
+    top: 40%;
     left: 0;
     right: 0;
     z-index: 1;
@@ -67,19 +78,20 @@ body {
 
 .preview-pause {
     position: fixed;
-    top: calc(env(safe-area-inset-top) + 12px);
+    top: calc(env(safe-area-inset-top) + 58px);
     right: 12px;
     z-index: 4;
     width: 40px;
     height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     border: 1px solid var(--line);
     border-radius: var(--radius-lg);
     background: var(--sheet-bg);
     -webkit-backdrop-filter: blur(16px);
     backdrop-filter: blur(16px);
     color: var(--text);
-    font-size: 16px;
-    line-height: 1;
     box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
 }
 
@@ -89,53 +101,186 @@ body {
     border-color: var(--accent);
 }
 
-.show-ui {
+.preview-pause svg {
+    width: 18px;
+    height: 18px;
+}
+
+/* ---- top bar ---- */
+
+.topbar {
     position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 7;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: calc(env(safe-area-inset-top) + 7px) 10px 7px;
+    background: var(--sheet-bg);
+    -webkit-backdrop-filter: blur(18px);
+    backdrop-filter: blur(18px);
+    border-bottom: 1px solid var(--line);
+    font-size: calc(15px * var(--ui-scale));
+}
+
+.topbar-left,
+.topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.app-name {
+    font-weight: 700;
+    font-size: 1.05em;
+    letter-spacing: 0.3px;
+    margin-left: 2px;
+}
+
+.tb-btn {
+    flex: none;
+    width: 2.5em;
+    height: 2.5em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--card-2);
+    color: var(--text);
+}
+
+.tb-btn.accent {
+    background: var(--accent);
+    color: var(--accent-ink);
+    border-color: var(--accent);
+}
+
+.tb-btn svg {
+    width: 1.3em;
+    height: 1.3em;
+    display: block;
+}
+
+/* ---- status toast ---- */
+
+.status-toast {
+    position: fixed;
+    top: calc(env(safe-area-inset-top) + 54px);
     left: 50%;
     transform: translateX(-50%);
-    bottom: calc(env(safe-area-inset-bottom) + 16px);
-    z-index: 4;
-    padding: 11px 20px;
-    border: 1px solid var(--line);
+    z-index: 8;
+    max-width: 80vw;
+    padding: 8px 14px;
     border-radius: var(--radius-lg);
     background: var(--sheet-bg);
     -webkit-backdrop-filter: blur(16px);
     backdrop-filter: blur(16px);
+    border: 1px solid var(--line);
     color: var(--text);
-    font-size: 14px;
-    font-weight: 600;
+    font-size: 13px;
     box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    pointer-events: none;
 }
 
-/* ---- bottom sheet ---- */
+.status-toast.show {
+    opacity: 1;
+}
 
-.sheet {
+/* ---- overlay sheets (settings / presets) ---- */
+
+.backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 5;
+    background: rgba(0, 0, 0, 0.5);
+}
+
+.overlay-sheet {
     position: fixed;
     left: 0;
     right: 0;
     bottom: 0;
-    z-index: 2;
+    z-index: 6;
     display: flex;
     flex-direction: column;
-    height: 52vh;
-    max-height: 94vh;
-    min-height: 84px;
+    max-height: 82vh;
     background: var(--sheet-bg);
-    -webkit-backdrop-filter: blur(20px);
-    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(22px);
+    backdrop-filter: blur(22px);
     border-top: 1px solid var(--line);
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-    box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.5);
-    transition: transform 0.28s ease;
+    box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.55);
+    font-size: calc(14px * var(--ui-scale));
 }
 
-.sheet.collapsed {
-    transform: translateY(100%);
-}
-
-.sheet-handle {
+.overlay-head {
     flex: none;
-    padding-top: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--line);
+}
+
+.overlay-title {
+    font-weight: 700;
+    font-size: 1.07em;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--muted);
+}
+
+.overlay-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    display: flex;
+    flex-direction: column;
+    gap: calc(6px * var(--space-scale));
+    padding: calc(10px * var(--space-scale)) 14px calc(16px + env(safe-area-inset-bottom));
+}
+
+/* ---- bottom dock ---- */
+
+.dock {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 3;
+    display: flex;
+    flex-direction: column;
+}
+
+/* tab panel opens above the tab bar */
+.tab-panel {
+    display: flex;
+    flex-direction: column;
+    height: 44vh;
+    min-height: 130px;
+    max-height: 78vh;
+    overflow: hidden;
+    background: var(--sheet-bg);
+    -webkit-backdrop-filter: blur(22px);
+    backdrop-filter: blur(22px);
+    border-top: 1px solid var(--line);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.45);
+    font-size: calc(14px * var(--ui-scale));
+}
+
+.panel-handle {
+    flex: none;
+    padding: 9px 0 6px;
     cursor: row-resize;
     touch-action: none;
     user-select: none;
@@ -146,80 +291,237 @@ body {
     display: block;
     width: 42px;
     height: 4px;
-    margin: 0 auto 8px;
+    margin: 0 auto;
     border-radius: 2px;
     background: var(--line);
 }
 
-.sheet-head {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 0 14px 10px;
-    border-bottom: 1px solid var(--line);
-}
-
-.icon-btn {
-    flex: none;
-    width: 32px;
-    height: 32px;
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    background: var(--card-2);
-    color: var(--text);
-    font-size: 14px;
-    line-height: 1;
-}
-
-.sheet-title {
-    font-size: 16px;
-    font-weight: 700;
-    letter-spacing: 0.3px;
-}
-
-.status {
-    margin-left: auto;
-    font-size: 13px;
-    color: var(--muted);
-    min-height: 16px;
-}
-
-.sheet-body {
+/* horizontal track of full-width pages; swipe / tab click translates it.
+   pan-y lets vertical scroll stay native while horizontal gestures come to js. */
+.tab-track {
     flex: 1;
     min-height: 0;
+    display: flex;
+    width: 100%;
+    transition: transform 0.25s ease;
+    touch-action: pan-y;
+}
+
+.tab-track.dragging {
+    transition: none;
+}
+
+.tab-page {
+    flex: 0 0 100%;
+    width: 100%;
+    min-width: 100%;
+    height: 100%;
     overflow-y: auto;
+    overflow-x: hidden;
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
     display: flex;
     flex-direction: column;
-    gap: calc(14px * var(--space-scale, 1));
-    padding: calc(14px * var(--space-scale, 1));
-    /* general size scaler: zoom is a real layout zoom in the android webview
-       (chromium), so content reflows and scrolls correctly at any scale */
-    zoom: var(--ui-scale, 1);
+    gap: calc(6px * var(--space-scale));
+    padding: calc(8px * var(--space-scale)) 14px calc(14px + env(safe-area-inset-bottom));
 }
 
-.sheet-actions {
+.subhead {
+    margin-top: calc(8px * var(--space-scale));
+    font-size: 0.85em;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+}
+
+/* bottom bar 1: tabs */
+.tabbar {
     flex: none;
     display: flex;
-    gap: 10px;
-    padding: 12px 14px calc(12px + env(safe-area-inset-bottom));
+    gap: 4px;
+    padding: 6px;
+    background: var(--sheet-bg);
+    -webkit-backdrop-filter: blur(18px);
+    backdrop-filter: blur(18px);
     border-top: 1px solid var(--line);
-    background: rgba(0, 0, 0, 0.22);
+    font-size: calc(14px * var(--ui-scale));
+}
+
+.tab-btn {
+    flex: 1;
+    padding: 0.75em 0.4em;
+    border: 0;
+    border-radius: var(--radius);
+    background: transparent;
+    color: var(--muted);
+    font-size: 1em;
+    font-weight: 600;
+    font-family: inherit;
+}
+
+.tab-btn.active {
+    background: var(--card-2);
+    color: var(--text);
+}
+
+.tab-btn.active::after {
+    content: "";
+    display: block;
+    width: 18px;
+    height: 3px;
+    margin: 3px auto 0;
+    border-radius: 2px;
+    background: var(--accent);
+}
+
+/* bottom bar 2: sources */
+.sources-bar {
+    flex: none;
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+    padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
+    background: var(--sheet-bg);
+    -webkit-backdrop-filter: blur(18px);
+    backdrop-filter: blur(18px);
+    border-top: 1px solid var(--line);
+    font-size: calc(14px * var(--ui-scale));
+}
+
+.sources-lead {
+    flex: none;
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+}
+
+.mode-seg {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 3px;
+    background: var(--card-2);
+    border-radius: var(--radius);
+}
+
+.mode-seg .seg-btn {
+    flex: 1;
+    padding: 0 0.7em;
+    border: 0;
+    border-radius: calc(var(--radius) - 3px);
+    background: transparent;
+    color: var(--muted);
+    font-size: 0.82em;
+    font-weight: 600;
+    font-family: inherit;
+    min-height: 26px;
+}
+
+.mode-seg .seg-btn.active {
+    background: var(--accent);
+    color: var(--accent-ink);
+}
+
+/* the 4-icon source-actions square (add / clear / fullscreen / save) */
+.source-actions {
+    flex: none;
+    width: 62px;
+    height: 62px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 2px;
+    padding: 2px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--card-2);
+}
+
+.source-actions button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    border-radius: calc(var(--radius) - 6px);
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text);
+}
+
+.source-actions button svg {
+    width: 15px;
+    height: 15px;
+}
+
+/* single-row horizontal strip of source squares; fullscreen -> wrapping grid */
+.source-strip {
+    flex: 1;
+    min-width: 0;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 62px;
+    grid-template-rows: 62px;
+    gap: 8px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+}
+
+.source-strip::-webkit-scrollbar {
+    display: none;
+}
+
+.source-strip .tile {
+    aspect-ratio: auto;
+    width: 62px;
+    height: 62px;
+}
+
+/* sources fullscreen: cover the screen below the top bar, multi-row grid */
+.sources-bar.fullscreen {
+    position: fixed;
+    left: 0;
+    right: 0;
+    top: calc(env(safe-area-inset-top) + 52px);
+    bottom: 0;
+    z-index: 6;
+    flex-direction: column;
+    align-items: stretch;
+    overflow-y: auto;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+
+.sources-bar.fullscreen .sources-lead {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    justify-content: space-between;
+    padding-bottom: 8px;
+    background: var(--sheet-bg);
+}
+
+.sources-bar.fullscreen .source-strip {
+    display: grid;
+    grid-auto-flow: row;
+    grid-template-columns: repeat(auto-fill, minmax(var(--tile, 84px), 1fr));
+    grid-auto-columns: auto;
+    grid-template-rows: none;
+    grid-auto-rows: 1fr;
+    overflow: visible;
+}
+
+.sources-bar.fullscreen .source-strip .tile {
+    width: auto;
+    height: auto;
+    aspect-ratio: 1 / 1;
 }
 
 /* ---- cards + controls ---- */
 
-.card {
-    background: var(--card);
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    padding: calc(16px * var(--space-scale, 1));
-}
-
-.card h2 {
-    margin: 0 0 12px;
-    font-size: 15px;
+h2 {
+    margin: 0 0 10px;
+    font-size: 0.95em;
     color: var(--muted);
     text-transform: uppercase;
     letter-spacing: 1px;
@@ -228,33 +530,18 @@ body {
 .seg {
     display: flex;
     gap: 6px;
-    background: var(--card-2);
-    padding: 4px;
-    border-radius: var(--radius);
-}
-
-.seg-btn {
-    flex: 1;
-    padding: 10px;
-    border: 0;
-    border-radius: var(--radius);
-    background: transparent;
-    color: var(--muted);
-    font-size: 15px;
-    font-weight: 600;
-}
-
-.seg-btn.active {
-    background: var(--accent);
-    color: var(--accent-ink);
 }
 
 .field {
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    margin-top: calc(14px * var(--space-scale, 1));
-    font-size: 14px;
+    gap: 5px;
+    margin-top: calc(12px * var(--space-scale));
+    font-size: 1em;
+}
+
+.field:first-child {
+    margin-top: calc(4px * var(--space-scale));
 }
 
 .field span {
@@ -276,16 +563,17 @@ input[type="color"] {
 }
 
 select {
-    padding: 11px;
+    padding: 0.7em;
     background: var(--card-2);
     color: var(--text);
     border: 1px solid var(--line);
     border-radius: var(--radius);
-    font-size: 15px;
+    font-size: 1em;
+    font-family: inherit;
 }
 
 input[type="color"] {
-    height: 42px;
+    height: 2.8em;
     padding: 4px;
     background: var(--card-2);
     border: 1px solid var(--line);
@@ -295,13 +583,14 @@ input[type="color"] {
 .btn {
     display: inline-block;
     width: 100%;
-    padding: 13px;
+    padding: 0.85em;
     border: 1px solid var(--line);
     border-radius: var(--radius);
     background: var(--card-2);
     color: var(--text);
-    font-size: 15px;
+    font-size: 1em;
     font-weight: 600;
+    font-family: inherit;
 }
 
 .btn.primary {
@@ -316,45 +605,18 @@ input[type="color"] {
 
 .muted {
     color: var(--muted);
-    font-size: 13px;
-    margin: 10px 0 0;
-    word-break: break-all;
+    font-size: 0.9em;
+    margin: 8px 0 0;
+    word-break: break-word;
 }
 
-.image-list {
-    list-style: none;
-    margin: 12px 0 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.image-list li {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    padding: 10px 12px;
-    background: var(--card-2);
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    font-size: 13px;
-}
-
-.image-list li span {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-/* ---- tile grids (images + filters) ---- */
+/* ---- tile grids (filters + fullscreen sources) ---- */
 
 .tile-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(var(--tile, 84px), 1fr));
     gap: 8px;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
 }
 
 .tile {
@@ -388,11 +650,12 @@ input[type="color"] {
 }
 
 .tile-label {
-    font-size: 13px;
+    font-size: 0.86em;
     font-weight: 600;
     color: var(--text);
     line-height: 1.2;
     word-break: break-word;
+    overflow: hidden;
 }
 
 .image-tile img {
@@ -406,11 +669,10 @@ input[type="color"] {
 .tile-add {
     border-style: dashed;
     color: var(--muted);
-    font-size: 26px;
+    font-size: 24px;
     font-weight: 400;
 }
 
-/* corner controls on a tile */
 .tile-x,
 .tile-toggle {
     position: absolute;
@@ -447,6 +709,22 @@ input[type="color"] {
     border-color: var(--accent);
 }
 
+/* smaller corner controls on the compact strip squares */
+.source-strip .tile-x,
+.source-strip .tile-toggle {
+    width: 18px;
+    height: 18px;
+    top: 3px;
+}
+
+.source-strip .tile-x {
+    right: 3px;
+}
+
+.source-strip .tile-toggle {
+    left: 3px;
+}
+
 .tile-editor {
     border-top: 1px solid var(--line);
     padding-top: 6px;
@@ -457,7 +735,7 @@ input[type="color"] {
     flex-direction: row;
     align-items: center;
     justify-content: space-between;
-    margin-top: 0;
+    margin-top: calc(10px * var(--space-scale));
 }
 
 .field.row span {
@@ -465,8 +743,8 @@ input[type="color"] {
 }
 
 .field.row input[type="checkbox"] {
-    width: 24px;
-    height: 24px;
+    width: 1.6em;
+    height: 1.6em;
     accent-color: var(--accent);
 }
 
@@ -478,7 +756,7 @@ input[type="color"] {
 
 .preset-group h3 {
     margin: 0 0 6px;
-    font-size: 13px;
+    font-size: 0.9em;
     color: var(--muted);
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -492,18 +770,19 @@ input[type="color"] {
 .preset-name {
     flex: 1;
     min-width: 0;
-    padding: 10px;
+    padding: 0.7em;
     background: var(--card-2);
     color: var(--text);
     border: 1px solid var(--line);
     border-radius: var(--radius);
-    font-size: 14px;
+    font-size: 1em;
+    font-family: inherit;
 }
 
 .preset-add .btn {
     width: auto;
     flex: none;
-    padding: 10px 14px;
+    padding: 0.7em 1em;
 }
 
 .preset-list {
@@ -517,7 +796,7 @@ input[type="color"] {
 
 .preset-empty {
     color: var(--muted);
-    font-size: 13px;
+    font-size: 0.9em;
 }
 
 .preset-list li {
@@ -528,12 +807,13 @@ input[type="color"] {
 .preset-load {
     flex: 1;
     text-align: left;
-    padding: 9px 12px;
+    padding: 0.7em 0.85em;
     border: 1px solid var(--line);
     border-radius: var(--radius);
     background: var(--card-2);
     color: var(--text);
-    font-size: 14px;
+    font-size: 1em;
+    font-family: inherit;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -541,7 +821,7 @@ input[type="color"] {
 
 .preset-del {
     flex: none;
-    width: 36px;
+    width: 2.4em;
     border: 1px solid var(--line);
     border-radius: var(--radius);
     background: transparent;
