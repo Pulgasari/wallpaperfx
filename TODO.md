@@ -17,8 +17,11 @@
 ## filters
 
 - [ ] filters alphabetisch sortieren
-- [ ] farbe einstellbar bei `vignette`
 - [ ] add filter: `fisheye`
+- [ ] add filter: `grain`
+- [ ] add filter: `noise`
+- [ ] add filter: `duotone-2`: (weiss nich wie mans nennen soll. aber man könnte bei der fg auch mehrere farben angeben + zeitdauer, dann wechselt die farbe dazwischen allmählich hin und her)
+- [ ] enhance filter `vignette`: farbe einstellbar (default: black)
 
 ## bugs
 
