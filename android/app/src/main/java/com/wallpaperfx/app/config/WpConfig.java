@@ -21,21 +21,31 @@ public class WpConfig {
     // mode: "video" | "images"
     public String mode = "video";
 
-    // video
-    public String videoPath = null;
+    // video: ordered list of items (reuses ImageItem = {path, enabled}), each
+    // individually enable-able and reorderable, mirrored in app.js as `videos`.
+    public String videoPath = null;     // legacy single path, kept for migration only
+    public List<ImageItem> videos = new ArrayList<>();
+    // loop | loop-random | single (single = one video, random pick, looped)
+    public String videoOrder = "loop";
     public String videoScale = "cover"; // cover | fit
     public float videoOffsetX = 0f;     // -1..1, pan within cropped area (cover only)
     public float videoOffsetY = 0f;
     public float videoSpeed = 1.0f;     // playback rate, 0.25..3
+    public boolean resumeVideo = true;  // remember playback position across reloads
 
     // images: ordered list of items, each individually enable-able
     public List<ImageItem> images = new ArrayList<>();
-    public String imageOrder = "normal"; // normal | random
+    // loop | loop-random | single (legacy: normal -> loop, random -> loop-random)
+    public String imageOrder = "loop";
     public int imageDurationMs = 8000;
     public int imageTransitionMs = 800;
     public String imageScale = "cover"; // cover | fit
     public float imageOffsetX = 0f;
     public float imageOffsetY = 0f;
+
+    // mirror the source content on the x / y axis (applies to video and images)
+    public boolean flipX = false;
+    public boolean flipY = false;
 
     // ordered filter chain, applied top to bottom in separate gl passes
     public List<FilterEntry> filters = new ArrayList<>();
@@ -63,8 +73,17 @@ public class WpConfig {
 
     // paths of the enabled images, in order, for the renderer to cycle through.
     public List<String> enabledImagePaths() {
+        return enabledPaths(images);
+    }
+
+    // paths of the enabled videos, in order, for the renderer to cycle through.
+    public List<String> enabledVideoPaths() {
+        return enabledPaths(videos);
+    }
+
+    private static List<String> enabledPaths(List<ImageItem> items) {
         List<String> out = new ArrayList<>();
-        for (ImageItem it : images) {
+        for (ImageItem it : items) {
             if (it.enabled && it.path != null && !it.path.isEmpty()) out.add(it.path);
         }
         return out;
@@ -74,13 +93,14 @@ public class WpConfig {
     // multiple times with different settings.
     // type: none | duotone | grayscale | sepia | gradientmap | posterize |
     //       pixelate | halftone | scanlines | crt | vignette | chromatic |
-    //       invert | filmgrain | glitch | vhs
+    //       invert | filmgrain | glitch | vhs | bloom | blur | fisheye |
+    //       grain | noise | duotone2
     public static class FilterEntry {
         public String type = "none";
         public boolean enabled = true;
         public int[] colorA = {18, 20, 42};      // duotone/gradient dark, halftone ink
         public int[] colorB = {240, 186, 72};    // duotone/gradient light, halftone paper
-        public int[] colorC = {120, 84, 168};    // gradientmap midtone
+        public int[] colorC = {120, 84, 168};    // gradientmap midtone, duotone2 second highlight
         public float scanCount = 320f;
         public float scanStrength = 0.35f;
         public float crtMask = 0.30f;
@@ -90,13 +110,21 @@ public class WpConfig {
         public float halftone = 90f;
         public float vignette = 0.6f;
         public float vignetteRadius = 0.6f;
+        public int[] vignetteColor = {0, 0, 0};  // vignette tint (default black)
         public float chromatic = 0.006f;
         public float grain = 0.15f;
         public float glitch = 0.5f;
         public float vhs = 0.6f;
+        public float bloom = 0.6f;               // bloom intensity
+        public float bloomThreshold = 0.7f;
+        public float blurRadius = 2.0f;          // blur tap spacing in px
+        public float fisheye = 0.5f;             // -1..1 lens distortion
+        public float noise = 0.15f;
+        public float cycleSec = 6.0f;            // duotone2 color-cycle period
 
         public boolean isAnimated() {
-            return "filmgrain".equals(type) || "glitch".equals(type) || "vhs".equals(type);
+            return "filmgrain".equals(type) || "glitch".equals(type)
+                    || "vhs".equals(type) || "duotone2".equals(type);
         }
 
         JSONObject toJson() throws Exception {
@@ -115,10 +143,17 @@ public class WpConfig {
             o.put("halftone", halftone);
             o.put("vignette", vignette);
             o.put("vignetteRadius", vignetteRadius);
+            o.put("vignetteColor", intArray(vignetteColor));
             o.put("chromatic", chromatic);
             o.put("grain", grain);
             o.put("glitch", glitch);
             o.put("vhs", vhs);
+            o.put("bloom", bloom);
+            o.put("bloomThreshold", bloomThreshold);
+            o.put("blurRadius", blurRadius);
+            o.put("fisheye", fisheye);
+            o.put("noise", noise);
+            o.put("cycleSec", cycleSec);
             return o;
         }
 
@@ -138,10 +173,17 @@ public class WpConfig {
             f.halftone = (float) o.optDouble("halftone", f.halftone);
             f.vignette = (float) o.optDouble("vignette", f.vignette);
             f.vignetteRadius = (float) o.optDouble("vignetteRadius", f.vignetteRadius);
+            f.vignetteColor = readColor(o.optJSONArray("vignetteColor"), f.vignetteColor);
             f.chromatic = (float) o.optDouble("chromatic", f.chromatic);
             f.grain = (float) o.optDouble("grain", f.grain);
             f.glitch = (float) o.optDouble("glitch", f.glitch);
             f.vhs = (float) o.optDouble("vhs", f.vhs);
+            f.bloom = (float) o.optDouble("bloom", f.bloom);
+            f.bloomThreshold = (float) o.optDouble("bloomThreshold", f.bloomThreshold);
+            f.blurRadius = (float) o.optDouble("blurRadius", f.blurRadius);
+            f.fisheye = (float) o.optDouble("fisheye", f.fisheye);
+            f.noise = (float) o.optDouble("noise", f.noise);
+            f.cycleSec = (float) o.optDouble("cycleSec", f.cycleSec);
             return f;
         }
     }
@@ -180,11 +222,20 @@ public class WpConfig {
         JSONObject o = new JSONObject();
         o.put("mode", mode);
 
-        o.put("videoPath", videoPath == null ? JSONObject.NULL : videoPath);
+        JSONArray vids = new JSONArray();
+        for (ImageItem it : videos) {
+            JSONObject vo = new JSONObject();
+            vo.put("path", it.path);
+            vo.put("enabled", it.enabled);
+            vids.put(vo);
+        }
+        o.put("videos", vids);
+        o.put("videoOrder", videoOrder);
         o.put("videoScale", videoScale);
         o.put("videoOffsetX", videoOffsetX);
         o.put("videoOffsetY", videoOffsetY);
         o.put("videoSpeed", videoSpeed);
+        o.put("resumeVideo", resumeVideo);
 
         JSONArray imgs = new JSONArray();
         for (ImageItem it : images) {
@@ -200,6 +251,9 @@ public class WpConfig {
         o.put("imageScale", imageScale);
         o.put("imageOffsetX", imageOffsetX);
         o.put("imageOffsetY", imageOffsetY);
+
+        o.put("flipX", flipX);
+        o.put("flipY", flipY);
 
         JSONArray fs = new JSONArray();
         for (FilterEntry f : filters) fs.put(f.toJson());
@@ -221,19 +275,21 @@ public class WpConfig {
         videoOffsetX = (float) o.optDouble("videoOffsetX", videoOffsetX);
         videoOffsetY = (float) o.optDouble("videoOffsetY", videoOffsetY);
         videoSpeed = (float) o.optDouble("videoSpeed", videoSpeed);
+        videoOrder = o.optString("videoOrder", videoOrder);
+        resumeVideo = o.optBoolean("resumeVideo", resumeVideo);
+
+        JSONArray vids = o.optJSONArray("videos");
+        if (vids != null) {
+            videos = readItems(vids);
+        } else if (videoPath != null && !videoPath.isEmpty()) {
+            // migrate the pre-list config (single videoPath) into one item
+            videos = new ArrayList<>();
+            videos.add(new ImageItem(videoPath));
+        }
 
         JSONArray imgs = o.optJSONArray("images");
         if (imgs != null) {
-            images = new ArrayList<>();
-            for (int i = 0; i < imgs.length(); i++) {
-                JSONObject io = imgs.optJSONObject(i);
-                if (io == null) continue;
-                String p = io.optString("path", null);
-                if (p == null || p.isEmpty()) continue;
-                ImageItem it = new ImageItem(p);
-                it.enabled = io.optBoolean("enabled", true);
-                images.add(it);
-            }
+            images = readItems(imgs);
         } else {
             // migrate the pre-tiles config (imagePaths: array of strings)
             JSONArray legacy = o.optJSONArray("imagePaths");
@@ -251,6 +307,9 @@ public class WpConfig {
         imageScale = o.optString("imageScale", imageScale);
         imageOffsetX = (float) o.optDouble("imageOffsetX", imageOffsetX);
         imageOffsetY = (float) o.optDouble("imageOffsetY", imageOffsetY);
+
+        flipX = o.optBoolean("flipX", flipX);
+        flipY = o.optBoolean("flipY", flipY);
 
         JSONArray fs = o.optJSONArray("filters");
         if (fs != null) {
@@ -293,6 +352,21 @@ public class WpConfig {
         f.glitch = (float) o.optDouble("glitchAmount", f.glitch);
         f.vhs = (float) o.optDouble("vhsAmount", f.vhs);
         filters.add(f);
+    }
+
+    // reads a json array of {path, enabled} objects into a media item list.
+    private static List<ImageItem> readItems(JSONArray arr) {
+        List<ImageItem> out = new ArrayList<>();
+        for (int i = 0; i < arr.length(); i++) {
+            JSONObject io = arr.optJSONObject(i);
+            if (io == null) continue;
+            String p = io.optString("path", null);
+            if (p == null || p.isEmpty()) continue;
+            ImageItem it = new ImageItem(p);
+            it.enabled = io.optBoolean("enabled", true);
+            out.add(it);
+        }
+        return out;
     }
 
     private static JSONArray intArray(int[] v) {

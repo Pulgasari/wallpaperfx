@@ -1,6 +1,7 @@
 package com.wallpaperfx.app.wallpaper;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.SurfaceTexture;
@@ -37,12 +38,14 @@ class SceneRenderer implements GLRenderThread.Renderer {
             "uniform vec2 uUvScale;\n" +
             "uniform vec2 uUvOffset;\n" +
             "uniform vec2 uPosScale;\n" +
+            "uniform vec2 uFlip;\n" + // (-1,1)=flip x, (1,-1)=flip y; content pass only
             "attribute vec2 aPosition;\n" +
             "attribute vec2 aTexCoord;\n" +
             "varying vec2 vTexCoord;\n" +
             "varying vec2 vScreenCoord;\n" +
             "void main() {\n" +
             "  vec2 uv = (aTexCoord - 0.5) * uUvScale + 0.5 + uUvOffset;\n" +
+            "  uv = (uv - 0.5) * uFlip + 0.5;\n" +
             "  vTexCoord = (uTexMatrix * vec4(uv, 0.0, 1.0)).xy;\n" +
             "  vScreenCoord = aTexCoord;\n" + // 0..1 across the screen (fullscreen quad)
             "  gl_Position = vec4(aPosition * uPosScale, 0.0, 1.0);\n" +
@@ -73,6 +76,11 @@ class SceneRenderer implements GLRenderThread.Renderer {
 
     private int screenW, screenH;
     private volatile boolean needsReload = true;
+    // full re-setup on first load / surface change; visibility returns only reload
+    // when the config file actually changed, so an unchanged config keeps the video
+    // playing (no restart, last frame stays) instead of tearing media down.
+    private volatile boolean forceReload = true;
+    private long loadedConfigMtime = -1L;
 
     // home-screen swipe position (0..1, 0.5 = centered), drives parallax
     private volatile float xOffset = 0.5f;
@@ -92,6 +100,13 @@ class SceneRenderer implements GLRenderThread.Renderer {
     private boolean frameAvailable;
     private volatile int videoW, videoH;
     private volatile boolean videoReady;
+    // multi-video cycling: the current index into activeVideoPaths, an advance flag
+    // set by the completion listener (handled on the render thread), and a pending
+    // seek applied on prepare so a remembered position resumes instead of restarting.
+    private List<String> activeVideoPaths = new ArrayList<>();
+    private int videoIndex;
+    private volatile boolean advancePending;
+    private volatile int pendingSeekMs;
 
     // image slideshow state; flip-y texture matrix so 2d textures render upright
     // (our quad maps screen-top to tex v=1). must match preview UNPACK_FLIP_Y=true.
@@ -110,6 +125,10 @@ class SceneRenderer implements GLRenderThread.Renderer {
     private final float[] identityMatrix = new float[16];
     // full-screen 1:1 uv transform used by chain passes
     private static final float[] FULL = {1f, 1f, 0f, 0f, 1f, 1f};
+    // uFlip values: chain passes never flip (fbo already holds flipped content),
+    // content passes use contentFlip derived from cfg.flipX / cfg.flipY
+    private static final float[] NO_FLIP = {1f, 1f};
+    private final float[] contentFlip = {1f, 1f};
 
     // ping-pong offscreen targets for the filter chain
     private Fbo fboA, fboB;
@@ -155,18 +174,32 @@ class SceneRenderer implements GLRenderThread.Renderer {
         screenW = width;
         screenH = height;
         createFbos(width, height);
-        // re-decode images at the new resolution
+        // re-decode images / re-setup at the new resolution
+        forceReload = true;
         needsReload = true;
     }
 
     @Override
     public long onDrawFrame() {
         if (needsReload && screenW > 0 && screenH > 0) {
-            applyConfig();
+            long mtime = configMtime();
+            // only a real config change (or a forced first-load/surface reload)
+            // rebuilds media; a plain visibility return leaves the video running
+            if (forceReload || mtime != loadedConfigMtime) {
+                applyConfig();
+                loadedConfigMtime = mtime;
+                forceReload = false;
+            }
             needsReload = false;
         }
         if (fboA == null || fboB == null) {
             return Long.MAX_VALUE;
+        }
+        // advance to the next video when the previous one finished (multi-video
+        // loop / loop-random); done here on the render thread, not the callback
+        if (advancePending) {
+            advancePending = false;
+            advanceVideo();
         }
 
         // pass 0: render the source (video or image cross-fade) into fbo a, unfiltered
@@ -197,7 +230,7 @@ class SceneRenderer implements GLRenderThread.Renderer {
         if (total == 0) {
             // passthrough: copy the source to the screen
             bindTarget(0);
-            drawQuad(prog2d, GLES20.GL_TEXTURE_2D, fboA.tex, identityMatrix, FULL, 1f, null);
+            drawQuad(prog2d, GLES20.GL_TEXTURE_2D, fboA.tex, identityMatrix, FULL, 1f, null, NO_FLIP);
             return;
         }
         for (WpConfig.FilterEntry f : cfg.filters) {
@@ -205,7 +238,7 @@ class SceneRenderer implements GLRenderThread.Renderer {
             boolean last = (drawn == total - 1);
             Fbo writeFbo = (readFbo == fboA) ? fboB : fboA;
             bindTarget(last ? 0 : writeFbo.fb);
-            drawQuad(prog2d, GLES20.GL_TEXTURE_2D, readTex, identityMatrix, FULL, 1f, f);
+            drawQuad(prog2d, GLES20.GL_TEXTURE_2D, readTex, identityMatrix, FULL, 1f, f, NO_FLIP);
             if (!last) {
                 readTex = writeFbo.tex;
                 readFbo = writeFbo;
@@ -262,14 +295,19 @@ class SceneRenderer implements GLRenderThread.Renderer {
         }
         if (videoW > 0 && videoH > 0) {
             float[] s = computeScale(videoW, videoH, cfg.videoScale, cfg.videoOffsetX, cfg.videoOffsetY);
-            drawQuad(progOes, GLES11Ext.GL_TEXTURE_EXTERNAL_OES, oesTexId, videoMatrix, s, 1f, null);
+            drawQuad(progOes, GLES11Ext.GL_TEXTURE_EXTERNAL_OES, oesTexId, videoMatrix, s, 1f, null, contentFlip);
         }
         // demand-driven: redraw only when a new decoded frame arrives
         return Long.MAX_VALUE;
     }
 
     private void setupVideo() {
-        if (cfg.videoPath == null) return;
+        if (activeVideoPaths.isEmpty()) return;
+        // single -> one random clip; otherwise resume the remembered index if the
+        // list is unchanged, else start at the top
+        videoIndex = isSingleVideo() ? random.nextInt(activeVideoPaths.size()) : resumeIndex();
+        pendingSeekMs = resumeSeekFor(videoIndex);
+
         oesTexId = createOesTexture();
         videoSurfaceTexture = new SurfaceTexture(oesTexId);
         videoSurfaceTexture.setOnFrameAvailableListener(st -> {
@@ -281,9 +319,24 @@ class SceneRenderer implements GLRenderThread.Renderer {
         videoSurface = new Surface(videoSurfaceTexture);
         try {
             mediaPlayer = new MediaPlayer();
+            startCurrentVideo();
+        } catch (Exception e) {
+            Log.e(GLUtil.TAG, "video setup failed", e);
+            releaseVideo();
+        }
+    }
+
+    // (re)configures the media player for activeVideoPaths[videoIndex]. reused for
+    // the first clip and every advance; listeners are (re)set here so they survive
+    // reset(). onPrepared applies the pending seek so a remembered position resumes.
+    private void startCurrentVideo() {
+        if (mediaPlayer == null || activeVideoPaths.isEmpty()) return;
+        String path = activeVideoPaths.get(videoIndex);
+        try {
+            mediaPlayer.reset();
             mediaPlayer.setSurface(videoSurface);
-            mediaPlayer.setDataSource(cfg.videoPath);
-            mediaPlayer.setLooping(true);
+            mediaPlayer.setDataSource(path);
+            mediaPlayer.setLooping(shouldLoopCurrent());
             mediaPlayer.setVolume(0f, 0f);
             mediaPlayer.setOnVideoSizeChangedListener((mp, w, h) -> {
                 if (w > 0 && h > 0) {
@@ -297,6 +350,9 @@ class SceneRenderer implements GLRenderThread.Renderer {
                     videoH = mp.getVideoHeight();
                 }
                 try {
+                    int seek = pendingSeekMs;
+                    pendingSeekMs = 0;
+                    if (seek > 0) mp.seekTo(seek);
                     mp.start();
                     // playback speed; some codecs reject non-default rates, hence the guard
                     float speed = clamp(cfg.videoSpeed, 0.25f, 3f);
@@ -307,15 +363,67 @@ class SceneRenderer implements GLRenderThread.Renderer {
                 }
                 videoReady = true;
             });
+            mediaPlayer.setOnCompletionListener(mp -> {
+                // fires only when not looping (multi-clip loop / loop-random); the
+                // actual advance runs on the render thread via advancePending
+                advancePending = true;
+                if (thread != null) thread.requestRender();
+            });
             mediaPlayer.prepareAsync();
         } catch (Exception e) {
-            Log.e(GLUtil.TAG, "video setup failed for " + cfg.videoPath, e);
+            Log.e(GLUtil.TAG, "video start failed for " + path, e);
             releaseVideo();
         }
     }
 
-    private void releaseVideo() {
+    // moves to the next clip after the previous finished (render thread only)
+    private void advanceVideo() {
+        if (mediaPlayer == null || activeVideoPaths.isEmpty()) return;
+        videoIndex = pickNextVideo();
+        pendingSeekMs = 0;
         videoReady = false;
+        videoW = 0;
+        videoH = 0;
+        startCurrentVideo();
+    }
+
+    private int pickNextVideo() {
+        int count = activeVideoPaths.size();
+        if (count <= 1) return 0;
+        if (isRandomVideoOrder()) {
+            int n;
+            do {
+                n = random.nextInt(count);
+            } while (n == videoIndex);
+            return n;
+        }
+        return (videoIndex + 1) % count;
+    }
+
+    private boolean isSingleVideo() {
+        return "single".equals(cfg.videoOrder);
+    }
+
+    private boolean isRandomVideoOrder() {
+        return "loop-random".equals(cfg.videoOrder);
+    }
+
+    // loop the current clip internally when it is the only thing to play; multi-clip
+    // loop / loop-random rely on the completion listener to advance instead
+    private boolean shouldLoopCurrent() {
+        return isSingleVideo() || activeVideoPaths.size() <= 1;
+    }
+
+    private void releaseVideo() {
+        // remember where we were so the next setup can resume instead of restarting
+        if (mediaPlayer != null && cfg.resumeVideo && !activeVideoPaths.isEmpty()) {
+            try {
+                persistResume(videoSignature(), videoIndex, mediaPlayer.getCurrentPosition());
+            } catch (Exception ignored) {
+            }
+        }
+        videoReady = false;
+        advancePending = false;
         if (mediaPlayer != null) {
             try {
                 mediaPlayer.stop();
@@ -343,6 +451,44 @@ class SceneRenderer implements GLRenderThread.Renderer {
         videoH = 0;
     }
 
+    // ---- video resume (survives full teardown via shared prefs) ----
+
+    private static final String RESUME_PREFS = "wallpaperfx_video";
+
+    // order-sensitive signature of the enabled video list, so a resume only applies
+    // when the same set of videos is still configured
+    private String videoSignature() {
+        return String.valueOf(activeVideoPaths.hashCode());
+    }
+
+    private int resumeIndex() {
+        if (!cfg.resumeVideo) return 0;
+        SharedPreferences p = context.getSharedPreferences(RESUME_PREFS, Context.MODE_PRIVATE);
+        if (!videoSignature().equals(p.getString("sig", ""))) return 0;
+        int idx = p.getInt("index", 0);
+        return (idx >= 0 && idx < activeVideoPaths.size()) ? idx : 0;
+    }
+
+    private int resumeSeekFor(int idx) {
+        if (!cfg.resumeVideo) return 0;
+        SharedPreferences p = context.getSharedPreferences(RESUME_PREFS, Context.MODE_PRIVATE);
+        if (!videoSignature().equals(p.getString("sig", ""))) return 0;
+        if (p.getInt("index", -1) != idx) return 0;
+        return Math.max(0, p.getInt("pos", 0));
+    }
+
+    private void persistResume(String sig, int index, int pos) {
+        try {
+            context.getSharedPreferences(RESUME_PREFS, Context.MODE_PRIVATE)
+                    .edit().putString("sig", sig).putInt("index", index).putInt("pos", pos).apply();
+        } catch (Exception ignored) {
+        }
+    }
+
+    private long configMtime() {
+        return WpConfig.file(context).lastModified();
+    }
+
     // ---- images ----
 
     private long drawImages() {
@@ -351,11 +497,13 @@ class SceneRenderer implements GLRenderThread.Renderer {
         }
         long now = SystemClock.uptimeMillis();
         int count = activeImagePaths.size();
+        // "single" holds one static image; loop / loop-random cycle the slideshow
+        boolean cycles = count > 1 && !isSingleImage();
 
         float[] sa = computeScale(texAw, texAh, cfg.imageScale, cfg.imageOffsetX, cfg.imageOffsetY);
-        drawQuad(prog2d, GLES20.GL_TEXTURE_2D, texA, imageMatrix, sa, 1f, null);
+        drawQuad(prog2d, GLES20.GL_TEXTURE_2D, texA, imageMatrix, sa, 1f, null, contentFlip);
 
-        if (count > 1) {
+        if (cycles) {
             if (!transitioning && now - lastShownAt >= cfg.imageDurationMs) {
                 nextIndex = pickNext(count);
                 texB = loadTexture(activeImagePaths.get(nextIndex));
@@ -387,7 +535,7 @@ class SceneRenderer implements GLRenderThread.Renderer {
                     float[] sb = computeScale(texBw, texBh, cfg.imageScale, cfg.imageOffsetX, cfg.imageOffsetY);
                     GLES20.glEnable(GLES20.GL_BLEND);
                     GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA);
-                    drawQuad(prog2d, GLES20.GL_TEXTURE_2D, texB, imageMatrix, sb, t, null);
+                    drawQuad(prog2d, GLES20.GL_TEXTURE_2D, texB, imageMatrix, sb, t, null, contentFlip);
                     GLES20.glDisable(GLES20.GL_BLEND);
                 }
             }
@@ -396,15 +544,24 @@ class SceneRenderer implements GLRenderThread.Renderer {
         if (transitioning) {
             return 0L; // animate the cross-fade
         }
-        if (count > 1) {
+        if (cycles) {
             long remain = cfg.imageDurationMs - (now - lastShownAt);
             return Math.max(16L, remain);
         }
         return Long.MAX_VALUE; // single static image
     }
 
+    // "loop-random" (and legacy "random") pick a random next image; loop is sequential
+    private boolean isRandomOrder() {
+        return "loop-random".equals(cfg.imageOrder) || "random".equals(cfg.imageOrder);
+    }
+
+    private boolean isSingleImage() {
+        return "single".equals(cfg.imageOrder);
+    }
+
     private int pickNext(int count) {
-        if ("random".equals(cfg.imageOrder)) {
+        if (isRandomOrder()) {
             if (count <= 1) return 0;
             int n;
             do {
@@ -417,8 +574,9 @@ class SceneRenderer implements GLRenderThread.Renderer {
 
     private void setupImages() {
         if (activeImagePaths.isEmpty()) return;
-        imageIndex = 0;
-        texA = loadTexture(activeImagePaths.get(0));
+        // single mode shows one image; pick it at random from the enabled set
+        imageIndex = isSingleImage() ? random.nextInt(activeImagePaths.size()) : 0;
+        texA = loadTexture(activeImagePaths.get(imageIndex));
         texAw = lastLoadedW;
         texAh = lastLoadedH;
         transitioning = false;
@@ -439,7 +597,10 @@ class SceneRenderer implements GLRenderThread.Renderer {
         releaseVideo();
         releaseImages();
         cfg = WpConfig.load(context);
+        contentFlip[0] = cfg.flipX ? -1f : 1f;
+        contentFlip[1] = cfg.flipY ? -1f : 1f;
         activeImagePaths = cfg.enabledImagePaths();
+        activeVideoPaths = cfg.enabledVideoPaths();
         if ("images".equals(cfg.mode)) {
             setupImages();
         } else {
@@ -590,7 +751,7 @@ class SceneRenderer implements GLRenderThread.Renderer {
 
     // draws the quad with the given source texture. fe == null means no filter
     // (used for the source pass); otherwise fe supplies the filter and its params.
-    private void drawQuad(Prog p, int target, int texId, float[] texMatrix, float[] s, float alpha, WpConfig.FilterEntry fe) {
+    private void drawQuad(Prog p, int target, int texId, float[] texMatrix, float[] s, float alpha, WpConfig.FilterEntry fe, float[] flip) {
         if (p == null || p.id == 0) return;
         GLES20.glUseProgram(p.id);
 
@@ -605,6 +766,7 @@ class SceneRenderer implements GLRenderThread.Renderer {
         GLES20.glUniform2f(p.uUvScale, s[0], s[1]);
         GLES20.glUniform2f(p.uUvOffset, s[2], s[3]);
         GLES20.glUniform2f(p.uPosScale, s[4], s[5]);
+        GLES20.glUniform2f(p.uFlip, flip[0], flip[1]);
         GLES20.glUniform1f(p.uAlpha, alpha);
         GLES20.glUniform1f(p.uTime, (SystemClock.uptimeMillis() - startTimeMs) / 1000f);
         GLES20.glUniform2f(p.uResolution, screenW, screenH);
@@ -625,10 +787,17 @@ class SceneRenderer implements GLRenderThread.Renderer {
             GLES20.glUniform1f(p.uHalftone, fe.halftone);
             GLES20.glUniform1f(p.uVignette, fe.vignette);
             GLES20.glUniform1f(p.uVignetteRadius, fe.vignetteRadius);
+            color(p.uVignetteColor, fe.vignetteColor);
             GLES20.glUniform1f(p.uChromatic, fe.chromatic);
             GLES20.glUniform1f(p.uGrain, fe.grain);
             GLES20.glUniform1f(p.uGlitch, fe.glitch);
             GLES20.glUniform1f(p.uVhs, fe.vhs);
+            GLES20.glUniform1f(p.uBloom, fe.bloom);
+            GLES20.glUniform1f(p.uBloomThreshold, fe.bloomThreshold);
+            GLES20.glUniform1f(p.uBlurRadius, fe.blurRadius);
+            GLES20.glUniform1f(p.uFisheye, fe.fisheye);
+            GLES20.glUniform1f(p.uNoise, fe.noise);
+            GLES20.glUniform1f(p.uCycleSec, fe.cycleSec);
         }
 
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
@@ -663,6 +832,12 @@ class SceneRenderer implements GLRenderThread.Renderer {
             case "filmgrain": return 13;
             case "glitch": return 14;
             case "vhs": return 15;
+            case "bloom": return 16;
+            case "blur": return 17;
+            case "fisheye": return 18;
+            case "grain": return 19;
+            case "noise": return 20;
+            case "duotone2": return 21;
             default: return 0;
         }
     }
@@ -693,10 +868,11 @@ class SceneRenderer implements GLRenderThread.Renderer {
     private static final class Prog {
         final int id;
         final int aPosition, aTexCoord;
-        final int uTexMatrix, uUvScale, uUvOffset, uPosScale;
+        final int uTexMatrix, uUvScale, uUvOffset, uPosScale, uFlip;
         final int uFilter, uColorA, uColorB, uColorC, uScanCount, uScanStrength, uCrtMask;
         final int uAmount, uLevels, uPixelSize, uHalftone, uVignette, uVignetteRadius, uChromatic;
-        final int uGrain, uGlitch, uVhs, uTime, uResolution, uAlpha, uTexture;
+        final int uGrain, uGlitch, uVhs, uVignetteColor, uBloom, uBloomThreshold, uBlurRadius;
+        final int uFisheye, uNoise, uCycleSec, uTime, uResolution, uAlpha, uTexture;
 
         Prog(String vs, String fs) {
             id = GLUtil.compileProgram(vs, fs);
@@ -706,6 +882,7 @@ class SceneRenderer implements GLRenderThread.Renderer {
             uUvScale = GLES20.glGetUniformLocation(id, "uUvScale");
             uUvOffset = GLES20.glGetUniformLocation(id, "uUvOffset");
             uPosScale = GLES20.glGetUniformLocation(id, "uPosScale");
+            uFlip = GLES20.glGetUniformLocation(id, "uFlip");
             uFilter = GLES20.glGetUniformLocation(id, "uFilter");
             uColorA = GLES20.glGetUniformLocation(id, "uColorA");
             uColorB = GLES20.glGetUniformLocation(id, "uColorB");
@@ -723,6 +900,13 @@ class SceneRenderer implements GLRenderThread.Renderer {
             uGrain = GLES20.glGetUniformLocation(id, "uGrain");
             uGlitch = GLES20.glGetUniformLocation(id, "uGlitch");
             uVhs = GLES20.glGetUniformLocation(id, "uVhs");
+            uVignetteColor = GLES20.glGetUniformLocation(id, "uVignetteColor");
+            uBloom = GLES20.glGetUniformLocation(id, "uBloom");
+            uBloomThreshold = GLES20.glGetUniformLocation(id, "uBloomThreshold");
+            uBlurRadius = GLES20.glGetUniformLocation(id, "uBlurRadius");
+            uFisheye = GLES20.glGetUniformLocation(id, "uFisheye");
+            uNoise = GLES20.glGetUniformLocation(id, "uNoise");
+            uCycleSec = GLES20.glGetUniformLocation(id, "uCycleSec");
             uTime = GLES20.glGetUniformLocation(id, "uTime");
             uResolution = GLES20.glGetUniformLocation(id, "uResolution");
             uAlpha = GLES20.glGetUniformLocation(id, "uAlpha");

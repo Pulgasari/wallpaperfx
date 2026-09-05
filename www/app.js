@@ -32,18 +32,22 @@ const plugin = getPlugin();
 
 const state = {
     mode: 'video',
-    videoPath: null,
+    videos: [], // [{ path, enabled }]
+    videoOrder: 'loop', // loop | loop-random | single
     videoScale: 'cover',
     videoOffsetX: 0,
     videoOffsetY: 0,
     videoSpeed: 1,
+    resumeVideo: true,
     images: [], // [{ path, enabled }]
-    imageOrder: 'normal',
+    imageOrder: 'loop', // loop | loop-random | single
     imageDurationMs: 8000,
     imageTransitionMs: 800,
     imageScale: 'cover',
     imageOffsetX: 0,
     imageOffsetY: 0,
+    flipX: false,
+    flipY: false,
     filters: [], // ordered chain of filter entries (see newFilter)
     parallaxEnabled: false,
     parallaxAmount: 0.15,
@@ -56,6 +60,33 @@ const state = {
 
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
+
+// monochrome inline icons (feather-style, currentColor). filled into any element
+// carrying data-icon="name" via applyIcons(). no emojis, themeable, scale with font.
+const ICONS = {
+    settings: '<line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>',
+    presets: '<path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>',
+    sources: '<polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>',
+    wallpaper: '<rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/>',
+    save: '<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>',
+    add: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
+    clear: '<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
+    expand: '<path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/>',
+    collapse: '<path d="M4 14h6v6"/><path d="M20 10h-6V4"/><path d="M14 10l7-7"/><path d="M3 21l7-7"/>',
+    close: '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
+    pause: '<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>',
+    play: '<polygon points="6 4 20 12 6 20 6 4"/>'
+};
+
+function svgIcon(name) {
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (ICONS[name] || '') + '</svg>';
+}
+
+function applyIcons(root) {
+    (root || document).querySelectorAll('[data-icon]').forEach((el) => {
+        el.innerHTML = svgIcon(el.getAttribute('data-icon'));
+    });
+}
 
 function basename(path) {
     if (!path) return '';
@@ -78,20 +109,25 @@ function hexToRgb(hex) {
 
 // ---- filter chain model + list ui ----
 
+// filter list, sorted alphabetically by label (drives the dropdown/order only;
+// the shader index mapping lives in preview.js FILTER_INDEX and is independent).
 const FILTER_TYPES = [
-    ['duotone', 'Duotone'], ['gradientmap', 'Gradient Map'], ['grayscale', 'Graustufen'],
-    ['sepia', 'Sepia'], ['posterize', 'Posterize'], ['invert', 'Invertieren'],
-    ['pixelate', 'Pixelate'], ['halftone', 'Halftone'], ['scanlines', 'Scanlines'],
-    ['crt', 'CRT'], ['vignette', 'Vignette'], ['chromatic', 'Chromatic'],
-    ['filmgrain', 'Film Grain'], ['glitch', 'Glitch'], ['vhs', 'VHS']
+    ['bloom', 'Bloom'], ['blur', 'Blur'], ['chromatic', 'Chromatic'], ['crt', 'CRT'],
+    ['duotone', 'Duotone'], ['duotone2', 'Duotone Cycle'], ['filmgrain', 'Film Grain'],
+    ['fisheye', 'Fisheye'], ['glitch', 'Glitch'], ['gradientmap', 'Gradient Map'],
+    ['grain', 'Grain'], ['grayscale', 'Graustufen'], ['halftone', 'Halftone'],
+    ['invert', 'Invertieren'], ['noise', 'Noise'], ['pixelate', 'Pixelate'],
+    ['posterize', 'Posterize'], ['scanlines', 'Scanlines'], ['sepia', 'Sepia'],
+    ['vhs', 'VHS'], ['vignette', 'Vignette']
 ];
 const FILTER_LABEL = Object.fromEntries(FILTER_TYPES);
-const ANIMATED_FILTERS = ['filmgrain', 'glitch', 'vhs'];
+const ANIMATED_FILTERS = ['filmgrain', 'glitch', 'vhs', 'duotone2'];
 
 // per-type editable params. color rows: [key, label, 'color'].
 // range rows: [key, label, min, max, step, decimals].
 const FILTER_PARAMS = {
     duotone: [['colorA', 'Schatten', 'color'], ['colorB', 'Lichter', 'color']],
+    duotone2: [['colorA', 'Schatten', 'color'], ['colorB', 'Licht A', 'color'], ['colorC', 'Licht B', 'color'], ['cycleSec', 'Dauer', 0.5, 20, 0.5, 1]],
     gradientmap: [['colorA', 'Dunkel', 'color'], ['colorC', 'Mitte', 'color'], ['colorB', 'Hell', 'color']],
     grayscale: [['amount', 'Stärke', 0, 1, 0.01, 2]],
     sepia: [['amount', 'Stärke', 0, 1, 0.01, 2]],
@@ -101,11 +137,16 @@ const FILTER_PARAMS = {
     halftone: [['colorA', 'Ink', 'color'], ['colorB', 'Paper', 'color'], ['halftone', 'Raster', 20, 240, 5, 0]],
     scanlines: [['scanCount', 'Linien', 60, 900, 10, 0], ['scanStrength', 'Stärke', 0, 1, 0.01, 2]],
     crt: [['scanCount', 'Linien', 60, 900, 10, 0], ['scanStrength', 'Stärke', 0, 1, 0.01, 2], ['crtMask', 'Maske', 0, 1, 0.01, 2]],
-    vignette: [['vignette', 'Stärke', 0, 1, 0.01, 2], ['vignetteRadius', 'Radius', 0, 1, 0.01, 2]],
+    vignette: [['vignette', 'Stärke', 0, 1, 0.01, 2], ['vignetteRadius', 'Radius', 0, 1, 0.01, 2], ['vignetteColor', 'Farbe', 'color']],
     chromatic: [['chromatic', 'Versatz', 0, 0.03, 0.001, 3]],
     filmgrain: [['grain', 'Körnung', 0, 0.6, 0.01, 2]],
     glitch: [['glitch', 'Stärke', 0, 1, 0.01, 2]],
-    vhs: [['vhs', 'Stärke', 0, 1, 0.01, 2]]
+    vhs: [['vhs', 'Stärke', 0, 1, 0.01, 2]],
+    bloom: [['bloom', 'Stärke', 0, 2, 0.01, 2], ['bloomThreshold', 'Schwelle', 0, 1, 0.01, 2]],
+    blur: [['blurRadius', 'Radius', 0.5, 8, 0.1, 1]],
+    fisheye: [['fisheye', 'Stärke', -1, 1, 0.01, 2]],
+    grain: [['grain', 'Körnung', 0, 0.6, 0.01, 2]],
+    noise: [['noise', 'Stärke', 0, 0.6, 0.01, 2]]
 };
 
 // a filter entry with the full param superset (mirrors WpConfig.FilterEntry)
@@ -115,8 +156,9 @@ function newFilter(type) {
         colorA: [18, 20, 42], colorB: [240, 186, 72], colorC: [120, 84, 168],
         scanCount: 320, scanStrength: 0.35, crtMask: 0.3,
         amount: 1, levels: 6, pixelSize: 12, halftone: 90,
-        vignette: 0.6, vignetteRadius: 0.6, chromatic: 0.006,
-        grain: 0.15, glitch: 0.5, vhs: 0.6
+        vignette: 0.6, vignetteRadius: 0.6, vignetteColor: [0, 0, 0], chromatic: 0.006,
+        grain: 0.15, glitch: 0.5, vhs: 0.6,
+        bloom: 0.6, bloomThreshold: 0.7, blurRadius: 2, fisheye: 0.5, noise: 0.15, cycleSec: 6
     };
 }
 
@@ -158,7 +200,9 @@ function tileToggle(on, onChange) {
 
 // pointer drag-to-reorder within a tile grid. tiles carry __item; the "+" tile
 // (.tile-add) always stays last. a tap without movement triggers onTap.
+// list may be an array or a function returning the array (sources depend on mode).
 function enableTileDrag(grid, list, onTap, commit) {
+    const resolveList = () => (typeof list === 'function' ? list() : list);
     grid.addEventListener('pointerdown', (e) => {
         const tile = e.target.closest('.tile');
         if (!tile || tile.classList.contains('tile-add')) return;
@@ -187,7 +231,8 @@ function enableTileDrag(grid, list, onTap, commit) {
             if (active) {
                 tile.classList.remove('dragging');
                 const order = Array.from(grid.querySelectorAll('.tile:not(.tile-add)')).map((t) => t.__item);
-                list.splice(0, list.length, ...order);
+                const arr = resolveList();
+                arr.splice(0, arr.length, ...order);
                 commit();
             } else if (onTap) {
                 onTap(item);
@@ -327,7 +372,10 @@ function buildParamControl(f, p) {
 
 // ---- theme engine: derive every shade from bg / fg / accent ----
 
-const themeSettings = { mode: 'system', accent: '#f0ba48', rounded: true, gridSize: 84 };
+const themeSettings = {
+    mode: 'system', accent: '#f0ba48', rounded: true, gridSize: 84,
+    uiScale: 1, spaceScale: 1
+};
 
 function mixHex(a, b, t) {
     const x = hexToRgb(a);
@@ -370,6 +418,9 @@ function applyTheme() {
     r.setProperty('--radius', rounded ? '14px' : '3px');
     r.setProperty('--radius-lg', rounded ? '18px' : '4px');
     r.setProperty('--tile', (themeSettings.gridSize || 84) + 'px');
+    // general size scaler (zoom on the sheet body) + separate spacing multiplier
+    r.setProperty('--ui-scale', String(themeSettings.uiScale || 1));
+    r.setProperty('--space-scale', String(themeSettings.spaceScale || 1));
     document.documentElement.dataset.theme = dark ? 'dark' : 'light';
 }
 
@@ -388,12 +439,23 @@ function initTheme() {
     const accent = $('#accentColor');
     const rounded = $('#rounded');
     const grid = $('#gridSize');
+    const uiScale = $('#uiScale');
+    const spaceScale = $('#spaceScale');
+    const pct = (v) => Math.round(v * 100) + '%';
     if (mode) mode.value = themeSettings.mode;
     if (accent) accent.value = themeSettings.accent;
     if (rounded) rounded.checked = themeSettings.rounded;
     if (grid) {
         grid.value = themeSettings.gridSize;
         setOut('gridSize', String(themeSettings.gridSize));
+    }
+    if (uiScale) {
+        uiScale.value = themeSettings.uiScale;
+        setOut('uiScale', pct(themeSettings.uiScale));
+    }
+    if (spaceScale) {
+        spaceScale.value = themeSettings.spaceScale;
+        setOut('spaceScale', pct(themeSettings.spaceScale));
     }
 
     if (mode) mode.addEventListener('change', (e) => { themeSettings.mode = e.target.value; applyTheme(); save(); });
@@ -402,6 +464,18 @@ function initTheme() {
     if (grid) grid.addEventListener('input', (e) => {
         themeSettings.gridSize = Number(e.target.value);
         setOut('gridSize', String(themeSettings.gridSize));
+        applyTheme();
+        save();
+    });
+    if (uiScale) uiScale.addEventListener('input', (e) => {
+        themeSettings.uiScale = Number(e.target.value);
+        setOut('uiScale', pct(themeSettings.uiScale));
+        applyTheme();
+        save();
+    });
+    if (spaceScale) spaceScale.addEventListener('input', (e) => {
+        themeSettings.spaceScale = Number(e.target.value);
+        setOut('spaceScale', pct(themeSettings.spaceScale));
         applyTheme();
         save();
     });
@@ -416,9 +490,10 @@ function initTheme() {
 
 // ---- presets: source / config / wallpaper (localStorage) ----
 
-const SOURCE_KEYS = ['mode', 'videoPath', 'images'];
-const CONFIG_KEYS = ['videoScale', 'videoOffsetX', 'videoOffsetY', 'videoSpeed',
+const SOURCE_KEYS = ['mode', 'videos', 'images'];
+const CONFIG_KEYS = ['videoOrder', 'videoScale', 'videoOffsetX', 'videoOffsetY', 'videoSpeed', 'resumeVideo',
     'imageOrder', 'imageDurationMs', 'imageTransitionMs', 'imageScale', 'imageOffsetX', 'imageOffsetY',
+    'flipX', 'flipY',
     'filters', 'parallaxEnabled', 'parallaxAmount', 'motionType', 'motionAmount', 'motionSpeed'];
 const PRESET_KEYS = { source: SOURCE_KEYS, config: CONFIG_KEYS, wallpaper: SOURCE_KEYS.concat(CONFIG_KEYS) };
 
@@ -517,7 +592,7 @@ function initPresets() {
 }
 
 function hasMedia() {
-    return (state.mode === 'video' && !!state.videoPath) ||
+    return (state.mode === 'video' && state.videos.some((v) => v.enabled)) ||
         (state.mode === 'images' && state.images.some((i) => i.enabled));
 }
 
@@ -530,9 +605,12 @@ function syncPreview() {
 
 let statusTimer = null;
 function setStatus(text) {
-    $('#status').textContent = text;
+    const el = $('#status');
+    if (!el) return;
+    el.textContent = text;
+    el.classList.add('show');
     clearTimeout(statusTimer);
-    statusTimer = setTimeout(() => ($('#status').textContent = ''), 2500);
+    statusTimer = setTimeout(() => el.classList.remove('show'), 2200);
 }
 
 // ---- rendering state -> controls ----
@@ -559,7 +637,7 @@ async function pickImages() {
         const res = await plugin.pickMedia({ type: 'image' });
         if (res.paths && res.paths.length) {
             res.paths.forEach((p) => state.images.push({ path: p, enabled: true }));
-            renderImageGrid();
+            renderSources();
             syncPreview();
         }
     } catch (e) {
@@ -567,12 +645,58 @@ async function pickImages() {
     }
 }
 
-function renderImageGrid() {
-    const grid = $('#imageGrid');
+async function pickVideos() {
+    try {
+        const res = await plugin.pickMedia({ type: 'video' });
+        if (res.paths && res.paths.length) {
+            res.paths.forEach((p) => state.videos.push({ path: p, enabled: true }));
+            renderSources();
+            syncPreview();
+        }
+    } catch (e) {
+        setStatus('auswahl abgebrochen');
+    }
+}
+
+// video tiles are label-based (filename + play glyph); no cheap thumbnail without
+// decoding, and reorder/toggle/remove mirror the image tiles.
+function buildVideoTile(vid) {
+    const tile = document.createElement('div');
+    tile.className = 'tile video-tile' + (vid.enabled ? '' : ' disabled');
+    tile.__item = vid;
+
+    const label = document.createElement('span');
+    label.className = 'tile-label';
+    label.textContent = '▶ ' + basename(vid.path);
+    tile.append(label);
+
+    tile.append(tileToggle(vid.enabled, (on) => {
+        vid.enabled = on;
+        tile.classList.toggle('disabled', !on);
+        syncPreview();
+    }));
+    tile.append(tileX(() => {
+        const i = state.videos.indexOf(vid);
+        if (i > -1) state.videos.splice(i, 1);
+        renderSources();
+        syncPreview();
+    }));
+    return tile;
+}
+
+// the active mode's media list; the sources strip shows this set
+function activeMediaList() {
+    return state.mode === 'video' ? state.videos : state.images;
+}
+
+// renders the source strip (bottom bar 2 / fullscreen) for the active mode
+function renderSources() {
+    const grid = $('#sourceStrip');
     if (!grid) return;
+    const isVideo = state.mode === 'video';
     grid.innerHTML = '';
-    state.images.forEach((img) => grid.append(buildImageTile(img)));
-    grid.append(addTile('bilder hinzufügen', pickImages));
+    activeMediaList().forEach((it) => grid.append(isVideo ? buildVideoTile(it) : buildImageTile(it)));
+    grid.append(addTile(isVideo ? 'videos hinzufügen' : 'bilder hinzufügen', isVideo ? pickVideos : pickImages));
 }
 
 function buildImageTile(img) {
@@ -594,7 +718,7 @@ function buildImageTile(img) {
     tile.append(tileX(() => {
         const i = state.images.indexOf(img);
         if (i > -1) state.images.splice(i, 1);
-        renderImageGrid();
+        renderSources();
         syncPreview();
     }));
     return tile;
@@ -608,9 +732,10 @@ function setOut(key, value) {
 function renderAll() {
     renderMode();
     renderFilterGrid();
-    renderImageGrid();
+    renderSources();
 
-    $('#videoName').textContent = state.videoPath ? basename(state.videoPath) : 'kein video gewählt';
+    $('#videoOrder').value = state.videoOrder;
+    $('#resumeVideo').checked = state.resumeVideo;
     $('#videoScale').value = state.videoScale;
     $('#videoOffsetX').value = state.videoOffsetX;
     $('#videoOffsetY').value = state.videoOffsetY;
@@ -629,6 +754,9 @@ function renderAll() {
     setOut('imageTransitionMs', (state.imageTransitionMs / 1000).toFixed(1));
     setOut('imageOffsetX', state.imageOffsetX.toFixed(2));
     setOut('imageOffsetY', state.imageOffsetY.toFixed(2));
+
+    $('#flipX').checked = state.flipX;
+    $('#flipY').checked = state.flipY;
 
     $('#parallaxEnabled').checked = state.parallaxEnabled;
     $('#parallaxAmount').value = state.parallaxAmount;
@@ -649,29 +777,18 @@ function bind() {
         b.addEventListener('click', () => {
             state.mode = b.dataset.mode;
             renderMode();
+            renderSources();
             syncPreview();
         })
     );
 
-    $('#pickVideo').addEventListener('click', async () => {
-        try {
-            const res = await plugin.pickMedia({ type: 'video' });
-            if (res.paths && res.paths.length) {
-                state.videoPath = res.paths[0];
-                $('#videoName').textContent = basename(state.videoPath);
-                syncPreview();
-            }
-        } catch (e) {
-            setStatus('auswahl abgebrochen');
-        }
-    });
-
-    // filter tiles: tap selects for editing; images: tap toggles enabled. both drag-reorder.
+    // filter tiles: tap selects for editing; source tiles: tap toggles enabled.
+    // both drag-reorder; the source strip commits to whichever mode's list is active.
     enableTileDrag($('#filterGrid'), state.filters,
         (f) => { selectedFilter = f; renderFilterGrid(); },
         () => renderFilterGrid());
-    enableTileDrag($('#imageGrid'), state.images, null,
-        () => { renderImageGrid(); syncPreview(); });
+    enableTileDrag($('#sourceStrip'), activeMediaList, null,
+        () => { renderSources(); syncPreview(); });
 
     const num = (id, key, out, div) =>
         $(id).addEventListener('input', (e) => {
@@ -679,6 +796,8 @@ function bind() {
             if (out) setOut(out, div ? (state[key] / div).toFixed(1) : state[key].toFixed(2));
         });
 
+    $('#videoOrder').addEventListener('change', (e) => (state.videoOrder = e.target.value));
+    $('#resumeVideo').addEventListener('change', (e) => (state.resumeVideo = e.target.checked));
     $('#videoScale').addEventListener('change', (e) => (state.videoScale = e.target.value));
     num('#videoOffsetX', 'videoOffsetX', 'videoOffsetX');
     num('#videoOffsetY', 'videoOffsetY', 'videoOffsetY');
@@ -698,6 +817,9 @@ function bind() {
             setOut(id.slice(1), digits === undefined ? String(state[key]) : state[key].toFixed(digits));
         });
 
+    $('#flipX').addEventListener('change', (e) => { state.flipX = e.target.checked; syncPreview(); });
+    $('#flipY').addEventListener('change', (e) => { state.flipY = e.target.checked; syncPreview(); });
+
     $('#parallaxEnabled').addEventListener('change', (e) => (state.parallaxEnabled = e.target.checked));
     $('#parallaxAmount').addEventListener('input', (e) => {
         state.parallaxAmount = Number(e.target.value);
@@ -711,8 +833,8 @@ function bind() {
     rng('#motionAmount', 'motionAmount', 2);
     rng('#motionSpeed', 'motionSpeed', 2);
 
-    $('#save').addEventListener('click', save);
-    $('#apply').addEventListener('click', apply);
+    $('#saveBtn').addEventListener('click', save);
+    $('#applyBtn').addEventListener('click', apply);
 }
 
 async function save() {
@@ -727,7 +849,7 @@ async function save() {
 }
 
 async function apply() {
-    if (state.mode === 'video' && !state.videoPath) {
+    if (state.mode === 'video' && !state.videos.some((v) => v.enabled)) {
         setStatus('erst ein video wählen');
         return;
     }
@@ -755,13 +877,22 @@ async function init() {
         if (saved && Array.isArray(saved.imagePaths) && state.images.length === 0) {
             state.images = saved.imagePaths.map((p) => ({ path: p, enabled: true }));
         }
+        // migrate the single-video config (videoPath) into the videos list
+        if (saved && saved.videoPath && state.videos.length === 0) {
+            state.videos = [{ path: saved.videoPath, enabled: true }];
+        }
+        // migrate the legacy image order names to the mode enum
+        if (state.imageOrder === 'normal') state.imageOrder = 'loop';
+        else if (state.imageOrder === 'random') state.imageOrder = 'loop-random';
     } catch (e) {
         // keep defaults
     }
+    applyIcons();
     bind();
     renderAll();
     initTheme();
-    initSheet();
+    initDock();
+    initOverlays();
     initPresets();
 
     // live preview mirrors the same shaders on the selected media
@@ -769,66 +900,235 @@ async function init() {
         Preview.attach(state);
         syncPreview();
     }
+    initPreviewControls();
 }
 
-// bottom-sheet: drag the top edge to resize, collapse button hides it, and
-// tapping the preview background (or the pill) brings it back.
-function initSheet() {
-    const sheet = $('#sheet');
-    const handle = $('#sheetHandle');
-    const collapseBtn = $('#collapseUi');
-    const showBtn = $('#showUi');
-    const canvas = $('#preview');
-    if (!sheet || !handle) return;
+// pause toggle + quality select for the live preview. quality persists; pause
+// is transient (starts running each time the ui opens).
+function initPreviewControls() {
+    if (typeof Preview === 'undefined') return;
+    const pause = $('#previewPause');
+    const quality = $('#previewQuality');
 
-    const MIN = 84;
-    const maxH = () => Math.round(window.innerHeight * 0.94);
-
-    let stored = null;
+    let storedQuality = '1.5';
     try {
-        stored = parseInt(localStorage.getItem('wpfx_sheet_h'), 10);
+        storedQuality = localStorage.getItem('wpfx_preview_quality') || '1.5';
     } catch (e) {}
-    if (stored && stored > MIN) sheet.style.height = Math.min(stored, maxH()) + 'px';
+    if (quality) {
+        quality.value = storedQuality;
+        quality.addEventListener('change', (e) => {
+            Preview.setQuality(Number(e.target.value));
+            try { localStorage.setItem('wpfx_preview_quality', e.target.value); } catch (err) {}
+        });
+    }
+    Preview.setQuality(Number(storedQuality));
 
-    let dragging = false;
-    let startY = 0;
-    let startH = 0;
+    if (pause) pause.addEventListener('click', () => {
+        const now = Preview.togglePaused();
+        pause.classList.toggle('paused', now);
+        pause.innerHTML = svgIcon(now ? 'play' : 'pause');
+        pause.setAttribute('aria-label', now ? 'Vorschau fortsetzen' : 'Vorschau pausieren');
+    });
+}
+
+// bottom dock: the tab bar opens a panel above it. tapping a tab opens its page,
+// tapping the same tab closes it; while open, tabs slide and can be swiped between.
+// a top handle resizes the panel height.
+const TABS = ['config', 'filters', 'motion', 'parallax'];
+
+function initDock() {
+    const panel = $('#tabPanel');
+    const track = $('#tabTrack');
+    const handle = $('#tabHandle');
+    const btns = $$('.tab-btn');
+    if (!panel || !track) return;
+
+    let active = null; // active tab index, or null when the panel is closed
+
+    // restore stored panel height
+    const maxH = () => Math.round(window.innerHeight * 0.78);
+    let storedH = null;
+    try {
+        storedH = parseInt(localStorage.getItem('wpfx_panel_h'), 10);
+    } catch (e) {}
+    if (storedH && storedH > 130) panel.style.height = Math.min(storedH, maxH()) + 'px';
+
+    const pageWidth = () => {
+        const p = track.querySelector('.tab-page');
+        return p ? p.getBoundingClientRect().width : panel.getBoundingClientRect().width;
+    };
+
+    // position the track on the active page (px so it is exact at any font scale)
+    function applyIndex(animate) {
+        if (active === null) return;
+        track.style.transition = animate ? 'transform 0.25s ease' : 'none';
+        track.style.transform = 'translateX(' + (-active * pageWidth()) + 'px)';
+        if (!animate) {
+            track.getBoundingClientRect(); // reflow so the next transition animates
+            track.style.transition = '';
+        }
+    }
+
+    function highlight() {
+        btns.forEach((b, i) => b.classList.toggle('active', i === active));
+    }
+
+    function openTab(i) {
+        active = i;
+        panel.hidden = false;
+        highlight();
+        requestAnimationFrame(() => applyIndex(false));
+    }
+
+    function closeTab() {
+        active = null;
+        panel.hidden = true;
+        highlight();
+    }
+
+    function selectTab(i) {
+        active = i;
+        highlight();
+        applyIndex(true);
+    }
+
+    btns.forEach((b, i) => b.addEventListener('click', () => {
+        if (active === i) closeTab();
+        else if (active === null) openTab(i);
+        else selectTab(i);
+    }));
+
+    // height handle (drag the top edge)
+    let rz = null;
     handle.addEventListener('pointerdown', (e) => {
-        // let the buttons in the header work without starting a resize
-        if (e.target.closest('button, input, select')) return;
-        dragging = true;
-        startY = e.clientY;
-        startH = sheet.getBoundingClientRect().height;
+        rz = { y: e.clientY, h: panel.getBoundingClientRect().height };
         handle.setPointerCapture(e.pointerId);
     });
     handle.addEventListener('pointermove', (e) => {
-        if (!dragging) return;
-        const h = Math.max(MIN, Math.min(maxH(), startH + (startY - e.clientY)));
-        sheet.style.height = h + 'px';
+        if (!rz) return;
+        const h = Math.max(130, Math.min(maxH(), rz.h + (rz.y - e.clientY)));
+        panel.style.height = h + 'px';
     });
-    const endDrag = () => {
-        if (!dragging) return;
-        dragging = false;
+    const endResize = () => {
+        if (!rz) return;
+        rz = null;
+        applyIndex(false);
         try {
-            localStorage.setItem('wpfx_sheet_h', String(Math.round(sheet.getBoundingClientRect().height)));
+            localStorage.setItem('wpfx_panel_h', String(Math.round(panel.getBoundingClientRect().height)));
         } catch (e) {}
     };
-    handle.addEventListener('pointerup', endDrag);
-    handle.addEventListener('pointercancel', endDrag);
+    handle.addEventListener('pointerup', endResize);
+    handle.addEventListener('pointercancel', endResize);
 
-    const collapse = () => {
-        sheet.classList.add('collapsed');
-        showBtn.hidden = false;
-    };
-    const expand = () => {
-        sheet.classList.remove('collapsed');
-        showBtn.hidden = true;
-    };
-    collapseBtn.addEventListener('click', collapse);
-    showBtn.addEventListener('click', expand);
-    if (canvas) canvas.addEventListener('click', () => {
-        if (sheet.classList.contains('collapsed')) expand();
+    // horizontal swipe between tabs. only starts on empty page area (not on
+    // controls/tiles, which own their gestures); vertical scroll stays native.
+    let sw = null;
+    track.addEventListener('pointerdown', (e) => {
+        if (active === null) return;
+        if (e.target.closest('input, select, textarea, button, a, .tile, .tile-editor')) return;
+        sw = { x: e.clientX, y: e.clientY, base: -active * pageWidth(), horiz: false, decided: false };
     });
+    track.addEventListener('pointermove', (e) => {
+        if (!sw) return;
+        const dx = e.clientX - sw.x;
+        const dy = e.clientY - sw.y;
+        if (!sw.decided) {
+            if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+            sw.horiz = Math.abs(dx) > Math.abs(dy);
+            sw.decided = true;
+            if (sw.horiz) track.classList.add('dragging');
+        }
+        if (!sw.horiz) return;
+        const pw = pageWidth();
+        const minX = -(TABS.length - 1) * pw;
+        let x = sw.base + dx;
+        if (x > 0) x *= 0.3; // rubber-band past the ends
+        else if (x < minX) x = minX + (x - minX) * 0.3;
+        track.style.transition = 'none';
+        track.style.transform = 'translateX(' + x + 'px)';
+    });
+    const endSwipe = (e) => {
+        if (!sw) return;
+        const horiz = sw.horiz;
+        const dx = (e ? e.clientX : sw.x) - sw.x;
+        sw = null;
+        track.classList.remove('dragging');
+        if (!horiz) return;
+        const pw = pageWidth();
+        let i = active;
+        if (dx < -pw * 0.25) i = Math.min(TABS.length - 1, active + 1);
+        else if (dx > pw * 0.25) i = Math.max(0, active - 1);
+        selectTab(i);
+    };
+    track.addEventListener('pointerup', endSwipe);
+    track.addEventListener('pointercancel', endSwipe);
+
+    window.addEventListener('resize', () => applyIndex(false));
+}
+
+// overlay sheets (settings / presets) and the sources fullscreen mode; only one
+// open at a time, dimmed by the backdrop. also wires the source-action square.
+function initOverlays() {
+    const backdrop = $('#backdrop');
+    const settings = $('#settingsPanel');
+    const presets = $('#presetsPanel');
+    const sourcesBar = $('#sourcesBar');
+    let openEl = null;
+
+    const fsBtn = () => $('.source-actions [data-act="fullscreen"]');
+    function setFsIcon(on) {
+        const b = fsBtn();
+        if (b) b.innerHTML = svgIcon(on ? 'collapse' : 'expand');
+    }
+
+    const pauseBtn = $('#previewPause');
+    const showPause = (show) => { if (pauseBtn) pauseBtn.hidden = !show; };
+
+    function closeAll() {
+        if (settings) settings.hidden = true;
+        if (presets) presets.hidden = true;
+        sourcesBar.classList.remove('fullscreen');
+        setFsIcon(false);
+        backdrop.hidden = true;
+        showPause(true);
+        openEl = null;
+    }
+
+    function openOverlay(el) {
+        closeAll();
+        el.hidden = false;
+        backdrop.hidden = false;
+        showPause(false);
+        openEl = el;
+    }
+
+    function toggleSourcesFs() {
+        const turnOn = !sourcesBar.classList.contains('fullscreen');
+        closeAll();
+        if (turnOn) {
+            sourcesBar.classList.add('fullscreen');
+            setFsIcon(true);
+            backdrop.hidden = false;
+            showPause(false);
+            openEl = sourcesBar;
+        }
+    }
+
+    $('#settingsToggle').addEventListener('click', () => (openEl === settings ? closeAll() : openOverlay(settings)));
+    $('#presetsToggle').addEventListener('click', () => (openEl === presets ? closeAll() : openOverlay(presets)));
+    $('#sourcesToggle').addEventListener('click', toggleSourcesFs);
+    backdrop.addEventListener('click', closeAll);
+    $$('[data-close]').forEach((b) => b.addEventListener('click', closeAll));
+
+    // the 4-icon source-actions square: add / clear / fullscreen / save
+    $$('.source-actions [data-act]').forEach((b) => b.addEventListener('click', () => {
+        switch (b.dataset.act) {
+            case 'add': state.mode === 'video' ? pickVideos() : pickImages(); break;
+            case 'clear': activeMediaList().length = 0; renderSources(); syncPreview(); break;
+            case 'fullscreen': toggleSourcesFs(); break;
+            case 'save': save(); break;
+        }
+    }));
 }
 
 document.addEventListener('DOMContentLoaded', init);

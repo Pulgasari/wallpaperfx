@@ -10,10 +10,13 @@ const Preview = (function () {
         uniform vec2 uUvScale;
         uniform vec2 uUvOffset;
         uniform vec2 uPosScale;
+        uniform vec2 uFlip;
         varying vec2 vTexCoord;
         varying vec2 vScreenCoord;
         void main() {
-            vTexCoord = (aTexCoord - 0.5) * uUvScale + 0.5 + uUvOffset;
+            vec2 uv = (aTexCoord - 0.5) * uUvScale + 0.5 + uUvOffset;
+            uv = (uv - 0.5) * uFlip + 0.5;
+            vTexCoord = uv;
             vScreenCoord = aTexCoord;
             gl_Position = vec4(aPosition * uPosScale, 0.0, 1.0);
         }`;
@@ -41,6 +44,13 @@ const Preview = (function () {
         uniform float uGrain;
         uniform float uGlitch;
         uniform float uVhs;
+        uniform vec3 uVignetteColor;
+        uniform float uBloom;
+        uniform float uBloomThreshold;
+        uniform float uBlurRadius;
+        uniform float uFisheye;
+        uniform float uNoise;
+        uniform float uCycleSec;
         uniform float uTime;
         uniform vec2 uResolution;
         float luma(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }
@@ -50,6 +60,10 @@ const Preview = (function () {
             if (uFilter == 7) {
                 vec2 grid = uResolution / max(1.0, uPixelSize);
                 uv = (floor(uv * grid) + 0.5) / grid;
+            } else if (uFilter == 18) {
+                vec2 cc = (uv - 0.5) * 2.0;
+                float r2 = dot(cc, cc);
+                uv = (cc * (1.0 + uFisheye * r2)) * 0.5 + 0.5;
             }
             vec4 c = texture2D(uTexture, uv);
             if (uFilter == 1) {
@@ -91,7 +105,8 @@ const Preview = (function () {
                 c.rgb *= 1.0 - 0.4 * smoothstep(0.6, 1.0, dv);
             } else if (uFilter == 9) {
                 float dv = length(vScreenCoord - 0.5) * 1.4142136;
-                c.rgb *= 1.0 - uVignette * smoothstep(uVignetteRadius, 1.0, dv);
+                float v = uVignette * smoothstep(uVignetteRadius, 1.0, dv);
+                c.rgb = mix(c.rgb, uVignetteColor, v);
             } else if (uFilter == 10) {
                 vec2 off = (vScreenCoord - 0.5) * uChromatic;
                 c.r = texture2D(uTexture, uv + off).r;
@@ -122,12 +137,53 @@ const Preview = (function () {
                 c.rgb += (g - 0.5) * 0.08 * uVhs;
                 float track = fract(vScreenCoord.y - uTime * 0.2);
                 c.rgb += smoothstep(0.97, 0.99, track) * 0.25 * uVhs;
+            } else if (uFilter == 16) {
+                vec2 px = 2.5 / uResolution;
+                vec3 b = vec3(0.0); vec3 t;
+                t = texture2D(uTexture, uv + px * vec2(-1.0, -1.0)).rgb; b += t * max(0.0, luma(t) - uBloomThreshold);
+                t = texture2D(uTexture, uv + px * vec2( 0.0, -1.0)).rgb; b += t * max(0.0, luma(t) - uBloomThreshold);
+                t = texture2D(uTexture, uv + px * vec2( 1.0, -1.0)).rgb; b += t * max(0.0, luma(t) - uBloomThreshold);
+                t = texture2D(uTexture, uv + px * vec2(-1.0,  0.0)).rgb; b += t * max(0.0, luma(t) - uBloomThreshold);
+                t = texture2D(uTexture, uv + px * vec2( 0.0,  0.0)).rgb; b += t * max(0.0, luma(t) - uBloomThreshold);
+                t = texture2D(uTexture, uv + px * vec2( 1.0,  0.0)).rgb; b += t * max(0.0, luma(t) - uBloomThreshold);
+                t = texture2D(uTexture, uv + px * vec2(-1.0,  1.0)).rgb; b += t * max(0.0, luma(t) - uBloomThreshold);
+                t = texture2D(uTexture, uv + px * vec2( 0.0,  1.0)).rgb; b += t * max(0.0, luma(t) - uBloomThreshold);
+                t = texture2D(uTexture, uv + px * vec2( 1.0,  1.0)).rgb; b += t * max(0.0, luma(t) - uBloomThreshold);
+                c.rgb += (b / 9.0) * uBloom * 4.0;
+            } else if (uFilter == 17) {
+                vec2 px = uBlurRadius / uResolution;
+                vec3 s = texture2D(uTexture, uv).rgb * 4.0;
+                s += texture2D(uTexture, uv + vec2( px.x, 0.0)).rgb * 2.0;
+                s += texture2D(uTexture, uv + vec2(-px.x, 0.0)).rgb * 2.0;
+                s += texture2D(uTexture, uv + vec2(0.0,  px.y)).rgb * 2.0;
+                s += texture2D(uTexture, uv + vec2(0.0, -px.y)).rgb * 2.0;
+                s += texture2D(uTexture, uv + vec2( px.x,  px.y)).rgb;
+                s += texture2D(uTexture, uv + vec2( px.x, -px.y)).rgb;
+                s += texture2D(uTexture, uv + vec2(-px.x,  px.y)).rgb;
+                s += texture2D(uTexture, uv + vec2(-px.x, -px.y)).rgb;
+                c.rgb = s / 16.0;
+            } else if (uFilter == 19) {
+                float g = hash(vScreenCoord * uResolution);
+                c.rgb += (g - 0.5) * uGrain;
+            } else if (uFilter == 20) {
+                vec2 sp = vScreenCoord * uResolution;
+                vec3 n = vec3(hash(sp + 1.0), hash(sp + 2.0), hash(sp + 3.0));
+                c.rgb += (n - 0.5) * uNoise;
+            } else if (uFilter == 21) {
+                float ph = 0.5 + 0.5 * sin(uTime * 6.2831853 / max(0.5, uCycleSec));
+                vec3 hi = mix(uColorB, uColorC, ph);
+                c.rgb = mix(uColorA, hi, luma(c.rgb));
             }
             gl_FragColor = c;
         }`;
 
     let gl, canvas, program, loc, quad;
     let state = null;
+
+    // preview controls: pause freezes the raf loop (and the video element);
+    // qualityCap bounds the device-pixel-ratio the canvas renders at
+    let paused = false;
+    let qualityCap = 1.5;
 
     // media source
     let sourceType = null; // 'image' | 'video' | null
@@ -140,6 +196,7 @@ const Preview = (function () {
     // ping-pong fbos for the filter chain
     let fboA = null, fboB = null, fboW = 0, fboH = 0;
     const FULL = [1, 1, 0, 0, 1, 1];
+    const NO_FLIP = [1, 1];
 
     function toSrc(path) {
         if (window.Capacitor && typeof window.Capacitor.convertFileSrc === 'function') {
@@ -181,10 +238,11 @@ const Preview = (function () {
             aTexCoord: gl.getAttribLocation(program, 'aTexCoord')
         };
         [
-            'uUvScale', 'uUvOffset', 'uPosScale', 'uFilter', 'uColorA', 'uColorB', 'uColorC',
+            'uUvScale', 'uUvOffset', 'uPosScale', 'uFlip', 'uFilter', 'uColorA', 'uColorB', 'uColorC',
             'uScanCount', 'uScanStrength', 'uCrtMask', 'uAmount', 'uLevels', 'uPixelSize',
             'uHalftone', 'uVignette', 'uVignetteRadius', 'uChromatic', 'uGrain', 'uGlitch',
-            'uVhs', 'uTime', 'uResolution', 'uTexture'
+            'uVhs', 'uVignetteColor', 'uBloom', 'uBloomThreshold', 'uBlurRadius', 'uFisheye',
+            'uNoise', 'uCycleSec', 'uTime', 'uResolution', 'uTexture'
         ].forEach((n) => (loc[n] = gl.getUniformLocation(program, n)));
 
         // positions (-1..1) and texcoords (0..1), triangle strip
@@ -211,7 +269,7 @@ const Preview = (function () {
         if (!canvas) return;
         // the preview is the fullscreen app background; match the viewport (which
         // equals the device screen), capped dpr to keep animated filters cheap
-        const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+        const dpr = Math.min(window.devicePixelRatio || 1, qualityCap);
         const w = window.innerWidth;
         const h = window.innerHeight;
         canvas.style.width = w + 'px';
@@ -229,9 +287,13 @@ const Preview = (function () {
         if (!gl || !state) return;
         let url = null;
         let type = null;
-        if (state.mode === 'video' && state.videoPath) {
-            url = toSrc(state.videoPath);
-            type = 'video';
+        if (state.mode === 'video') {
+            // preview shows the first enabled video of the list
+            const first = (state.videos || []).find((v) => v.enabled);
+            if (first) {
+                url = toSrc(first.path);
+                type = 'video';
+            }
         } else if (state.mode === 'images') {
             const first = (state.images || []).find((i) => i.enabled);
             if (first) {
@@ -270,7 +332,7 @@ const Preview = (function () {
                 contentW = v.videoWidth || 1;
                 contentH = v.videoHeight || 1;
             });
-            v.play().catch(() => {});
+            if (!paused) v.play().catch(() => {});
             sourceEl = v;
         }
     }
@@ -377,15 +439,42 @@ const Preview = (function () {
     const FILTER_INDEX = {
         none: 0, duotone: 1, scanlines: 2, grayscale: 3, sepia: 4, gradientmap: 5,
         posterize: 6, pixelate: 7, halftone: 8, vignette: 9, chromatic: 10, crt: 11, invert: 12,
-        filmgrain: 13, glitch: 14, vhs: 15
+        filmgrain: 13, glitch: 14, vhs: 15, bloom: 16, blur: 17, fisheye: 18,
+        grain: 19, noise: 20, duotone2: 21
     };
     function filterIndex(type) {
         return FILTER_INDEX[type] || 0;
     }
 
     function loop() {
-        render();
+        if (!paused) render();
         requestAnimationFrame(loop);
+    }
+
+    // freeze/resume the preview: stop the raf render and the video element too
+    function setPaused(value) {
+        paused = !!value;
+        if (sourceType === 'video' && sourceEl) {
+            if (paused) {
+                try { sourceEl.pause(); } catch (e) {}
+            } else {
+                sourceEl.play().catch(() => {});
+            }
+        }
+    }
+
+    function togglePaused() {
+        setPaused(!paused);
+        return paused;
+    }
+
+    // bound the render dpr; re-sizes the canvas backing store at the new cap
+    function setQuality(cap) {
+        const v = Number(cap);
+        if (v > 0) {
+            qualityCap = v;
+            resize();
+        }
     }
 
     function createFbo(w, h) {
@@ -417,8 +506,9 @@ const Preview = (function () {
         fboB = createFbo(fboW, fboH);
     }
 
-    // one pass: draw srcTex into targetFb (null = screen) with scale s and filter fe
-    function drawPass(targetFb, srcTex, s, fe) {
+    // one pass: draw srcTex into targetFb (null = screen) with scale s and filter fe.
+    // flip is applied on the content pass only; chain passes pass NO_FLIP.
+    function drawPass(targetFb, srcTex, s, fe, flip) {
         gl.bindFramebuffer(gl.FRAMEBUFFER, targetFb);
         gl.viewport(0, 0, canvas.width, canvas.height);
         gl.useProgram(program);
@@ -431,6 +521,7 @@ const Preview = (function () {
         gl.uniform2f(loc.uUvScale, s[0], s[1]);
         gl.uniform2f(loc.uUvOffset, s[2], s[3]);
         gl.uniform2f(loc.uPosScale, s[4], s[5]);
+        gl.uniform2f(loc.uFlip, flip[0], flip[1]);
         gl.uniform1f(loc.uTime, performance.now() / 1000);
         gl.uniform2f(loc.uResolution, canvas.width, canvas.height);
 
@@ -450,10 +541,17 @@ const Preview = (function () {
             gl.uniform1f(loc.uHalftone, fe.halftone);
             gl.uniform1f(loc.uVignette, fe.vignette);
             gl.uniform1f(loc.uVignetteRadius, fe.vignetteRadius);
+            gl.uniform3f(loc.uVignetteColor, rgb(fe.vignetteColor, 0), rgb(fe.vignetteColor, 1), rgb(fe.vignetteColor, 2));
             gl.uniform1f(loc.uChromatic, fe.chromatic);
             gl.uniform1f(loc.uGrain, fe.grain);
             gl.uniform1f(loc.uGlitch, fe.glitch);
             gl.uniform1f(loc.uVhs, fe.vhs);
+            gl.uniform1f(loc.uBloom, fe.bloom);
+            gl.uniform1f(loc.uBloomThreshold, fe.bloomThreshold);
+            gl.uniform1f(loc.uBlurRadius, fe.blurRadius);
+            gl.uniform1f(loc.uFisheye, fe.fisheye);
+            gl.uniform1f(loc.uNoise, fe.noise);
+            gl.uniform1f(loc.uCycleSec, fe.cycleSec);
         }
 
         gl.activeTexture(gl.TEXTURE0);
@@ -489,16 +587,17 @@ const Preview = (function () {
 
         ensureFbos();
 
-        // pass 0: source (scaled + motion) into fbo a, unfiltered
+        // pass 0: source (scaled + motion + mirror) into fbo a, unfiltered
+        const flip = [state.flipX ? -1 : 1, state.flipY ? -1 : 1];
         gl.bindFramebuffer(gl.FRAMEBUFFER, fboA.fb);
         gl.viewport(0, 0, canvas.width, canvas.height);
         gl.clear(gl.COLOR_BUFFER_BIT);
-        drawPass(fboA.fb, texture, computeScale(), null);
+        drawPass(fboA.fb, texture, computeScale(), null, flip);
 
         // filter chain, last pass to the screen
         const active = (state.filters || []).filter((f) => f.enabled && f.type !== 'none');
         if (active.length === 0) {
-            drawPass(null, fboA.tex, FULL, null);
+            drawPass(null, fboA.tex, FULL, null, NO_FLIP);
             return;
         }
         let readTex = fboA.tex;
@@ -506,7 +605,7 @@ const Preview = (function () {
         for (let i = 0; i < active.length; i++) {
             const last = i === active.length - 1;
             const writeFbo = readFbo === fboA ? fboB : fboA;
-            drawPass(last ? null : writeFbo.fb, readTex, FULL, active[i]);
+            drawPass(last ? null : writeFbo.fb, readTex, FULL, active[i], NO_FLIP);
             if (!last) {
                 readTex = writeFbo.tex;
                 readFbo = writeFbo;
@@ -514,5 +613,5 @@ const Preview = (function () {
         }
     }
 
-    return { init, attach, refreshMedia };
+    return { init, attach, refreshMedia, setPaused, togglePaused, setQuality, isPaused: () => paused };
 })();

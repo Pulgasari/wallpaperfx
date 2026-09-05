@@ -11,156 +11,34 @@
 <!-- fullscreen live preview background -->
 <canvas id="preview"></canvas>
 <p id="previewHint" class="preview-hint">Vorschau erscheint nach Medienauswahl</p>
+<button id="previewPause" class="preview-pause" data-icon="pause" aria-label="Vorschau pausieren"></button>
 
-<!-- shown when the sheet is collapsed; tapping the preview also restores it -->
-<button id="showUi" class="show-ui" hidden>Bedienung</button>
+<div id="status" class="status-toast" role="status"></div>
 
-<!-- config as a resizable bottom sheet over the preview -->
-<section id="sheet" class="sheet">
-    <div id="sheetHandle" class="sheet-handle">
-        <span class="grip"></span>
-        <div class="sheet-head">
-            <button id="collapseUi" class="icon-btn" aria-label="ui ausblenden">✕</button>
-            <span class="sheet-title">WallpaperFX</span>
-            <span id="status" class="status"></span>
-        </div>
+<!-- backdrop dims the preview while an overlay sheet is open -->
+<div id="backdrop" class="backdrop" hidden></div>
+
+<!-- ===== top bar ===== -->
+<header class="topbar">
+    <div class="topbar-left">
+        <button id="settingsToggle" class="tb-btn" data-icon="settings" aria-label="App-Einstellungen"></button>
+        <span class="app-name">WallpaperFX</span>
     </div>
+    <div class="topbar-right">
+        <button id="presetsToggle" class="tb-btn" data-icon="presets" aria-label="Presets"></button>
+        <button id="sourcesToggle" class="tb-btn" data-icon="sources" aria-label="Quellen"></button>
+        <button id="applyBtn" class="tb-btn" data-icon="wallpaper" aria-label="Als Wallpaper setzen"></button>
+        <button id="saveBtn" class="tb-btn accent" data-icon="save" aria-label="Speichern"></button>
+    </div>
+</header>
 
-    <div class="sheet-body">
-    <!-- mode switch -->
-    <section class="card">
-        <div class="seg" role="tablist">
-            <button class="seg-btn" data-mode="video" role="tab">Video</button>
-            <button class="seg-btn" data-mode="images" role="tab">Bilder</button>
-        </div>
-    </section>
-
-    <!-- video panel -->
-    <section class="card panel" data-panel="video">
-        <h2>Video</h2>
-        <button id="pickVideo" class="btn">Video auswählen</button>
-        <p id="videoName" class="muted">kein video gewählt</p>
-
-        <label class="field">
-            <span>Skalierung</span>
-            <select id="videoScale">
-                <option value="cover">Cover (ausfüllen, beschneiden)</option>
-                <option value="fit">Fit (einpassen, ränder)</option>
-            </select>
-        </label>
-
-        <label class="field">
-            <span>Geschwindigkeit <em data-out="videoSpeed">1.00</em>x</span>
-            <input id="videoSpeed" type="range" min="0.25" max="3" step="0.05" value="1" />
-        </label>
-
-        <div class="offset-group" data-for="video">
-            <label class="field">
-                <span>Offset X <em data-out="videoOffsetX">0.00</em></span>
-                <input id="videoOffsetX" type="range" min="-1" max="1" step="0.01" value="0" />
-            </label>
-            <label class="field">
-                <span>Offset Y <em data-out="videoOffsetY">0.00</em></span>
-                <input id="videoOffsetY" type="range" min="-1" max="1" step="0.01" value="0" />
-            </label>
-        </div>
-    </section>
-
-    <!-- images panel -->
-    <section class="card panel" data-panel="images" hidden>
-        <h2>Bilder</h2>
-        <div id="imageGrid" class="tile-grid"></div>
-
-        <label class="field">
-            <span>Reihenfolge</span>
-            <select id="imageOrder">
-                <option value="normal">Normal</option>
-                <option value="random">Zufall</option>
-            </select>
-        </label>
-
-        <label class="field">
-            <span>Anzeigedauer <em data-out="imageDurationMs">8.0</em> s</span>
-            <input id="imageDurationMs" type="range" min="100" max="60000" step="100" value="8000" />
-        </label>
-
-        <label class="field">
-            <span>Überblendung <em data-out="imageTransitionMs">0.8</em> s</span>
-            <input id="imageTransitionMs" type="range" min="0" max="3000" step="100" value="800" />
-        </label>
-
-        <label class="field">
-            <span>Skalierung</span>
-            <select id="imageScale">
-                <option value="cover">Cover (ausfüllen, beschneiden)</option>
-                <option value="fit">Fit (einpassen, ränder)</option>
-            </select>
-        </label>
-
-        <div class="offset-group" data-for="images">
-            <label class="field">
-                <span>Offset X <em data-out="imageOffsetX">0.00</em></span>
-                <input id="imageOffsetX" type="range" min="-1" max="1" step="0.01" value="0" />
-            </label>
-            <label class="field">
-                <span>Offset Y <em data-out="imageOffsetY">0.00</em></span>
-                <input id="imageOffsetY" type="range" min="-1" max="1" step="0.01" value="0" />
-            </label>
-        </div>
-    </section>
-
-    <!-- filter chain -->
-    <section class="card">
-        <h2>Filter</h2>
-        <div id="filterGrid" class="tile-grid"></div>
-        <div id="filterEditor" class="tile-editor" hidden></div>
-    </section>
-
-    <!-- parallax panel -->
-    <section class="card">
-        <h2>Parallax</h2>
-        <label class="field row">
-            <span>Beim Wischen bewegen</span>
-            <input id="parallaxEnabled" type="checkbox" />
-        </label>
-        <label class="field" data-for="parallax">
-            <span>Stärke <em data-out="parallaxAmount">0.15</em></span>
-            <input id="parallaxAmount" type="range" min="0" max="0.5" step="0.01" value="0.15" />
-        </label>
-    </section>
-
-    <!-- motion panel -->
-    <section class="card">
-        <h2>Bewegung</h2>
-        <label class="field">
-            <span>Typ</span>
-            <select id="motionType">
-                <option value="none">Kein</option>
-                <option value="zoom">Zoom (rein/raus)</option>
-                <option value="breathe">Atmen</option>
-                <option value="drift">Drift</option>
-                <option value="sway">Schaukeln</option>
-                <option value="shake">Wackeln</option>
-            </select>
-        </label>
-        <div data-motion hidden>
-            <label class="field">
-                <span>Stärke <em data-out="motionAmount">0.50</em></span>
-                <input id="motionAmount" type="range" min="0" max="1" step="0.01" value="0.5" />
-            </label>
-            <label class="field">
-                <span>Tempo <em data-out="motionSpeed">0.50</em></span>
-                <input id="motionSpeed" type="range" min="0" max="1" step="0.01" value="0.5" />
-            </label>
-        </div>
-        <p class="muted" hidden data-motion>
-            bewegung rendert kontinuierlich solange sichtbar, verbraucht mehr akku.
-        </p>
-    </section>
-
-    <!-- app settings panel -->
-    <section class="card">
-        <h2>App</h2>
+<!-- ===== app-settings overlay (toggled by the gear) ===== -->
+<section id="settingsPanel" class="overlay-sheet" hidden aria-label="App-Einstellungen">
+    <div class="overlay-head">
+        <span class="overlay-title">Einstellungen</span>
+        <button class="tb-btn overlay-close" data-icon="close" data-close="settingsPanel" aria-label="Schließen"></button>
+    </div>
+    <div class="overlay-body">
         <label class="field">
             <span>Theme</span>
             <select id="themeMode">
@@ -181,11 +59,32 @@
             <span>Kachelgröße <em data-out="gridSize">84</em> px</span>
             <input id="gridSize" type="range" min="56" max="140" step="4" value="84" />
         </label>
-    </section>
+        <label class="field">
+            <span>Größe <em data-out="uiScale">100%</em></span>
+            <input id="uiScale" type="range" min="0.8" max="1.6" step="0.05" value="1" />
+        </label>
+        <label class="field">
+            <span>Abstände <em data-out="spaceScale">100%</em></span>
+            <input id="spaceScale" type="range" min="0.5" max="1.8" step="0.05" value="1" />
+        </label>
+        <label class="field">
+            <span>Vorschau-Qualität</span>
+            <select id="previewQuality">
+                <option value="0.75">Niedrig (spart Akku)</option>
+                <option value="1">Mittel</option>
+                <option value="1.5">Hoch</option>
+            </select>
+        </label>
+    </div>
+</section>
 
-    <!-- presets: source / config / wallpaper -->
-    <section class="card">
-        <h2>Presets</h2>
+<!-- ===== presets overlay ===== -->
+<section id="presetsPanel" class="overlay-sheet" hidden aria-label="Presets">
+    <div class="overlay-head">
+        <span class="overlay-title">Presets</span>
+        <button class="tb-btn overlay-close" data-icon="close" data-close="presetsPanel" aria-label="Schließen"></button>
+    </div>
+    <div class="overlay-body">
         <div class="preset-group" data-kind="source">
             <h3>Quelle</h3>
             <div class="preset-add">
@@ -210,14 +109,173 @@
             </div>
             <ul class="preset-list"></ul>
         </div>
-    </section>
     </div>
-
-    <footer class="sheet-actions">
-        <button id="save" class="btn ghost">Speichern</button>
-        <button id="apply" class="btn primary">Als Wallpaper setzen</button>
-    </footer>
 </section>
+
+<!-- ===== bottom dock: tab panel + tab bar + sources bar ===== -->
+<div class="dock">
+    <!-- panel that opens above the tab bar; swipe left/right between tabs -->
+    <section id="tabPanel" class="tab-panel" hidden>
+        <div id="tabHandle" class="panel-handle" aria-label="Höhe anpassen"><span class="grip"></span></div>
+        <div id="tabTrack" class="tab-track">
+            <!-- config tab -->
+            <div class="tab-page" data-tab="config">
+                <section class="panel" data-panel="video">
+                    <label class="field">
+                        <span>Modus</span>
+                        <select id="videoOrder">
+                            <option value="loop">Loop (der Reihe nach)</option>
+                            <option value="loop-random">Loop zufällig</option>
+                            <option value="single">Einzeln (ein Video, zufällig)</option>
+                        </select>
+                    </label>
+                    <label class="field row">
+                        <span>Position merken</span>
+                        <input id="resumeVideo" type="checkbox" checked />
+                    </label>
+                    <label class="field">
+                        <span>Skalierung</span>
+                        <select id="videoScale">
+                            <option value="cover">Cover (ausfüllen, beschneiden)</option>
+                            <option value="fit">Fit (einpassen, ränder)</option>
+                        </select>
+                    </label>
+                    <label class="field">
+                        <span>Geschwindigkeit <em data-out="videoSpeed">1.00</em>x</span>
+                        <input id="videoSpeed" type="range" min="0.25" max="3" step="0.05" value="1" />
+                    </label>
+                    <div class="offset-group" data-for="video">
+                        <label class="field">
+                            <span>Offset X <em data-out="videoOffsetX">0.00</em></span>
+                            <input id="videoOffsetX" type="range" min="-1" max="1" step="0.01" value="0" />
+                        </label>
+                        <label class="field">
+                            <span>Offset Y <em data-out="videoOffsetY">0.00</em></span>
+                            <input id="videoOffsetY" type="range" min="-1" max="1" step="0.01" value="0" />
+                        </label>
+                    </div>
+                </section>
+
+                <section class="panel" data-panel="images" hidden>
+                    <label class="field">
+                        <span>Modus</span>
+                        <select id="imageOrder">
+                            <option value="loop">Loop (der Reihe nach)</option>
+                            <option value="loop-random">Loop zufällig</option>
+                            <option value="single">Einzeln (ein Bild, zufällig)</option>
+                        </select>
+                    </label>
+                    <label class="field">
+                        <span>Anzeigedauer <em data-out="imageDurationMs">8.0</em> s</span>
+                        <input id="imageDurationMs" type="range" min="100" max="60000" step="100" value="8000" />
+                    </label>
+                    <label class="field">
+                        <span>Überblendung <em data-out="imageTransitionMs">0.8</em> s</span>
+                        <input id="imageTransitionMs" type="range" min="0" max="3000" step="100" value="800" />
+                    </label>
+                    <label class="field">
+                        <span>Skalierung</span>
+                        <select id="imageScale">
+                            <option value="cover">Cover (ausfüllen, beschneiden)</option>
+                            <option value="fit">Fit (einpassen, ränder)</option>
+                        </select>
+                    </label>
+                    <div class="offset-group" data-for="images">
+                        <label class="field">
+                            <span>Offset X <em data-out="imageOffsetX">0.00</em></span>
+                            <input id="imageOffsetX" type="range" min="-1" max="1" step="0.01" value="0" />
+                        </label>
+                        <label class="field">
+                            <span>Offset Y <em data-out="imageOffsetY">0.00</em></span>
+                            <input id="imageOffsetY" type="range" min="-1" max="1" step="0.01" value="0" />
+                        </label>
+                    </div>
+                </section>
+
+                <div class="subhead">Spiegeln</div>
+                <label class="field row">
+                    <span>X-Achse (horizontal)</span>
+                    <input id="flipX" type="checkbox" />
+                </label>
+                <label class="field row">
+                    <span>Y-Achse (vertikal)</span>
+                    <input id="flipY" type="checkbox" />
+                </label>
+            </div>
+
+            <!-- filters tab -->
+            <div class="tab-page" data-tab="filters">
+                <div id="filterGrid" class="tile-grid"></div>
+                <div id="filterEditor" class="tile-editor" hidden></div>
+            </div>
+
+            <!-- motion tab -->
+            <div class="tab-page" data-tab="motion">
+                <label class="field">
+                    <span>Typ</span>
+                    <select id="motionType">
+                        <option value="none">Kein</option>
+                        <option value="zoom">Zoom (rein/raus)</option>
+                        <option value="breathe">Atmen</option>
+                        <option value="drift">Drift</option>
+                        <option value="sway">Schaukeln</option>
+                        <option value="shake">Wackeln</option>
+                    </select>
+                </label>
+                <div data-motion hidden>
+                    <label class="field">
+                        <span>Stärke <em data-out="motionAmount">0.50</em></span>
+                        <input id="motionAmount" type="range" min="0" max="1" step="0.01" value="0.5" />
+                    </label>
+                    <label class="field">
+                        <span>Tempo <em data-out="motionSpeed">0.50</em></span>
+                        <input id="motionSpeed" type="range" min="0" max="1" step="0.01" value="0.5" />
+                    </label>
+                </div>
+                <p class="muted" hidden data-motion>
+                    bewegung rendert kontinuierlich solange sichtbar, verbraucht mehr akku.
+                </p>
+            </div>
+
+            <!-- parallax tab -->
+            <div class="tab-page" data-tab="parallax">
+                <label class="field row">
+                    <span>Beim Wischen bewegen</span>
+                    <input id="parallaxEnabled" type="checkbox" />
+                </label>
+                <label class="field" data-for="parallax">
+                    <span>Stärke <em data-out="parallaxAmount">0.15</em></span>
+                    <input id="parallaxAmount" type="range" min="0" max="0.5" step="0.01" value="0.15" />
+                </label>
+            </div>
+        </div>
+    </section>
+
+    <!-- bottom bar 1: tab buttons -->
+    <nav class="tabbar" role="tablist">
+        <button class="tab-btn" data-tab="config" role="tab">Config</button>
+        <button class="tab-btn" data-tab="filters" role="tab">Filter</button>
+        <button class="tab-btn" data-tab="motion" role="tab">Bewegung</button>
+        <button class="tab-btn" data-tab="parallax" role="tab">Parallax</button>
+    </nav>
+
+    <!-- bottom bar 2: sources -->
+    <section id="sourcesBar" class="sources-bar">
+        <div class="sources-lead">
+            <div class="seg mode-seg" role="tablist">
+                <button class="seg-btn" data-mode="video" role="tab">Video</button>
+                <button class="seg-btn" data-mode="images" role="tab">Bilder</button>
+            </div>
+            <div class="source-actions" aria-label="Quellen-Aktionen">
+                <button data-act="add" data-icon="add" aria-label="Hinzufügen"></button>
+                <button data-act="clear" data-icon="clear" aria-label="Alle entfernen"></button>
+                <button data-act="fullscreen" data-icon="expand" aria-label="Vollbild"></button>
+                <button data-act="save" data-icon="save" aria-label="Speichern"></button>
+            </div>
+        </div>
+        <div id="sourceStrip" class="source-strip"></div>
+    </section>
+</div>
 
 <script src="preview.js"></script>
 <script src="app.js"></script>
