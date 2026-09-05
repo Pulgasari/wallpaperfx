@@ -42,6 +42,7 @@
 
 # ui-umbau
 
+- [ ] font: "Manrope"
 - [ ] leiste oben, linke seite: appname + settings-icon zum togglen der app-settings
 - [ ] leiste oben, rechte seite: buttons für: (saved) configs/presets, sources, wallpapers, save
 - [ ] leiste unten 1: config, filters, motion, parallaxe (klickt man auf eins davon öffnet sich darüber dessen panel/tab, auf den selben button nochma klicken = geht wieder zu, während panel offen is, kann man dort nach links/rechts swipen um zwischen den tabs zu wechseln. und handle um das panel in der höhe einzustellen)
