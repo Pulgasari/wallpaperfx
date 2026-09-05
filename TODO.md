@@ -1,7 +1,13 @@
 # todo
 
 - [ ] die preview sollte pausierbar sein
-- [ ] `iconify` für icons nutzen
+- [ ] anmerkung/hinweis: `iconify` für icons nutzen (es sei denn wir bekämen alle nötigen icons via unicode-symbole hin)
+
+## app-settings
+
+- [ ] add: regler für scaling der generellen größe (beeinflusst quasi alles?)
+- [ ] add: evtl. regler für fontsize (is aber quasi auch iconsize)
+- [ ] add: evtl. regeler für scaling von spacings (padding/gaps)
 
 ## bugs
 
