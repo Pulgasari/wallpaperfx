@@ -11,6 +11,8 @@
 ## filters
 
 - [ ] filters alphabetisch sortieren
+- [ ] add filter: `bloom`
+- [ ] add filter: `blur` (real)
 - [ ] add filter: `fisheye`
 - [ ] add filter: `grain`
 - [ ] add filter: `noise`
