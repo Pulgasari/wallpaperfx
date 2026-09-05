@@ -159,8 +159,11 @@ body {
     -webkit-overflow-scrolling: touch;
     display: flex;
     flex-direction: column;
-    gap: 14px;
-    padding: 14px;
+    gap: calc(14px * var(--space-scale, 1));
+    padding: calc(14px * var(--space-scale, 1));
+    /* general size scaler: zoom is a real layout zoom in the android webview
+       (chromium), so content reflows and scrolls correctly at any scale */
+    zoom: var(--ui-scale, 1);
 }
 
 .sheet-actions {
@@ -178,7 +181,7 @@ body {
     background: var(--card);
     border: 1px solid var(--line);
     border-radius: var(--radius);
-    padding: 16px;
+    padding: calc(16px * var(--space-scale, 1));
 }
 
 .card h2 {
@@ -217,7 +220,7 @@ body {
     display: flex;
     flex-direction: column;
     gap: 6px;
-    margin-top: 14px;
+    margin-top: calc(14px * var(--space-scale, 1));
     font-size: 14px;
 }
 

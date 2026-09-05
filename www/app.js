@@ -338,7 +338,10 @@ function buildParamControl(f, p) {
 
 // ---- theme engine: derive every shade from bg / fg / accent ----
 
-const themeSettings = { mode: 'system', accent: '#f0ba48', rounded: true, gridSize: 84 };
+const themeSettings = {
+    mode: 'system', accent: '#f0ba48', rounded: true, gridSize: 84,
+    uiScale: 1, spaceScale: 1
+};
 
 function mixHex(a, b, t) {
     const x = hexToRgb(a);
@@ -381,6 +384,9 @@ function applyTheme() {
     r.setProperty('--radius', rounded ? '14px' : '3px');
     r.setProperty('--radius-lg', rounded ? '18px' : '4px');
     r.setProperty('--tile', (themeSettings.gridSize || 84) + 'px');
+    // general size scaler (zoom on the sheet body) + separate spacing multiplier
+    r.setProperty('--ui-scale', String(themeSettings.uiScale || 1));
+    r.setProperty('--space-scale', String(themeSettings.spaceScale || 1));
     document.documentElement.dataset.theme = dark ? 'dark' : 'light';
 }
 
@@ -399,12 +405,23 @@ function initTheme() {
     const accent = $('#accentColor');
     const rounded = $('#rounded');
     const grid = $('#gridSize');
+    const uiScale = $('#uiScale');
+    const spaceScale = $('#spaceScale');
+    const pct = (v) => Math.round(v * 100) + '%';
     if (mode) mode.value = themeSettings.mode;
     if (accent) accent.value = themeSettings.accent;
     if (rounded) rounded.checked = themeSettings.rounded;
     if (grid) {
         grid.value = themeSettings.gridSize;
         setOut('gridSize', String(themeSettings.gridSize));
+    }
+    if (uiScale) {
+        uiScale.value = themeSettings.uiScale;
+        setOut('uiScale', pct(themeSettings.uiScale));
+    }
+    if (spaceScale) {
+        spaceScale.value = themeSettings.spaceScale;
+        setOut('spaceScale', pct(themeSettings.spaceScale));
     }
 
     if (mode) mode.addEventListener('change', (e) => { themeSettings.mode = e.target.value; applyTheme(); save(); });
@@ -413,6 +430,18 @@ function initTheme() {
     if (grid) grid.addEventListener('input', (e) => {
         themeSettings.gridSize = Number(e.target.value);
         setOut('gridSize', String(themeSettings.gridSize));
+        applyTheme();
+        save();
+    });
+    if (uiScale) uiScale.addEventListener('input', (e) => {
+        themeSettings.uiScale = Number(e.target.value);
+        setOut('uiScale', pct(themeSettings.uiScale));
+        applyTheme();
+        save();
+    });
+    if (spaceScale) spaceScale.addEventListener('input', (e) => {
+        themeSettings.spaceScale = Number(e.target.value);
+        setOut('spaceScale', pct(themeSettings.spaceScale));
         applyTheme();
         save();
     });
