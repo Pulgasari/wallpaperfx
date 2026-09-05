@@ -91,8 +91,9 @@ class SceneRenderer implements GLRenderThread.Renderer {
     private volatile int videoW, videoH;
     private volatile boolean videoReady;
 
-    // image slideshow state
-    private final float[] identityMatrix = new float[16];
+    // image slideshow state; flip-y texture matrix so 2d textures render upright
+    // (our quad maps screen-top to tex v=1). must match preview UNPACK_FLIP_Y=true.
+    private final float[] imageMatrix = new float[16];
     private int texA, texAw, texAh;
     private int texB, texBw, texBh;
     private int imageIndex;
@@ -104,7 +105,10 @@ class SceneRenderer implements GLRenderThread.Renderer {
 
     SceneRenderer(Context context) {
         this.context = context.getApplicationContext();
-        Matrix.setIdentityM(identityMatrix, 0);
+        // v' = 1 - v : vertical flip about the texture center
+        Matrix.setIdentityM(imageMatrix, 0);
+        Matrix.translateM(imageMatrix, 0, 0f, 1f, 0f);
+        Matrix.scaleM(imageMatrix, 0, 1f, -1f, 1f);
     }
 
     void attachThread(GLRenderThread t) {
@@ -274,7 +278,7 @@ class SceneRenderer implements GLRenderThread.Renderer {
         int count = cfg.imagePaths.size();
 
         float[] sa = computeScale(texAw, texAh, cfg.imageScale, cfg.imageOffsetX, cfg.imageOffsetY);
-        drawQuad(prog2d, GLES20.GL_TEXTURE_2D, texA, identityMatrix, sa, 1f);
+        drawQuad(prog2d, GLES20.GL_TEXTURE_2D, texA, imageMatrix, sa, 1f);
 
         if (count > 1) {
             if (!transitioning && now - lastShownAt >= cfg.imageDurationMs) {
@@ -308,7 +312,7 @@ class SceneRenderer implements GLRenderThread.Renderer {
                     float[] sb = computeScale(texBw, texBh, cfg.imageScale, cfg.imageOffsetX, cfg.imageOffsetY);
                     GLES20.glEnable(GLES20.GL_BLEND);
                     GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA);
-                    drawQuad(prog2d, GLES20.GL_TEXTURE_2D, texB, identityMatrix, sb, t);
+                    drawQuad(prog2d, GLES20.GL_TEXTURE_2D, texB, imageMatrix, sb, t);
                     GLES20.glDisable(GLES20.GL_BLEND);
                 }
             }

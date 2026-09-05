@@ -25,10 +25,13 @@ add a config field, touch all three: `WpConfig` (model + toJson/fromJson),
   static images idle, video wakes on `onFrameAvailable`, transitions animate.
 - Video = external OES texture; images = `GL_TEXTURE_2D`. Both share the vertex
   shader (cover/fit + pan) and the filter fragment code. The quad maps screen-top
-  to texture `v=1`, so images need no vertical flip (identity `uTexMatrix`, and the
-  preview sets `UNPACK_FLIP_Y_WEBGL=false`); video uses the `SurfaceTexture`
-  transform matrix. If you change the quad or texcoords, re-check orientation in
-  both renderers.
+  to texture `v=1`, so 2d image textures render upside down unless flipped: the
+  wallpaper uses a flip-Y `uTexMatrix` (`imageMatrix` in `SceneRenderer`) and the
+  preview sets `UNPACK_FLIP_Y_WEBGL=true`; keep those two in agreement. Video uses
+  the `SurfaceTexture` transform matrix. Verified upright with a headless
+  screenshot test; if you change the quad/texcoords, re-check both renderers.
+- Preview `<img>` textures must NOT set `crossOrigin` — the capacitor file server
+  is same-origin and sends no cors headers, so cors mode makes the load fail.
 - All GL calls must run on the render thread (the one with the EGL context).
 
 ## Second invariant: the two filter shaders

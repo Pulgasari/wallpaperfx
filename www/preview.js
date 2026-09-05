@@ -193,9 +193,8 @@ const Preview = (function () {
             1, 1, 1, 1
         ]), gl.STATIC_DRAW);
 
-        // our quad maps screen-top to tex v=1, so no upload flip is needed;
-        // flipping here would render images/video upside down
-        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+        // upload with a vertical flip so images/video render upright with our quad
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
         gl.clearColor(0, 0, 0, 1);
 
         resize();
@@ -241,8 +240,9 @@ const Preview = (function () {
         if (!url) return;
 
         if (type === 'image') {
+            // no crossOrigin: the capacitor file server serves same-origin without
+            // cors headers, so requesting cors mode makes the image fail to load
             const img = new Image();
-            img.crossOrigin = 'anonymous';
             img.onload = () => {
                 contentW = img.naturalWidth || 1;
                 contentH = img.naturalHeight || 1;
