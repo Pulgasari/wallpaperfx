@@ -21,12 +21,17 @@ public class WpConfig {
     // mode: "video" | "images"
     public String mode = "video";
 
-    // video
-    public String videoPath = null;
+    // video: ordered list of items (reuses ImageItem = {path, enabled}), each
+    // individually enable-able and reorderable, mirrored in app.js as `videos`.
+    public String videoPath = null;     // legacy single path, kept for migration only
+    public List<ImageItem> videos = new ArrayList<>();
+    // loop | loop-random | single (single = one video, random pick, looped)
+    public String videoOrder = "loop";
     public String videoScale = "cover"; // cover | fit
     public float videoOffsetX = 0f;     // -1..1, pan within cropped area (cover only)
     public float videoOffsetY = 0f;
     public float videoSpeed = 1.0f;     // playback rate, 0.25..3
+    public boolean resumeVideo = true;  // remember playback position across reloads
 
     // images: ordered list of items, each individually enable-able
     public List<ImageItem> images = new ArrayList<>();
@@ -68,8 +73,17 @@ public class WpConfig {
 
     // paths of the enabled images, in order, for the renderer to cycle through.
     public List<String> enabledImagePaths() {
+        return enabledPaths(images);
+    }
+
+    // paths of the enabled videos, in order, for the renderer to cycle through.
+    public List<String> enabledVideoPaths() {
+        return enabledPaths(videos);
+    }
+
+    private static List<String> enabledPaths(List<ImageItem> items) {
         List<String> out = new ArrayList<>();
-        for (ImageItem it : images) {
+        for (ImageItem it : items) {
             if (it.enabled && it.path != null && !it.path.isEmpty()) out.add(it.path);
         }
         return out;
@@ -208,11 +222,20 @@ public class WpConfig {
         JSONObject o = new JSONObject();
         o.put("mode", mode);
 
-        o.put("videoPath", videoPath == null ? JSONObject.NULL : videoPath);
+        JSONArray vids = new JSONArray();
+        for (ImageItem it : videos) {
+            JSONObject vo = new JSONObject();
+            vo.put("path", it.path);
+            vo.put("enabled", it.enabled);
+            vids.put(vo);
+        }
+        o.put("videos", vids);
+        o.put("videoOrder", videoOrder);
         o.put("videoScale", videoScale);
         o.put("videoOffsetX", videoOffsetX);
         o.put("videoOffsetY", videoOffsetY);
         o.put("videoSpeed", videoSpeed);
+        o.put("resumeVideo", resumeVideo);
 
         JSONArray imgs = new JSONArray();
         for (ImageItem it : images) {
@@ -252,19 +275,21 @@ public class WpConfig {
         videoOffsetX = (float) o.optDouble("videoOffsetX", videoOffsetX);
         videoOffsetY = (float) o.optDouble("videoOffsetY", videoOffsetY);
         videoSpeed = (float) o.optDouble("videoSpeed", videoSpeed);
+        videoOrder = o.optString("videoOrder", videoOrder);
+        resumeVideo = o.optBoolean("resumeVideo", resumeVideo);
+
+        JSONArray vids = o.optJSONArray("videos");
+        if (vids != null) {
+            videos = readItems(vids);
+        } else if (videoPath != null && !videoPath.isEmpty()) {
+            // migrate the pre-list config (single videoPath) into one item
+            videos = new ArrayList<>();
+            videos.add(new ImageItem(videoPath));
+        }
 
         JSONArray imgs = o.optJSONArray("images");
         if (imgs != null) {
-            images = new ArrayList<>();
-            for (int i = 0; i < imgs.length(); i++) {
-                JSONObject io = imgs.optJSONObject(i);
-                if (io == null) continue;
-                String p = io.optString("path", null);
-                if (p == null || p.isEmpty()) continue;
-                ImageItem it = new ImageItem(p);
-                it.enabled = io.optBoolean("enabled", true);
-                images.add(it);
-            }
+            images = readItems(imgs);
         } else {
             // migrate the pre-tiles config (imagePaths: array of strings)
             JSONArray legacy = o.optJSONArray("imagePaths");
@@ -327,6 +352,21 @@ public class WpConfig {
         f.glitch = (float) o.optDouble("glitchAmount", f.glitch);
         f.vhs = (float) o.optDouble("vhsAmount", f.vhs);
         filters.add(f);
+    }
+
+    // reads a json array of {path, enabled} objects into a media item list.
+    private static List<ImageItem> readItems(JSONArray arr) {
+        List<ImageItem> out = new ArrayList<>();
+        for (int i = 0; i < arr.length(); i++) {
+            JSONObject io = arr.optJSONObject(i);
+            if (io == null) continue;
+            String p = io.optString("path", null);
+            if (p == null || p.isEmpty()) continue;
+            ImageItem it = new ImageItem(p);
+            it.enabled = io.optBoolean("enabled", true);
+            out.add(it);
+        }
+        return out;
     }
 
     private static JSONArray intArray(int[] v) {

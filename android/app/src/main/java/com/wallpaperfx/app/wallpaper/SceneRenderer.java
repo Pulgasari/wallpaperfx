@@ -1,6 +1,7 @@
 package com.wallpaperfx.app.wallpaper;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.SurfaceTexture;
@@ -75,6 +76,11 @@ class SceneRenderer implements GLRenderThread.Renderer {
 
     private int screenW, screenH;
     private volatile boolean needsReload = true;
+    // full re-setup on first load / surface change; visibility returns only reload
+    // when the config file actually changed, so an unchanged config keeps the video
+    // playing (no restart, last frame stays) instead of tearing media down.
+    private volatile boolean forceReload = true;
+    private long loadedConfigMtime = -1L;
 
     // home-screen swipe position (0..1, 0.5 = centered), drives parallax
     private volatile float xOffset = 0.5f;
@@ -94,6 +100,13 @@ class SceneRenderer implements GLRenderThread.Renderer {
     private boolean frameAvailable;
     private volatile int videoW, videoH;
     private volatile boolean videoReady;
+    // multi-video cycling: the current index into activeVideoPaths, an advance flag
+    // set by the completion listener (handled on the render thread), and a pending
+    // seek applied on prepare so a remembered position resumes instead of restarting.
+    private List<String> activeVideoPaths = new ArrayList<>();
+    private int videoIndex;
+    private volatile boolean advancePending;
+    private volatile int pendingSeekMs;
 
     // image slideshow state; flip-y texture matrix so 2d textures render upright
     // (our quad maps screen-top to tex v=1). must match preview UNPACK_FLIP_Y=true.
@@ -161,18 +174,32 @@ class SceneRenderer implements GLRenderThread.Renderer {
         screenW = width;
         screenH = height;
         createFbos(width, height);
-        // re-decode images at the new resolution
+        // re-decode images / re-setup at the new resolution
+        forceReload = true;
         needsReload = true;
     }
 
     @Override
     public long onDrawFrame() {
         if (needsReload && screenW > 0 && screenH > 0) {
-            applyConfig();
+            long mtime = configMtime();
+            // only a real config change (or a forced first-load/surface reload)
+            // rebuilds media; a plain visibility return leaves the video running
+            if (forceReload || mtime != loadedConfigMtime) {
+                applyConfig();
+                loadedConfigMtime = mtime;
+                forceReload = false;
+            }
             needsReload = false;
         }
         if (fboA == null || fboB == null) {
             return Long.MAX_VALUE;
+        }
+        // advance to the next video when the previous one finished (multi-video
+        // loop / loop-random); done here on the render thread, not the callback
+        if (advancePending) {
+            advancePending = false;
+            advanceVideo();
         }
 
         // pass 0: render the source (video or image cross-fade) into fbo a, unfiltered
@@ -275,7 +302,12 @@ class SceneRenderer implements GLRenderThread.Renderer {
     }
 
     private void setupVideo() {
-        if (cfg.videoPath == null) return;
+        if (activeVideoPaths.isEmpty()) return;
+        // single -> one random clip; otherwise resume the remembered index if the
+        // list is unchanged, else start at the top
+        videoIndex = isSingleVideo() ? random.nextInt(activeVideoPaths.size()) : resumeIndex();
+        pendingSeekMs = resumeSeekFor(videoIndex);
+
         oesTexId = createOesTexture();
         videoSurfaceTexture = new SurfaceTexture(oesTexId);
         videoSurfaceTexture.setOnFrameAvailableListener(st -> {
@@ -287,9 +319,24 @@ class SceneRenderer implements GLRenderThread.Renderer {
         videoSurface = new Surface(videoSurfaceTexture);
         try {
             mediaPlayer = new MediaPlayer();
+            startCurrentVideo();
+        } catch (Exception e) {
+            Log.e(GLUtil.TAG, "video setup failed", e);
+            releaseVideo();
+        }
+    }
+
+    // (re)configures the media player for activeVideoPaths[videoIndex]. reused for
+    // the first clip and every advance; listeners are (re)set here so they survive
+    // reset(). onPrepared applies the pending seek so a remembered position resumes.
+    private void startCurrentVideo() {
+        if (mediaPlayer == null || activeVideoPaths.isEmpty()) return;
+        String path = activeVideoPaths.get(videoIndex);
+        try {
+            mediaPlayer.reset();
             mediaPlayer.setSurface(videoSurface);
-            mediaPlayer.setDataSource(cfg.videoPath);
-            mediaPlayer.setLooping(true);
+            mediaPlayer.setDataSource(path);
+            mediaPlayer.setLooping(shouldLoopCurrent());
             mediaPlayer.setVolume(0f, 0f);
             mediaPlayer.setOnVideoSizeChangedListener((mp, w, h) -> {
                 if (w > 0 && h > 0) {
@@ -303,6 +350,9 @@ class SceneRenderer implements GLRenderThread.Renderer {
                     videoH = mp.getVideoHeight();
                 }
                 try {
+                    int seek = pendingSeekMs;
+                    pendingSeekMs = 0;
+                    if (seek > 0) mp.seekTo(seek);
                     mp.start();
                     // playback speed; some codecs reject non-default rates, hence the guard
                     float speed = clamp(cfg.videoSpeed, 0.25f, 3f);
@@ -313,15 +363,67 @@ class SceneRenderer implements GLRenderThread.Renderer {
                 }
                 videoReady = true;
             });
+            mediaPlayer.setOnCompletionListener(mp -> {
+                // fires only when not looping (multi-clip loop / loop-random); the
+                // actual advance runs on the render thread via advancePending
+                advancePending = true;
+                if (thread != null) thread.requestRender();
+            });
             mediaPlayer.prepareAsync();
         } catch (Exception e) {
-            Log.e(GLUtil.TAG, "video setup failed for " + cfg.videoPath, e);
+            Log.e(GLUtil.TAG, "video start failed for " + path, e);
             releaseVideo();
         }
     }
 
-    private void releaseVideo() {
+    // moves to the next clip after the previous finished (render thread only)
+    private void advanceVideo() {
+        if (mediaPlayer == null || activeVideoPaths.isEmpty()) return;
+        videoIndex = pickNextVideo();
+        pendingSeekMs = 0;
         videoReady = false;
+        videoW = 0;
+        videoH = 0;
+        startCurrentVideo();
+    }
+
+    private int pickNextVideo() {
+        int count = activeVideoPaths.size();
+        if (count <= 1) return 0;
+        if (isRandomVideoOrder()) {
+            int n;
+            do {
+                n = random.nextInt(count);
+            } while (n == videoIndex);
+            return n;
+        }
+        return (videoIndex + 1) % count;
+    }
+
+    private boolean isSingleVideo() {
+        return "single".equals(cfg.videoOrder);
+    }
+
+    private boolean isRandomVideoOrder() {
+        return "loop-random".equals(cfg.videoOrder);
+    }
+
+    // loop the current clip internally when it is the only thing to play; multi-clip
+    // loop / loop-random rely on the completion listener to advance instead
+    private boolean shouldLoopCurrent() {
+        return isSingleVideo() || activeVideoPaths.size() <= 1;
+    }
+
+    private void releaseVideo() {
+        // remember where we were so the next setup can resume instead of restarting
+        if (mediaPlayer != null && cfg.resumeVideo && !activeVideoPaths.isEmpty()) {
+            try {
+                persistResume(videoSignature(), videoIndex, mediaPlayer.getCurrentPosition());
+            } catch (Exception ignored) {
+            }
+        }
+        videoReady = false;
+        advancePending = false;
         if (mediaPlayer != null) {
             try {
                 mediaPlayer.stop();
@@ -347,6 +449,44 @@ class SceneRenderer implements GLRenderThread.Renderer {
         }
         videoW = 0;
         videoH = 0;
+    }
+
+    // ---- video resume (survives full teardown via shared prefs) ----
+
+    private static final String RESUME_PREFS = "wallpaperfx_video";
+
+    // order-sensitive signature of the enabled video list, so a resume only applies
+    // when the same set of videos is still configured
+    private String videoSignature() {
+        return String.valueOf(activeVideoPaths.hashCode());
+    }
+
+    private int resumeIndex() {
+        if (!cfg.resumeVideo) return 0;
+        SharedPreferences p = context.getSharedPreferences(RESUME_PREFS, Context.MODE_PRIVATE);
+        if (!videoSignature().equals(p.getString("sig", ""))) return 0;
+        int idx = p.getInt("index", 0);
+        return (idx >= 0 && idx < activeVideoPaths.size()) ? idx : 0;
+    }
+
+    private int resumeSeekFor(int idx) {
+        if (!cfg.resumeVideo) return 0;
+        SharedPreferences p = context.getSharedPreferences(RESUME_PREFS, Context.MODE_PRIVATE);
+        if (!videoSignature().equals(p.getString("sig", ""))) return 0;
+        if (p.getInt("index", -1) != idx) return 0;
+        return Math.max(0, p.getInt("pos", 0));
+    }
+
+    private void persistResume(String sig, int index, int pos) {
+        try {
+            context.getSharedPreferences(RESUME_PREFS, Context.MODE_PRIVATE)
+                    .edit().putString("sig", sig).putInt("index", index).putInt("pos", pos).apply();
+        } catch (Exception ignored) {
+        }
+    }
+
+    private long configMtime() {
+        return WpConfig.file(context).lastModified();
     }
 
     // ---- images ----
@@ -460,6 +600,7 @@ class SceneRenderer implements GLRenderThread.Renderer {
         contentFlip[0] = cfg.flipX ? -1f : 1f;
         contentFlip[1] = cfg.flipY ? -1f : 1f;
         activeImagePaths = cfg.enabledImagePaths();
+        activeVideoPaths = cfg.enabledVideoPaths();
         if ("images".equals(cfg.mode)) {
             setupImages();
         } else {

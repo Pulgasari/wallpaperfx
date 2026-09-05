@@ -287,9 +287,13 @@ const Preview = (function () {
         if (!gl || !state) return;
         let url = null;
         let type = null;
-        if (state.mode === 'video' && state.videoPath) {
-            url = toSrc(state.videoPath);
-            type = 'video';
+        if (state.mode === 'video') {
+            // preview shows the first enabled video of the list
+            const first = (state.videos || []).find((v) => v.enabled);
+            if (first) {
+                url = toSrc(first.path);
+                type = 'video';
+            }
         } else if (state.mode === 'images') {
             const first = (state.images || []).find((i) => i.enabled);
             if (first) {

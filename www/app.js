@@ -32,11 +32,13 @@ const plugin = getPlugin();
 
 const state = {
     mode: 'video',
-    videoPath: null,
+    videos: [], // [{ path, enabled }]
+    videoOrder: 'loop', // loop | loop-random | single
     videoScale: 'cover',
     videoOffsetX: 0,
     videoOffsetY: 0,
     videoSpeed: 1,
+    resumeVideo: true,
     images: [], // [{ path, enabled }]
     imageOrder: 'loop', // loop | loop-random | single
     imageDurationMs: 8000,
@@ -458,8 +460,8 @@ function initTheme() {
 
 // ---- presets: source / config / wallpaper (localStorage) ----
 
-const SOURCE_KEYS = ['mode', 'videoPath', 'images'];
-const CONFIG_KEYS = ['videoScale', 'videoOffsetX', 'videoOffsetY', 'videoSpeed',
+const SOURCE_KEYS = ['mode', 'videos', 'images'];
+const CONFIG_KEYS = ['videoOrder', 'videoScale', 'videoOffsetX', 'videoOffsetY', 'videoSpeed', 'resumeVideo',
     'imageOrder', 'imageDurationMs', 'imageTransitionMs', 'imageScale', 'imageOffsetX', 'imageOffsetY',
     'flipX', 'flipY',
     'filters', 'parallaxEnabled', 'parallaxAmount', 'motionType', 'motionAmount', 'motionSpeed'];
@@ -560,7 +562,7 @@ function initPresets() {
 }
 
 function hasMedia() {
-    return (state.mode === 'video' && !!state.videoPath) ||
+    return (state.mode === 'video' && state.videos.some((v) => v.enabled)) ||
         (state.mode === 'images' && state.images.some((i) => i.enabled));
 }
 
@@ -610,6 +612,53 @@ async function pickImages() {
     }
 }
 
+async function pickVideos() {
+    try {
+        const res = await plugin.pickMedia({ type: 'video' });
+        if (res.paths && res.paths.length) {
+            res.paths.forEach((p) => state.videos.push({ path: p, enabled: true }));
+            renderVideoGrid();
+            syncPreview();
+        }
+    } catch (e) {
+        setStatus('auswahl abgebrochen');
+    }
+}
+
+function renderVideoGrid() {
+    const grid = $('#videoGrid');
+    if (!grid) return;
+    grid.innerHTML = '';
+    state.videos.forEach((v) => grid.append(buildVideoTile(v)));
+    grid.append(addTile('videos hinzufügen', pickVideos));
+}
+
+// video tiles are label-based (filename + play glyph); no cheap thumbnail without
+// decoding, and reorder/toggle/remove mirror the image tiles.
+function buildVideoTile(vid) {
+    const tile = document.createElement('div');
+    tile.className = 'tile video-tile' + (vid.enabled ? '' : ' disabled');
+    tile.__item = vid;
+
+    const label = document.createElement('span');
+    label.className = 'tile-label';
+    label.textContent = '▶ ' + basename(vid.path);
+    tile.append(label);
+
+    tile.append(tileToggle(vid.enabled, (on) => {
+        vid.enabled = on;
+        tile.classList.toggle('disabled', !on);
+        syncPreview();
+    }));
+    tile.append(tileX(() => {
+        const i = state.videos.indexOf(vid);
+        if (i > -1) state.videos.splice(i, 1);
+        renderVideoGrid();
+        syncPreview();
+    }));
+    return tile;
+}
+
 function renderImageGrid() {
     const grid = $('#imageGrid');
     if (!grid) return;
@@ -652,8 +701,10 @@ function renderAll() {
     renderMode();
     renderFilterGrid();
     renderImageGrid();
+    renderVideoGrid();
 
-    $('#videoName').textContent = state.videoPath ? basename(state.videoPath) : 'kein video gewählt';
+    $('#videoOrder').value = state.videoOrder;
+    $('#resumeVideo').checked = state.resumeVideo;
     $('#videoScale').value = state.videoScale;
     $('#videoOffsetX').value = state.videoOffsetX;
     $('#videoOffsetY').value = state.videoOffsetY;
@@ -699,25 +750,15 @@ function bind() {
         })
     );
 
-    $('#pickVideo').addEventListener('click', async () => {
-        try {
-            const res = await plugin.pickMedia({ type: 'video' });
-            if (res.paths && res.paths.length) {
-                state.videoPath = res.paths[0];
-                $('#videoName').textContent = basename(state.videoPath);
-                syncPreview();
-            }
-        } catch (e) {
-            setStatus('auswahl abgebrochen');
-        }
-    });
-
-    // filter tiles: tap selects for editing; images: tap toggles enabled. both drag-reorder.
+    // filter tiles: tap selects for editing; image/video tiles: tap toggles enabled.
+    // all three drag-reorder.
     enableTileDrag($('#filterGrid'), state.filters,
         (f) => { selectedFilter = f; renderFilterGrid(); },
         () => renderFilterGrid());
     enableTileDrag($('#imageGrid'), state.images, null,
         () => { renderImageGrid(); syncPreview(); });
+    enableTileDrag($('#videoGrid'), state.videos, null,
+        () => { renderVideoGrid(); syncPreview(); });
 
     const num = (id, key, out, div) =>
         $(id).addEventListener('input', (e) => {
@@ -725,6 +766,8 @@ function bind() {
             if (out) setOut(out, div ? (state[key] / div).toFixed(1) : state[key].toFixed(2));
         });
 
+    $('#videoOrder').addEventListener('change', (e) => (state.videoOrder = e.target.value));
+    $('#resumeVideo').addEventListener('change', (e) => (state.resumeVideo = e.target.checked));
     $('#videoScale').addEventListener('change', (e) => (state.videoScale = e.target.value));
     num('#videoOffsetX', 'videoOffsetX', 'videoOffsetX');
     num('#videoOffsetY', 'videoOffsetY', 'videoOffsetY');
@@ -776,7 +819,7 @@ async function save() {
 }
 
 async function apply() {
-    if (state.mode === 'video' && !state.videoPath) {
+    if (state.mode === 'video' && !state.videos.some((v) => v.enabled)) {
         setStatus('erst ein video wählen');
         return;
     }
@@ -803,6 +846,10 @@ async function init() {
         // migrate the pre-tiles config (imagePaths: array of strings)
         if (saved && Array.isArray(saved.imagePaths) && state.images.length === 0) {
             state.images = saved.imagePaths.map((p) => ({ path: p, enabled: true }));
+        }
+        // migrate the single-video config (videoPath) into the videos list
+        if (saved && saved.videoPath && state.videos.length === 0) {
+            state.videos = [{ path: saved.videoPath, enabled: true }];
         }
         // migrate the legacy image order names to the mode enum
         if (state.imageOrder === 'normal') state.imageOrder = 'loop';

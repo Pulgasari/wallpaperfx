@@ -66,7 +66,7 @@ public class WallpaperFxPlugin extends Plugin {
     @PluginMethod
     public void pickMedia(PluginCall call) {
         String type = call.getString("type", "video");
-        boolean multiple = "image".equals(type);
+        boolean multiple = true; // images and videos can both be multi-selected
         String mime = "image".equals(type) ? "image/*" : "video/*";
 
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);

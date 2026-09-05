@@ -39,8 +39,21 @@
     <!-- video panel -->
     <section class="card panel" data-panel="video">
         <h2>Video</h2>
-        <button id="pickVideo" class="btn">Video auswählen</button>
-        <p id="videoName" class="muted">kein video gewählt</p>
+        <div id="videoGrid" class="tile-grid"></div>
+
+        <label class="field">
+            <span>Modus</span>
+            <select id="videoOrder">
+                <option value="loop">Loop (der Reihe nach)</option>
+                <option value="loop-random">Loop zufällig</option>
+                <option value="single">Einzeln (ein Video, zufällig)</option>
+            </select>
+        </label>
+
+        <label class="field row">
+            <span>Position merken</span>
+            <input id="resumeVideo" type="checkbox" checked />
+        </label>
 
         <label class="field">
             <span>Skalierung</span>
