@@ -30,7 +30,8 @@ public class WpConfig {
 
     // images: ordered list of items, each individually enable-able
     public List<ImageItem> images = new ArrayList<>();
-    public String imageOrder = "normal"; // normal | random
+    // loop | loop-random | single (legacy: normal -> loop, random -> loop-random)
+    public String imageOrder = "loop";
     public int imageDurationMs = 8000;
     public int imageTransitionMs = 800;
     public String imageScale = "cover"; // cover | fit

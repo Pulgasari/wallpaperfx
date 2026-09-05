@@ -357,11 +357,13 @@ class SceneRenderer implements GLRenderThread.Renderer {
         }
         long now = SystemClock.uptimeMillis();
         int count = activeImagePaths.size();
+        // "single" holds one static image; loop / loop-random cycle the slideshow
+        boolean cycles = count > 1 && !isSingleImage();
 
         float[] sa = computeScale(texAw, texAh, cfg.imageScale, cfg.imageOffsetX, cfg.imageOffsetY);
         drawQuad(prog2d, GLES20.GL_TEXTURE_2D, texA, imageMatrix, sa, 1f, null, contentFlip);
 
-        if (count > 1) {
+        if (cycles) {
             if (!transitioning && now - lastShownAt >= cfg.imageDurationMs) {
                 nextIndex = pickNext(count);
                 texB = loadTexture(activeImagePaths.get(nextIndex));
@@ -402,15 +404,24 @@ class SceneRenderer implements GLRenderThread.Renderer {
         if (transitioning) {
             return 0L; // animate the cross-fade
         }
-        if (count > 1) {
+        if (cycles) {
             long remain = cfg.imageDurationMs - (now - lastShownAt);
             return Math.max(16L, remain);
         }
         return Long.MAX_VALUE; // single static image
     }
 
+    // "loop-random" (and legacy "random") pick a random next image; loop is sequential
+    private boolean isRandomOrder() {
+        return "loop-random".equals(cfg.imageOrder) || "random".equals(cfg.imageOrder);
+    }
+
+    private boolean isSingleImage() {
+        return "single".equals(cfg.imageOrder);
+    }
+
     private int pickNext(int count) {
-        if ("random".equals(cfg.imageOrder)) {
+        if (isRandomOrder()) {
             if (count <= 1) return 0;
             int n;
             do {
@@ -423,8 +434,9 @@ class SceneRenderer implements GLRenderThread.Renderer {
 
     private void setupImages() {
         if (activeImagePaths.isEmpty()) return;
-        imageIndex = 0;
-        texA = loadTexture(activeImagePaths.get(0));
+        // single mode shows one image; pick it at random from the enabled set
+        imageIndex = isSingleImage() ? random.nextInt(activeImagePaths.size()) : 0;
+        texA = loadTexture(activeImagePaths.get(imageIndex));
         texAw = lastLoadedW;
         texAh = lastLoadedH;
         transitioning = false;

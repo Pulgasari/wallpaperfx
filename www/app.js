@@ -38,7 +38,7 @@ const state = {
     videoOffsetY: 0,
     videoSpeed: 1,
     images: [], // [{ path, enabled }]
-    imageOrder: 'normal',
+    imageOrder: 'loop', // loop | loop-random | single
     imageDurationMs: 8000,
     imageTransitionMs: 800,
     imageScale: 'cover',
@@ -804,6 +804,9 @@ async function init() {
         if (saved && Array.isArray(saved.imagePaths) && state.images.length === 0) {
             state.images = saved.imagePaths.map((p) => ({ path: p, enabled: true }));
         }
+        // migrate the legacy image order names to the mode enum
+        if (state.imageOrder === 'normal') state.imageOrder = 'loop';
+        else if (state.imageOrder === 'random') state.imageOrder = 'loop-random';
     } catch (e) {
         // keep defaults
     }
