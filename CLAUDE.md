@@ -17,6 +17,10 @@ the `WallpaperFx` plugin; `SceneRenderer` reads the same file on reload. If you
 add a config field, touch all three: `WpConfig` (model + toJson/fromJson),
 `app.js` (`state` + a control), and the renderer that consumes it.
 
+Images are `images`: an ordered array of `{path, enabled}` (mirrored by
+`WpConfig.ImageItem`); the renderer cycles `enabledImagePaths()`. The ui shows
+them as reorderable/toggleable thumbnail tiles.
+
 Filters are a chain: `filters` is an ordered array of entries, each carrying its
 own params (`WpConfig.FilterEntry` ⇄ `app.js` `newFilter()` — keep the defaults
 and json keys identical). They render as a multi-pass fbo pipeline: the source

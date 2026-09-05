@@ -69,8 +69,7 @@
     <!-- images panel -->
     <section class="card panel" data-panel="images" hidden>
         <h2>Bilder</h2>
-        <button id="pickImages" class="btn">Bilder hinzufügen</button>
-        <ul id="imageList" class="image-list"></ul>
+        <div id="imageGrid" class="tile-grid"></div>
 
         <label class="field">
             <span>Reihenfolge</span>
@@ -113,11 +112,8 @@
     <!-- filter chain -->
     <section class="card">
         <h2>Filter</h2>
-        <ul id="filterList" class="chain-list"></ul>
-        <div class="chain-add">
-            <select id="addFilterType"></select>
-            <button id="addFilter" class="btn">+ Hinzufügen</button>
-        </div>
+        <div id="filterGrid" class="tile-grid"></div>
+        <div id="filterEditor" class="tile-editor" hidden></div>
     </section>
 
     <!-- parallax panel -->
@@ -180,6 +176,10 @@
         <label class="field row">
             <span>Abgerundet</span>
             <input id="rounded" type="checkbox" checked />
+        </label>
+        <label class="field">
+            <span>Kachelgröße <em data-out="gridSize">84</em> px</span>
+            <input id="gridSize" type="range" min="56" max="140" step="4" value="84" />
         </label>
     </section>
     </div>

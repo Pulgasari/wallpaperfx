@@ -28,8 +28,8 @@ public class WpConfig {
     public float videoOffsetY = 0f;
     public float videoSpeed = 1.0f;     // playback rate, 0.25..3
 
-    // images
-    public List<String> imagePaths = new ArrayList<>();
+    // images: ordered list of items, each individually enable-able
+    public List<ImageItem> images = new ArrayList<>();
     public String imageOrder = "normal"; // normal | random
     public int imageDurationMs = 8000;
     public int imageTransitionMs = 800;
@@ -50,6 +50,25 @@ public class WpConfig {
     public String motionType = "none";
     public float motionAmount = 0.5f;
     public float motionSpeed = 0.5f;
+
+    // one image in the slideshow, individually enable-able and reorderable.
+    public static class ImageItem {
+        public String path;
+        public boolean enabled = true;
+
+        public ImageItem(String path) {
+            this.path = path;
+        }
+    }
+
+    // paths of the enabled images, in order, for the renderer to cycle through.
+    public List<String> enabledImagePaths() {
+        List<String> out = new ArrayList<>();
+        for (ImageItem it : images) {
+            if (it.enabled && it.path != null && !it.path.isEmpty()) out.add(it.path);
+        }
+        return out;
+    }
 
     // one filter in the chain. carries its own params so a type can appear
     // multiple times with different settings.
@@ -168,8 +187,13 @@ public class WpConfig {
         o.put("videoSpeed", videoSpeed);
 
         JSONArray imgs = new JSONArray();
-        for (String p : imagePaths) imgs.put(p);
-        o.put("imagePaths", imgs);
+        for (ImageItem it : images) {
+            JSONObject io = new JSONObject();
+            io.put("path", it.path);
+            io.put("enabled", it.enabled);
+            imgs.put(io);
+        }
+        o.put("images", imgs);
         o.put("imageOrder", imageOrder);
         o.put("imageDurationMs", imageDurationMs);
         o.put("imageTransitionMs", imageTransitionMs);
@@ -198,12 +222,27 @@ public class WpConfig {
         videoOffsetY = (float) o.optDouble("videoOffsetY", videoOffsetY);
         videoSpeed = (float) o.optDouble("videoSpeed", videoSpeed);
 
-        JSONArray imgs = o.optJSONArray("imagePaths");
+        JSONArray imgs = o.optJSONArray("images");
         if (imgs != null) {
-            imagePaths = new ArrayList<>();
+            images = new ArrayList<>();
             for (int i = 0; i < imgs.length(); i++) {
-                String p = imgs.optString(i, null);
-                if (p != null && !p.isEmpty()) imagePaths.add(p);
+                JSONObject io = imgs.optJSONObject(i);
+                if (io == null) continue;
+                String p = io.optString("path", null);
+                if (p == null || p.isEmpty()) continue;
+                ImageItem it = new ImageItem(p);
+                it.enabled = io.optBoolean("enabled", true);
+                images.add(it);
+            }
+        } else {
+            // migrate the pre-tiles config (imagePaths: array of strings)
+            JSONArray legacy = o.optJSONArray("imagePaths");
+            if (legacy != null) {
+                images = new ArrayList<>();
+                for (int i = 0; i < legacy.length(); i++) {
+                    String p = legacy.optString(i, null);
+                    if (p != null && !p.isEmpty()) images.add(new ImageItem(p));
+                }
             }
         }
         imageOrder = o.optString("imageOrder", imageOrder);

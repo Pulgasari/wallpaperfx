@@ -18,6 +18,8 @@ import com.wallpaperfx.app.config.WpConfig;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 
 // draws the wallpaper scene: either a looping video sampled as an external oes
@@ -96,6 +98,7 @@ class SceneRenderer implements GLRenderThread.Renderer {
     private final float[] imageMatrix = new float[16];
     private int texA, texAw, texAh;
     private int texB, texBw, texBh;
+    private List<String> activeImagePaths = new ArrayList<>();
     private int imageIndex;
     private int nextIndex;
     private boolean transitioning;
@@ -343,11 +346,11 @@ class SceneRenderer implements GLRenderThread.Renderer {
     // ---- images ----
 
     private long drawImages() {
-        if (cfg.imagePaths.isEmpty() || texA == 0) {
+        if (activeImagePaths.isEmpty() || texA == 0) {
             return Long.MAX_VALUE;
         }
         long now = SystemClock.uptimeMillis();
-        int count = cfg.imagePaths.size();
+        int count = activeImagePaths.size();
 
         float[] sa = computeScale(texAw, texAh, cfg.imageScale, cfg.imageOffsetX, cfg.imageOffsetY);
         drawQuad(prog2d, GLES20.GL_TEXTURE_2D, texA, imageMatrix, sa, 1f, null);
@@ -355,7 +358,7 @@ class SceneRenderer implements GLRenderThread.Renderer {
         if (count > 1) {
             if (!transitioning && now - lastShownAt >= cfg.imageDurationMs) {
                 nextIndex = pickNext(count);
-                texB = loadTexture(cfg.imagePaths.get(nextIndex));
+                texB = loadTexture(activeImagePaths.get(nextIndex));
                 if (texB != 0) {
                     texBw = lastLoadedW;
                     texBh = lastLoadedH;
@@ -413,9 +416,9 @@ class SceneRenderer implements GLRenderThread.Renderer {
     }
 
     private void setupImages() {
-        if (cfg.imagePaths.isEmpty()) return;
+        if (activeImagePaths.isEmpty()) return;
         imageIndex = 0;
-        texA = loadTexture(cfg.imagePaths.get(0));
+        texA = loadTexture(activeImagePaths.get(0));
         texAw = lastLoadedW;
         texAh = lastLoadedH;
         transitioning = false;
@@ -436,6 +439,7 @@ class SceneRenderer implements GLRenderThread.Renderer {
         releaseVideo();
         releaseImages();
         cfg = WpConfig.load(context);
+        activeImagePaths = cfg.enabledImagePaths();
         if ("images".equals(cfg.mode)) {
             setupImages();
         } else {

@@ -232,9 +232,12 @@ const Preview = (function () {
         if (state.mode === 'video' && state.videoPath) {
             url = toSrc(state.videoPath);
             type = 'video';
-        } else if (state.mode === 'images' && state.imagePaths.length) {
-            url = toSrc(state.imagePaths[0]);
-            type = 'image';
+        } else if (state.mode === 'images') {
+            const first = (state.images || []).find((i) => i.enabled);
+            if (first) {
+                url = toSrc(first.path);
+                type = 'image';
+            }
         }
 
         if (url === sourceUrl && type === sourceType) return; // unchanged

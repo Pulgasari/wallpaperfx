@@ -37,7 +37,7 @@ const state = {
     videoOffsetX: 0,
     videoOffsetY: 0,
     videoSpeed: 1,
-    imagePaths: [],
+    images: [], // [{ path, enabled }]
     imageOrder: 'normal',
     imageDurationMs: 8000,
     imageTransitionMs: 800,
@@ -120,33 +120,156 @@ function newFilter(type) {
     };
 }
 
-function renderFilters() {
-    const ul = $('#filterList');
-    if (!ul) return;
-    ul.innerHTML = '';
-    if (state.filters.length === 0) {
-        const empty = document.createElement('li');
-        empty.className = 'chain-empty';
-        empty.textContent = 'noch keine filter';
-        ul.append(empty);
-        return;
-    }
-    state.filters.forEach((f, i) => ul.append(buildFilterRow(f, i)));
+// ---- shared tile helpers (used by filter + image grids) ----
+
+function addTile(title, onClick) {
+    const t = document.createElement('button');
+    t.type = 'button';
+    t.className = 'tile tile-add';
+    t.title = title;
+    t.textContent = '+';
+    t.addEventListener('click', onClick);
+    return t;
 }
 
-function buildFilterRow(f, i) {
-    const li = document.createElement('li');
-    li.className = 'chain-item' + (f.enabled ? '' : ' disabled');
+function tileX(onClick) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'tile-x';
+    b.textContent = '✕';
+    b.title = 'entfernen';
+    b.addEventListener('click', (e) => { e.stopPropagation(); onClick(); });
+    return b;
+}
 
-    const head = document.createElement('div');
-    head.className = 'chain-head';
+function tileToggle(on, onChange) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'tile-toggle' + (on ? ' on' : '');
+    b.title = 'aktiv';
+    b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const now = !b.classList.contains('on');
+        b.classList.toggle('on', now);
+        onChange(now);
+    });
+    return b;
+}
 
-    const grip = document.createElement('span');
-    grip.className = 'chain-grip';
-    grip.textContent = '⋮⋮';
+// pointer drag-to-reorder within a tile grid. tiles carry __item; the "+" tile
+// (.tile-add) always stays last. a tap without movement triggers onTap.
+function enableTileDrag(grid, list, onTap, commit) {
+    grid.addEventListener('pointerdown', (e) => {
+        const tile = e.target.closest('.tile');
+        if (!tile || tile.classList.contains('tile-add')) return;
+        if (e.target.closest('.tile-x, .tile-toggle')) return;
+        const item = tile.__item;
+        const startX = e.clientX;
+        const startY = e.clientY;
+        let active = false;
+        const addEl = grid.querySelector('.tile-add');
 
+        const move = (ev) => {
+            if (!active) {
+                if (Math.hypot(ev.clientX - startX, ev.clientY - startY) < 8) return;
+                active = true;
+                tile.classList.add('dragging');
+                try { tile.setPointerCapture(ev.pointerId); } catch (err) {}
+            }
+            const after = tileAfter(grid, ev.clientX, ev.clientY);
+            grid.insertBefore(tile, after || addEl);
+        };
+        const up = (ev) => {
+            grid.removeEventListener('pointermove', move);
+            grid.removeEventListener('pointerup', up);
+            grid.removeEventListener('pointercancel', up);
+            try { if (ev) tile.releasePointerCapture(ev.pointerId); } catch (err) {}
+            if (active) {
+                tile.classList.remove('dragging');
+                const order = Array.from(grid.querySelectorAll('.tile:not(.tile-add)')).map((t) => t.__item);
+                list.splice(0, list.length, ...order);
+                commit();
+            } else if (onTap) {
+                onTap(item);
+            }
+        };
+        grid.addEventListener('pointermove', move);
+        grid.addEventListener('pointerup', up);
+        grid.addEventListener('pointercancel', up);
+    });
+}
+
+function tileAfter(grid, x, y) {
+    const tiles = Array.from(grid.querySelectorAll('.tile:not(.tile-add):not(.dragging)'));
+    let best = null;
+    let bestD = Infinity;
+    for (const t of tiles) {
+        const r = t.getBoundingClientRect();
+        const cx = r.left + r.width / 2;
+        const cy = r.top + r.height / 2;
+        // insert before the tile the pointer sits left of / above (row-major)
+        if (y < cy - 1 || (y < cy + r.height / 2 && x < cx)) {
+            const d = Math.hypot(x - cx, y - cy);
+            if (d < bestD) { bestD = d; best = t; }
+        }
+    }
+    return best;
+}
+
+// ---- filter chain grid + editor ----
+
+let selectedFilter = null;
+
+function renderFilterGrid() {
+    const grid = $('#filterGrid');
+    if (!grid) return;
+    grid.innerHTML = '';
+    state.filters.forEach((f) => grid.append(buildFilterTile(f)));
+    grid.append(addTile('filter hinzufügen', () => {
+        const f = newFilter('duotone');
+        state.filters.push(f);
+        selectedFilter = f;
+        renderFilterGrid();
+    }));
+    renderFilterEditor();
+}
+
+function buildFilterTile(f) {
+    const tile = document.createElement('div');
+    tile.className = 'tile filter-tile' + (f.enabled ? '' : ' disabled') + (f === selectedFilter ? ' selected' : '');
+    tile.__item = f;
+
+    const label = document.createElement('span');
+    label.className = 'tile-label';
+    label.textContent = FILTER_LABEL[f.type] || f.type;
+    tile.append(label);
+
+    tile.append(tileToggle(f.enabled, (on) => { f.enabled = on; tile.classList.toggle('disabled', !on); }));
+    tile.append(tileX(() => {
+        const i = state.filters.indexOf(f);
+        if (i > -1) state.filters.splice(i, 1);
+        if (selectedFilter === f) selectedFilter = null;
+        renderFilterGrid();
+    }));
+    return tile;
+}
+
+function renderFilterEditor() {
+    const box = $('#filterEditor');
+    if (!box) return;
+    box.innerHTML = '';
+    if (!selectedFilter || state.filters.indexOf(selectedFilter) === -1) {
+        box.hidden = true;
+        return;
+    }
+    box.hidden = false;
+    const f = selectedFilter;
+
+    const typeLabel = document.createElement('label');
+    typeLabel.className = 'field';
+    const ts = document.createElement('span');
+    ts.textContent = 'Typ';
     const sel = document.createElement('select');
-    sel.className = 'chain-type';
     FILTER_TYPES.forEach(([v, label]) => {
         const o = document.createElement('option');
         o.value = v;
@@ -154,55 +277,17 @@ function buildFilterRow(f, i) {
         if (v === f.type) o.selected = true;
         sel.append(o);
     });
-    sel.addEventListener('change', (e) => {
-        f.type = e.target.value;
-        renderFilters();
-    });
+    sel.addEventListener('change', (e) => { f.type = e.target.value; renderFilterGrid(); });
+    typeLabel.append(ts, sel);
+    box.append(typeLabel);
 
-    const en = document.createElement('input');
-    en.type = 'checkbox';
-    en.className = 'chain-enable';
-    en.checked = f.enabled;
-    en.title = 'aktiv';
-    en.addEventListener('change', (e) => {
-        f.enabled = e.target.checked;
-        li.classList.toggle('disabled', !f.enabled);
-    });
-
-    head.append(grip, sel, en,
-        iconBtn('▲', 'nach oben', () => moveFilter(i, -1)),
-        iconBtn('▼', 'nach unten', () => moveFilter(i, 1)),
-        iconBtn('✕', 'entfernen', () => { state.filters.splice(i, 1); renderFilters(); }));
-    li.append(head);
-
-    const params = document.createElement('div');
-    params.className = 'chain-params';
-    (FILTER_PARAMS[f.type] || []).forEach((p) => params.append(buildParamControl(f, p)));
+    (FILTER_PARAMS[f.type] || []).forEach((p) => box.append(buildParamControl(f, p)));
     if (ANIMATED_FILTERS.includes(f.type)) {
         const note = document.createElement('p');
         note.className = 'muted';
         note.textContent = 'animiert: läuft kontinuierlich, mehr akku.';
-        params.append(note);
+        box.append(note);
     }
-    li.append(params);
-    return li;
-}
-
-function iconBtn(label, title, onClick) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'chain-btn';
-    b.textContent = label;
-    b.title = title;
-    b.addEventListener('click', onClick);
-    return b;
-}
-
-function moveFilter(i, dir) {
-    const j = i + dir;
-    if (j < 0 || j >= state.filters.length) return;
-    [state.filters[i], state.filters[j]] = [state.filters[j], state.filters[i]];
-    renderFilters();
 }
 
 function buildParamControl(f, p) {
@@ -242,7 +327,7 @@ function buildParamControl(f, p) {
 
 // ---- theme engine: derive every shade from bg / fg / accent ----
 
-const themeSettings = { mode: 'system', accent: '#f0ba48', rounded: true };
+const themeSettings = { mode: 'system', accent: '#f0ba48', rounded: true, gridSize: 84 };
 
 function mixHex(a, b, t) {
     const x = hexToRgb(a);
@@ -284,6 +369,7 @@ function applyTheme() {
     r.setProperty('--sheet-bg', rgbaOf(bg, 0.82));
     r.setProperty('--radius', rounded ? '14px' : '3px');
     r.setProperty('--radius-lg', rounded ? '18px' : '4px');
+    r.setProperty('--tile', (themeSettings.gridSize || 84) + 'px');
     document.documentElement.dataset.theme = dark ? 'dark' : 'light';
 }
 
@@ -301,13 +387,24 @@ function initTheme() {
     const mode = $('#themeMode');
     const accent = $('#accentColor');
     const rounded = $('#rounded');
+    const grid = $('#gridSize');
     if (mode) mode.value = themeSettings.mode;
     if (accent) accent.value = themeSettings.accent;
     if (rounded) rounded.checked = themeSettings.rounded;
+    if (grid) {
+        grid.value = themeSettings.gridSize;
+        setOut('gridSize', String(themeSettings.gridSize));
+    }
 
     if (mode) mode.addEventListener('change', (e) => { themeSettings.mode = e.target.value; applyTheme(); save(); });
     if (accent) accent.addEventListener('input', (e) => { themeSettings.accent = e.target.value; applyTheme(); save(); });
     if (rounded) rounded.addEventListener('change', (e) => { themeSettings.rounded = e.target.checked; applyTheme(); save(); });
+    if (grid) grid.addEventListener('input', (e) => {
+        themeSettings.gridSize = Number(e.target.value);
+        setOut('gridSize', String(themeSettings.gridSize));
+        applyTheme();
+        save();
+    });
 
     // follow the system theme live while in system mode
     if (window.matchMedia) {
@@ -319,7 +416,7 @@ function initTheme() {
 
 function hasMedia() {
     return (state.mode === 'video' && !!state.videoPath) ||
-        (state.mode === 'images' && state.imagePaths.length > 0);
+        (state.mode === 'images' && state.images.some((i) => i.enabled));
 }
 
 // refresh the preview source and toggle the "no media" hint over the background
@@ -348,31 +445,57 @@ function renderMotionParams() {
     $$('[data-motion]').forEach((el) => (el.hidden = !on));
 }
 
-function moveImage(i, dir) {
-    const j = i + dir;
-    if (j < 0 || j >= state.imagePaths.length) return;
-    [state.imagePaths[i], state.imagePaths[j]] = [state.imagePaths[j], state.imagePaths[i]];
-    renderImageList();
-    syncPreview();
+function toSrcApp(path) {
+    if (window.Capacitor && typeof window.Capacitor.convertFileSrc === 'function') {
+        return window.Capacitor.convertFileSrc(path);
+    }
+    return path;
 }
 
-function renderImageList() {
-    const ul = $('#imageList');
-    ul.innerHTML = '';
-    state.imagePaths.forEach((path, i) => {
-        const li = document.createElement('li');
-        const grip = document.createElement('span');
-        grip.className = 'chain-grip';
-        grip.textContent = '⋮⋮';
-        const span = document.createElement('span');
-        span.className = 'img-name';
-        span.textContent = basename(path);
-        li.append(grip, span,
-            iconBtn('▲', 'nach oben', () => moveImage(i, -1)),
-            iconBtn('▼', 'nach unten', () => moveImage(i, 1)),
-            iconBtn('✕', 'entfernen', () => { state.imagePaths.splice(i, 1); renderImageList(); syncPreview(); }));
-        ul.append(li);
-    });
+async function pickImages() {
+    try {
+        const res = await plugin.pickMedia({ type: 'image' });
+        if (res.paths && res.paths.length) {
+            res.paths.forEach((p) => state.images.push({ path: p, enabled: true }));
+            renderImageGrid();
+            syncPreview();
+        }
+    } catch (e) {
+        setStatus('auswahl abgebrochen');
+    }
+}
+
+function renderImageGrid() {
+    const grid = $('#imageGrid');
+    if (!grid) return;
+    grid.innerHTML = '';
+    state.images.forEach((img) => grid.append(buildImageTile(img)));
+    grid.append(addTile('bilder hinzufügen', pickImages));
+}
+
+function buildImageTile(img) {
+    const tile = document.createElement('div');
+    tile.className = 'tile image-tile' + (img.enabled ? '' : ' disabled');
+    tile.__item = img;
+
+    const el = document.createElement('img');
+    el.src = toSrcApp(img.path);
+    el.alt = '';
+    el.loading = 'lazy';
+    tile.append(el);
+
+    tile.append(tileToggle(img.enabled, (on) => {
+        img.enabled = on;
+        tile.classList.toggle('disabled', !on);
+        syncPreview();
+    }));
+    tile.append(tileX(() => {
+        const i = state.images.indexOf(img);
+        if (i > -1) state.images.splice(i, 1);
+        renderImageGrid();
+        syncPreview();
+    }));
+    return tile;
 }
 
 function setOut(key, value) {
@@ -382,8 +505,8 @@ function setOut(key, value) {
 
 function renderAll() {
     renderMode();
-    renderFilters();
-    renderImageList();
+    renderFilterGrid();
+    renderImageGrid();
 
     $('#videoName').textContent = state.videoPath ? basename(state.videoPath) : 'kein video gewählt';
     $('#videoScale').value = state.videoScale;
@@ -441,18 +564,12 @@ function bind() {
         }
     });
 
-    $('#pickImages').addEventListener('click', async () => {
-        try {
-            const res = await plugin.pickMedia({ type: 'image' });
-            if (res.paths && res.paths.length) {
-                state.imagePaths.push(...res.paths);
-                renderImageList();
-                syncPreview();
-            }
-        } catch (e) {
-            setStatus('auswahl abgebrochen');
-        }
-    });
+    // filter tiles: tap selects for editing; images: tap toggles enabled. both drag-reorder.
+    enableTileDrag($('#filterGrid'), state.filters,
+        (f) => { selectedFilter = f; renderFilterGrid(); },
+        () => renderFilterGrid());
+    enableTileDrag($('#imageGrid'), state.images, null,
+        () => { renderImageGrid(); syncPreview(); });
 
     const num = (id, key, out, div) =>
         $(id).addEventListener('input', (e) => {
@@ -478,19 +595,6 @@ function bind() {
             state[key] = Number(e.target.value);
             setOut(id.slice(1), digits === undefined ? String(state[key]) : state[key].toFixed(digits));
         });
-
-    // filter chain: populate the type picker, append on click
-    const addSel = $('#addFilterType');
-    FILTER_TYPES.forEach(([v, label]) => {
-        const o = document.createElement('option');
-        o.value = v;
-        o.textContent = label;
-        addSel.append(o);
-    });
-    $('#addFilter').addEventListener('click', () => {
-        state.filters.push(newFilter(addSel.value || 'duotone'));
-        renderFilters();
-    });
 
     $('#parallaxEnabled').addEventListener('change', (e) => (state.parallaxEnabled = e.target.checked));
     $('#parallaxAmount').addEventListener('input', (e) => {
@@ -525,7 +629,7 @@ async function apply() {
         setStatus('erst ein video wählen');
         return;
     }
-    if (state.mode === 'images' && state.imagePaths.length === 0) {
+    if (state.mode === 'images' && !state.images.some((i) => i.enabled)) {
         setStatus('erst bilder wählen');
         return;
     }
@@ -545,6 +649,10 @@ async function init() {
         Object.keys(state).forEach((k) => {
             if (saved && saved[k] !== undefined && saved[k] !== null) state[k] = saved[k];
         });
+        // migrate the pre-tiles config (imagePaths: array of strings)
+        if (saved && Array.isArray(saved.imagePaths) && state.images.length === 0) {
+            state.images = saved.imagePaths.map((p) => ({ path: p, enabled: true }));
+        }
     } catch (e) {
         // keep defaults
     }
