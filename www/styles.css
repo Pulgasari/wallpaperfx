@@ -312,13 +312,98 @@ input[type="color"] {
     white-space: nowrap;
 }
 
-.image-list button {
-    flex: none;
-    border: 0;
-    background: transparent;
+.img-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ---- filter chain + reorderable rows ---- */
+
+.chain-list {
+    list-style: none;
+    margin: 0 0 10px;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.chain-empty {
     color: var(--muted);
-    font-size: 18px;
-    padding: 0 4px;
+    font-size: 13px;
+    padding: 2px;
+}
+
+.chain-item {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--card-2);
+}
+
+.chain-item.disabled {
+    opacity: 0.5;
+}
+
+.chain-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 10px;
+}
+
+.chain-grip {
+    flex: none;
+    color: var(--muted);
+    font-size: 14px;
+    letter-spacing: -3px;
+    cursor: grab;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.chain-type {
+    flex: 1;
+    min-width: 0;
+}
+
+.chain-enable {
+    flex: none;
+    width: 22px;
+    height: 22px;
+    accent-color: var(--accent);
+}
+
+.chain-btn {
+    flex: none;
+    width: 30px;
+    height: 30px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: transparent;
+    color: var(--text);
+    font-size: 12px;
+}
+
+.chain-params {
+    padding: 0 10px 10px;
+}
+
+.chain-add {
+    display: flex;
+    gap: 8px;
+}
+
+.chain-add select {
+    flex: 1;
+    min-width: 0;
+}
+
+.chain-add .btn {
+    width: auto;
+    flex: none;
+    padding: 11px 14px;
 }
 
 .field.row {

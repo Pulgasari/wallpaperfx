@@ -137,6 +137,10 @@ const Preview = (function () {
     let texReady = false;
     let contentW = 1, contentH = 1;
 
+    // ping-pong fbos for the filter chain
+    let fboA = null, fboB = null, fboW = 0, fboH = 0;
+    const FULL = [1, 1, 0, 0, 1, 1];
+
     function toSrc(path) {
         if (window.Capacitor && typeof window.Capacitor.convertFileSrc === 'function') {
             return window.Capacitor.convertFileSrc(path);
@@ -381,25 +385,39 @@ const Preview = (function () {
         requestAnimationFrame(loop);
     }
 
-    function render() {
-        if (!gl) return;
-        gl.viewport(0, 0, canvas.width, canvas.height);
-        gl.clear(gl.COLOR_BUFFER_BIT);
+    function createFbo(w, h) {
+        const tex = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, tex);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        const fb = gl.createFramebuffer();
+        gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        return { fb, tex };
+    }
 
-        if (!state || !sourceEl) return;
-        if (sourceType === 'video') {
-            const rate = state.videoSpeed || 1;
-            if (sourceEl.playbackRate !== rate) sourceEl.playbackRate = rate;
-            if (sourceEl.readyState >= 2) {
-                contentW = sourceEl.videoWidth || contentW;
-                contentH = sourceEl.videoHeight || contentH;
-                uploadTexture(sourceEl);
-                texReady = true;
-            }
+    function ensureFbos() {
+        if (fboA && fboW === canvas.width && fboH === canvas.height) return;
+        if (fboA) {
+            gl.deleteFramebuffer(fboA.fb);
+            gl.deleteTexture(fboA.tex);
+            gl.deleteFramebuffer(fboB.fb);
+            gl.deleteTexture(fboB.tex);
         }
-        if (!texReady || !texture) return;
+        fboW = canvas.width;
+        fboH = canvas.height;
+        fboA = createFbo(fboW, fboH);
+        fboB = createFbo(fboW, fboH);
+    }
 
-        const s = computeScale();
+    // one pass: draw srcTex into targetFb (null = screen) with scale s and filter fe
+    function drawPass(targetFb, srcTex, s, fe) {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, targetFb);
+        gl.viewport(0, 0, canvas.width, canvas.height);
         gl.useProgram(program);
         gl.bindBuffer(gl.ARRAY_BUFFER, quad);
         gl.enableVertexAttribArray(loc.aPosition);
@@ -410,32 +428,87 @@ const Preview = (function () {
         gl.uniform2f(loc.uUvScale, s[0], s[1]);
         gl.uniform2f(loc.uUvOffset, s[2], s[3]);
         gl.uniform2f(loc.uPosScale, s[4], s[5]);
-
-        gl.uniform1i(loc.uFilter, filterIndex(state.filterType));
-        gl.uniform3f(loc.uColorA, rgb(state.duotoneShadow, 0), rgb(state.duotoneShadow, 1), rgb(state.duotoneShadow, 2));
-        gl.uniform3f(loc.uColorB, rgb(state.duotoneHighlight, 0), rgb(state.duotoneHighlight, 1), rgb(state.duotoneHighlight, 2));
-        gl.uniform3f(loc.uColorC, rgb(state.gradientMid, 0), rgb(state.gradientMid, 1), rgb(state.gradientMid, 2));
-        gl.uniform1f(loc.uScanCount, state.scanCount);
-        gl.uniform1f(loc.uScanStrength, state.scanStrength);
-        gl.uniform1f(loc.uCrtMask, state.crtMask);
-        gl.uniform1f(loc.uAmount, state.filterType === 'grayscale' ? state.grayAmount : state.sepiaAmount);
-        gl.uniform1f(loc.uLevels, state.posterizeLevels);
-        gl.uniform1f(loc.uPixelSize, state.pixelSize);
-        gl.uniform1f(loc.uHalftone, state.halftoneScale);
-        gl.uniform1f(loc.uVignette, state.vignetteStrength);
-        gl.uniform1f(loc.uVignetteRadius, state.vignetteRadius);
-        gl.uniform1f(loc.uChromatic, state.chromaticAmount);
-        gl.uniform1f(loc.uGrain, state.grainAmount);
-        gl.uniform1f(loc.uGlitch, state.glitchAmount);
-        gl.uniform1f(loc.uVhs, state.vhsAmount);
         gl.uniform1f(loc.uTime, performance.now() / 1000);
         gl.uniform2f(loc.uResolution, canvas.width, canvas.height);
 
-        gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, texture);
-        gl.uniform1i(loc.uTexture, 0);
+        if (!fe) {
+            gl.uniform1i(loc.uFilter, 0);
+        } else {
+            gl.uniform1i(loc.uFilter, filterIndex(fe.type));
+            gl.uniform3f(loc.uColorA, rgb(fe.colorA, 0), rgb(fe.colorA, 1), rgb(fe.colorA, 2));
+            gl.uniform3f(loc.uColorB, rgb(fe.colorB, 0), rgb(fe.colorB, 1), rgb(fe.colorB, 2));
+            gl.uniform3f(loc.uColorC, rgb(fe.colorC, 0), rgb(fe.colorC, 1), rgb(fe.colorC, 2));
+            gl.uniform1f(loc.uScanCount, fe.scanCount);
+            gl.uniform1f(loc.uScanStrength, fe.scanStrength);
+            gl.uniform1f(loc.uCrtMask, fe.crtMask);
+            gl.uniform1f(loc.uAmount, fe.amount);
+            gl.uniform1f(loc.uLevels, fe.levels);
+            gl.uniform1f(loc.uPixelSize, fe.pixelSize);
+            gl.uniform1f(loc.uHalftone, fe.halftone);
+            gl.uniform1f(loc.uVignette, fe.vignette);
+            gl.uniform1f(loc.uVignetteRadius, fe.vignetteRadius);
+            gl.uniform1f(loc.uChromatic, fe.chromatic);
+            gl.uniform1f(loc.uGrain, fe.grain);
+            gl.uniform1f(loc.uGlitch, fe.glitch);
+            gl.uniform1f(loc.uVhs, fe.vhs);
+        }
 
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, srcTex);
+        gl.uniform1i(loc.uTexture, 0);
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    }
+
+    function render() {
+        if (!gl) return;
+        if (!state || !sourceEl) {
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+            gl.viewport(0, 0, canvas.width, canvas.height);
+            gl.clear(gl.COLOR_BUFFER_BIT);
+            return;
+        }
+        if (sourceType === 'video') {
+            const rate = state.videoSpeed || 1;
+            if (sourceEl.playbackRate !== rate) sourceEl.playbackRate = rate;
+            if (sourceEl.readyState >= 2) {
+                contentW = sourceEl.videoWidth || contentW;
+                contentH = sourceEl.videoHeight || contentH;
+                uploadTexture(sourceEl);
+                texReady = true;
+            }
+        }
+        if (!texReady || !texture) {
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+            gl.viewport(0, 0, canvas.width, canvas.height);
+            gl.clear(gl.COLOR_BUFFER_BIT);
+            return;
+        }
+
+        ensureFbos();
+
+        // pass 0: source (scaled + motion) into fbo a, unfiltered
+        gl.bindFramebuffer(gl.FRAMEBUFFER, fboA.fb);
+        gl.viewport(0, 0, canvas.width, canvas.height);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        drawPass(fboA.fb, texture, computeScale(), null);
+
+        // filter chain, last pass to the screen
+        const active = (state.filters || []).filter((f) => f.enabled && f.type !== 'none');
+        if (active.length === 0) {
+            drawPass(null, fboA.tex, FULL, null);
+            return;
+        }
+        let readTex = fboA.tex;
+        let readFbo = fboA;
+        for (let i = 0; i < active.length; i++) {
+            const last = i === active.length - 1;
+            const writeFbo = readFbo === fboA ? fboB : fboA;
+            drawPass(last ? null : writeFbo.fb, readTex, FULL, active[i]);
+            if (!last) {
+                readTex = writeFbo.tex;
+                readFbo = writeFbo;
+            }
+        }
     }
 
     return { init, attach, refreshMedia };

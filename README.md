@@ -25,8 +25,10 @@ kann kein Live-Wallpaper sein. Deshalb der Split:
    einstellbare Abspielgeschwindigkeit (0.25x–3x).
 2. **Bilder** — ein oder mehrere, geloopt, Modi `normal` / `random`, einstellbare
    Anzeigedauer und Überblendzeit, gleiche Skalierungs-/Offset-Optionen.
-3. **Filter** — 12 Effekte, wirken auf Video und Bilder gleichermaßen (alle
-   single-pass, keine erzwungene Animation):
+3. **Filter** — verkettbar: eine geordnete liste von filtern, jeder mit eigenen
+   parametern, aktivierbar/umsortierbar/entfernbar. gerendert als multi-pass
+   fbo-pipeline (quelle -> fbo, dann pro filter ein fullscreen-pass, ping-pong,
+   letzter pass auf den screen). 15 effekt-typen (video und bilder gleichermaßen):
    - farbe: `duotone`, `gradientmap` (tritone), `grayscale`, `sepia`,
      `posterize`, `invert`
    - retro/screen-space: `pixelate`, `halftone`, `scanlines`, `crt`,

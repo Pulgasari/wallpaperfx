@@ -44,24 +44,7 @@ const state = {
     imageScale: 'cover',
     imageOffsetX: 0,
     imageOffsetY: 0,
-    filterType: 'none',
-    duotoneShadow: [18, 20, 42],
-    duotoneHighlight: [240, 186, 72],
-    gradientMid: [120, 84, 168],
-    scanCount: 320,
-    scanStrength: 0.35,
-    crtMask: 0.3,
-    grayAmount: 1,
-    sepiaAmount: 1,
-    posterizeLevels: 6,
-    pixelSize: 12,
-    halftoneScale: 90,
-    vignetteStrength: 0.6,
-    vignetteRadius: 0.6,
-    chromaticAmount: 0.006,
-    grainAmount: 0.15,
-    glitchAmount: 0.5,
-    vhsAmount: 0.6,
+    filters: [], // ordered chain of filter entries (see newFilter)
     parallaxEnabled: false,
     parallaxAmount: 0.15,
     motionType: 'none',
@@ -91,6 +74,170 @@ function rgbToHex(rgb) {
 function hexToRgb(hex) {
     const m = hex.replace('#', '');
     return [parseInt(m.slice(0, 2), 16), parseInt(m.slice(2, 4), 16), parseInt(m.slice(4, 6), 16)];
+}
+
+// ---- filter chain model + list ui ----
+
+const FILTER_TYPES = [
+    ['duotone', 'Duotone'], ['gradientmap', 'Gradient Map'], ['grayscale', 'Graustufen'],
+    ['sepia', 'Sepia'], ['posterize', 'Posterize'], ['invert', 'Invertieren'],
+    ['pixelate', 'Pixelate'], ['halftone', 'Halftone'], ['scanlines', 'Scanlines'],
+    ['crt', 'CRT'], ['vignette', 'Vignette'], ['chromatic', 'Chromatic'],
+    ['filmgrain', 'Film Grain'], ['glitch', 'Glitch'], ['vhs', 'VHS']
+];
+const FILTER_LABEL = Object.fromEntries(FILTER_TYPES);
+const ANIMATED_FILTERS = ['filmgrain', 'glitch', 'vhs'];
+
+// per-type editable params. color rows: [key, label, 'color'].
+// range rows: [key, label, min, max, step, decimals].
+const FILTER_PARAMS = {
+    duotone: [['colorA', 'Schatten', 'color'], ['colorB', 'Lichter', 'color']],
+    gradientmap: [['colorA', 'Dunkel', 'color'], ['colorC', 'Mitte', 'color'], ['colorB', 'Hell', 'color']],
+    grayscale: [['amount', 'Stärke', 0, 1, 0.01, 2]],
+    sepia: [['amount', 'Stärke', 0, 1, 0.01, 2]],
+    posterize: [['levels', 'Stufen', 2, 16, 1, 0]],
+    invert: [],
+    pixelate: [['pixelSize', 'Blockgröße', 2, 64, 1, 0]],
+    halftone: [['colorA', 'Ink', 'color'], ['colorB', 'Paper', 'color'], ['halftone', 'Raster', 20, 240, 5, 0]],
+    scanlines: [['scanCount', 'Linien', 60, 900, 10, 0], ['scanStrength', 'Stärke', 0, 1, 0.01, 2]],
+    crt: [['scanCount', 'Linien', 60, 900, 10, 0], ['scanStrength', 'Stärke', 0, 1, 0.01, 2], ['crtMask', 'Maske', 0, 1, 0.01, 2]],
+    vignette: [['vignette', 'Stärke', 0, 1, 0.01, 2], ['vignetteRadius', 'Radius', 0, 1, 0.01, 2]],
+    chromatic: [['chromatic', 'Versatz', 0, 0.03, 0.001, 3]],
+    filmgrain: [['grain', 'Körnung', 0, 0.6, 0.01, 2]],
+    glitch: [['glitch', 'Stärke', 0, 1, 0.01, 2]],
+    vhs: [['vhs', 'Stärke', 0, 1, 0.01, 2]]
+};
+
+// a filter entry with the full param superset (mirrors WpConfig.FilterEntry)
+function newFilter(type) {
+    return {
+        type: type, enabled: true,
+        colorA: [18, 20, 42], colorB: [240, 186, 72], colorC: [120, 84, 168],
+        scanCount: 320, scanStrength: 0.35, crtMask: 0.3,
+        amount: 1, levels: 6, pixelSize: 12, halftone: 90,
+        vignette: 0.6, vignetteRadius: 0.6, chromatic: 0.006,
+        grain: 0.15, glitch: 0.5, vhs: 0.6
+    };
+}
+
+function renderFilters() {
+    const ul = $('#filterList');
+    if (!ul) return;
+    ul.innerHTML = '';
+    if (state.filters.length === 0) {
+        const empty = document.createElement('li');
+        empty.className = 'chain-empty';
+        empty.textContent = 'noch keine filter';
+        ul.append(empty);
+        return;
+    }
+    state.filters.forEach((f, i) => ul.append(buildFilterRow(f, i)));
+}
+
+function buildFilterRow(f, i) {
+    const li = document.createElement('li');
+    li.className = 'chain-item' + (f.enabled ? '' : ' disabled');
+
+    const head = document.createElement('div');
+    head.className = 'chain-head';
+
+    const grip = document.createElement('span');
+    grip.className = 'chain-grip';
+    grip.textContent = '⋮⋮';
+
+    const sel = document.createElement('select');
+    sel.className = 'chain-type';
+    FILTER_TYPES.forEach(([v, label]) => {
+        const o = document.createElement('option');
+        o.value = v;
+        o.textContent = label;
+        if (v === f.type) o.selected = true;
+        sel.append(o);
+    });
+    sel.addEventListener('change', (e) => {
+        f.type = e.target.value;
+        renderFilters();
+    });
+
+    const en = document.createElement('input');
+    en.type = 'checkbox';
+    en.className = 'chain-enable';
+    en.checked = f.enabled;
+    en.title = 'aktiv';
+    en.addEventListener('change', (e) => {
+        f.enabled = e.target.checked;
+        li.classList.toggle('disabled', !f.enabled);
+    });
+
+    head.append(grip, sel, en,
+        iconBtn('▲', 'nach oben', () => moveFilter(i, -1)),
+        iconBtn('▼', 'nach unten', () => moveFilter(i, 1)),
+        iconBtn('✕', 'entfernen', () => { state.filters.splice(i, 1); renderFilters(); }));
+    li.append(head);
+
+    const params = document.createElement('div');
+    params.className = 'chain-params';
+    (FILTER_PARAMS[f.type] || []).forEach((p) => params.append(buildParamControl(f, p)));
+    if (ANIMATED_FILTERS.includes(f.type)) {
+        const note = document.createElement('p');
+        note.className = 'muted';
+        note.textContent = 'animiert: läuft kontinuierlich, mehr akku.';
+        params.append(note);
+    }
+    li.append(params);
+    return li;
+}
+
+function iconBtn(label, title, onClick) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'chain-btn';
+    b.textContent = label;
+    b.title = title;
+    b.addEventListener('click', onClick);
+    return b;
+}
+
+function moveFilter(i, dir) {
+    const j = i + dir;
+    if (j < 0 || j >= state.filters.length) return;
+    [state.filters[i], state.filters[j]] = [state.filters[j], state.filters[i]];
+    renderFilters();
+}
+
+function buildParamControl(f, p) {
+    const label = document.createElement('label');
+    label.className = 'field';
+    const span = document.createElement('span');
+
+    if (p[2] === 'color') {
+        span.textContent = p[1];
+        const input = document.createElement('input');
+        input.type = 'color';
+        input.value = rgbToHex(f[p[0]]);
+        input.addEventListener('input', (e) => (f[p[0]] = hexToRgb(e.target.value)));
+        label.append(span, input);
+        return label;
+    }
+
+    const [key, name, min, max, step, dec] = p;
+    const out = document.createElement('em');
+    const fmt = (v) => (dec ? Number(v).toFixed(dec) : String(v));
+    span.textContent = name + ' ';
+    span.append(out);
+    out.textContent = fmt(f[key]);
+    const input = document.createElement('input');
+    input.type = 'range';
+    input.min = min;
+    input.max = max;
+    input.step = step;
+    input.value = f[key];
+    input.addEventListener('input', (e) => {
+        f[key] = Number(e.target.value);
+        out.textContent = fmt(f[key]);
+    });
+    label.append(span, input);
+    return label;
 }
 
 // ---- theme engine: derive every shade from bg / fg / accent ----
@@ -196,21 +343,17 @@ function renderMode() {
     $$('.panel').forEach((p) => (p.hidden = p.dataset.panel !== state.mode));
 }
 
-const ANIMATED_FILTERS = ['filmgrain', 'glitch', 'vhs'];
-
-function renderFilterParams() {
-    // data-filter may list several filters (space separated) that share a group
-    $$('.filter-params').forEach((g) => {
-        if (!g.dataset.filter) return;
-        g.hidden = !g.dataset.filter.split(' ').includes(state.filterType);
-    });
-    const note = document.querySelector('[data-filter-note]');
-    if (note) note.hidden = !ANIMATED_FILTERS.includes(state.filterType);
-}
-
 function renderMotionParams() {
     const on = state.motionType !== 'none';
     $$('[data-motion]').forEach((el) => (el.hidden = !on));
+}
+
+function moveImage(i, dir) {
+    const j = i + dir;
+    if (j < 0 || j >= state.imagePaths.length) return;
+    [state.imagePaths[i], state.imagePaths[j]] = [state.imagePaths[j], state.imagePaths[i]];
+    renderImageList();
+    syncPreview();
 }
 
 function renderImageList() {
@@ -218,17 +361,16 @@ function renderImageList() {
     ul.innerHTML = '';
     state.imagePaths.forEach((path, i) => {
         const li = document.createElement('li');
+        const grip = document.createElement('span');
+        grip.className = 'chain-grip';
+        grip.textContent = '⋮⋮';
         const span = document.createElement('span');
+        span.className = 'img-name';
         span.textContent = basename(path);
-        const rm = document.createElement('button');
-        rm.textContent = '×';
-        rm.setAttribute('aria-label', 'entfernen');
-        rm.addEventListener('click', () => {
-            state.imagePaths.splice(i, 1);
-            renderImageList();
-            syncPreview();
-        });
-        li.append(span, rm);
+        li.append(grip, span,
+            iconBtn('▲', 'nach oben', () => moveImage(i, -1)),
+            iconBtn('▼', 'nach unten', () => moveImage(i, 1)),
+            iconBtn('✕', 'entfernen', () => { state.imagePaths.splice(i, 1); renderImageList(); syncPreview(); }));
         ul.append(li);
     });
 }
@@ -240,7 +382,7 @@ function setOut(key, value) {
 
 function renderAll() {
     renderMode();
-    renderFilterParams();
+    renderFilters();
     renderImageList();
 
     $('#videoName').textContent = state.videoPath ? basename(state.videoPath) : 'kein video gewählt';
@@ -262,39 +404,6 @@ function renderAll() {
     setOut('imageTransitionMs', (state.imageTransitionMs / 1000).toFixed(1));
     setOut('imageOffsetX', state.imageOffsetX.toFixed(2));
     setOut('imageOffsetY', state.imageOffsetY.toFixed(2));
-
-    $('#filterType').value = state.filterType;
-    $('#duotoneShadow').value = rgbToHex(state.duotoneShadow);
-    $('#duotoneHighlight').value = rgbToHex(state.duotoneHighlight);
-    $('#gradientMid').value = rgbToHex(state.gradientMid);
-    $('#scanCount').value = state.scanCount;
-    $('#scanStrength').value = state.scanStrength;
-    $('#crtMask').value = state.crtMask;
-    $('#grayAmount').value = state.grayAmount;
-    $('#sepiaAmount').value = state.sepiaAmount;
-    $('#posterizeLevels').value = state.posterizeLevels;
-    $('#pixelSize').value = state.pixelSize;
-    $('#halftoneScale').value = state.halftoneScale;
-    $('#vignetteStrength').value = state.vignetteStrength;
-    $('#vignetteRadius').value = state.vignetteRadius;
-    $('#chromaticAmount').value = state.chromaticAmount;
-    setOut('scanCount', String(state.scanCount));
-    setOut('scanStrength', state.scanStrength.toFixed(2));
-    setOut('crtMask', state.crtMask.toFixed(2));
-    setOut('grayAmount', state.grayAmount.toFixed(2));
-    setOut('sepiaAmount', state.sepiaAmount.toFixed(2));
-    setOut('posterizeLevels', String(state.posterizeLevels));
-    setOut('pixelSize', String(state.pixelSize));
-    setOut('halftoneScale', String(state.halftoneScale));
-    setOut('vignetteStrength', state.vignetteStrength.toFixed(2));
-    setOut('vignetteRadius', state.vignetteRadius.toFixed(2));
-    setOut('chromaticAmount', state.chromaticAmount.toFixed(3));
-    $('#grainAmount').value = state.grainAmount;
-    $('#glitchAmount').value = state.glitchAmount;
-    $('#vhsAmount').value = state.vhsAmount;
-    setOut('grainAmount', state.grainAmount.toFixed(2));
-    setOut('glitchAmount', state.glitchAmount.toFixed(2));
-    setOut('vhsAmount', state.vhsAmount.toFixed(2));
 
     $('#parallaxEnabled').checked = state.parallaxEnabled;
     $('#parallaxAmount').value = state.parallaxAmount;
@@ -363,42 +472,25 @@ function bind() {
     num('#imageOffsetX', 'imageOffsetX', 'imageOffsetX');
     num('#imageOffsetY', 'imageOffsetY', 'imageOffsetY');
 
-    $('#filterType').addEventListener('change', (e) => {
-        state.filterType = e.target.value;
-        renderFilterParams();
-    });
-    $('#duotoneShadow').addEventListener('input', (e) => (state.duotoneShadow = hexToRgb(e.target.value)));
-    $('#duotoneHighlight').addEventListener('input', (e) => (state.duotoneHighlight = hexToRgb(e.target.value)));
-    $('#scanCount').addEventListener('input', (e) => {
-        state.scanCount = Number(e.target.value);
-        setOut('scanCount', String(state.scanCount));
-    });
-    $('#scanStrength').addEventListener('input', (e) => {
-        state.scanStrength = Number(e.target.value);
-        setOut('scanStrength', state.scanStrength.toFixed(2));
-    });
-
-    // generic range + color binders; data-out id matches the input id
+    // generic range binder for the remaining single controls (parallax, motion)
     const rng = (id, key, digits) =>
         $(id).addEventListener('input', (e) => {
             state[key] = Number(e.target.value);
             setOut(id.slice(1), digits === undefined ? String(state[key]) : state[key].toFixed(digits));
         });
-    const colr = (id, key) => $(id).addEventListener('input', (e) => (state[key] = hexToRgb(e.target.value)));
 
-    colr('#gradientMid', 'gradientMid');
-    rng('#crtMask', 'crtMask', 2);
-    rng('#grayAmount', 'grayAmount', 2);
-    rng('#sepiaAmount', 'sepiaAmount', 2);
-    rng('#posterizeLevels', 'posterizeLevels');
-    rng('#pixelSize', 'pixelSize');
-    rng('#halftoneScale', 'halftoneScale');
-    rng('#vignetteStrength', 'vignetteStrength', 2);
-    rng('#vignetteRadius', 'vignetteRadius', 2);
-    rng('#chromaticAmount', 'chromaticAmount', 3);
-    rng('#grainAmount', 'grainAmount', 2);
-    rng('#glitchAmount', 'glitchAmount', 2);
-    rng('#vhsAmount', 'vhsAmount', 2);
+    // filter chain: populate the type picker, append on click
+    const addSel = $('#addFilterType');
+    FILTER_TYPES.forEach(([v, label]) => {
+        const o = document.createElement('option');
+        o.value = v;
+        o.textContent = label;
+        addSel.append(o);
+    });
+    $('#addFilter').addEventListener('click', () => {
+        state.filters.push(newFilter(addSel.value || 'duotone'));
+        renderFilters();
+    });
 
     $('#parallaxEnabled').addEventListener('change', (e) => (state.parallaxEnabled = e.target.checked));
     $('#parallaxAmount').addEventListener('input', (e) => {

@@ -17,6 +17,16 @@ the `WallpaperFx` plugin; `SceneRenderer` reads the same file on reload. If you
 add a config field, touch all three: `WpConfig` (model + toJson/fromJson),
 `app.js` (`state` + a control), and the renderer that consumes it.
 
+Filters are a chain: `filters` is an ordered array of entries, each carrying its
+own params (`WpConfig.FilterEntry` ⇄ `app.js` `newFilter()` — keep the defaults
+and json keys identical). They render as a multi-pass fbo pipeline: the source
+(video/image) is drawn once into an fbo unfiltered, then each enabled filter is a
+fullscreen pass ping-ponging between two fbos, the last pass to the screen. This
+lives in `SceneRenderer.renderChain` and `preview.js` `render()` — both must
+agree; the fbo content is upright so chain passes sample it 1:1 (identity, no
+flip). `drawQuad`/`drawPass` take a filter entry (or null = source pass, no
+filter).
+
 ## Rendering model
 
 - `GLRenderThread` owns the EGL context and a demand-driven loop. `onDrawFrame`

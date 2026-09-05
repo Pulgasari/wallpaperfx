@@ -103,8 +103,17 @@ class SceneRenderer implements GLRenderThread.Renderer {
     private long transitionStart;
     private final Random random = new Random();
 
+    // identity texture matrix for fbo chain passes (fbo content is already upright)
+    private final float[] identityMatrix = new float[16];
+    // full-screen 1:1 uv transform used by chain passes
+    private static final float[] FULL = {1f, 1f, 0f, 0f, 1f, 1f};
+
+    // ping-pong offscreen targets for the filter chain
+    private Fbo fboA, fboB;
+
     SceneRenderer(Context context) {
         this.context = context.getApplicationContext();
+        Matrix.setIdentityM(identityMatrix, 0);
         // v' = 1 - v : vertical flip about the texture center
         Matrix.setIdentityM(imageMatrix, 0);
         Matrix.translateM(imageMatrix, 0, 0f, 1f, 0f);
@@ -142,6 +151,7 @@ class SceneRenderer implements GLRenderThread.Renderer {
     public void onSurfaceChanged(int width, int height) {
         screenW = width;
         screenH = height;
+        createFbos(width, height);
         // re-decode images at the new resolution
         needsReload = true;
     }
@@ -152,24 +162,86 @@ class SceneRenderer implements GLRenderThread.Renderer {
             applyConfig();
             needsReload = false;
         }
+        if (fboA == null || fboB == null) {
+            return Long.MAX_VALUE;
+        }
 
+        // pass 0: render the source (video or image cross-fade) into fbo a, unfiltered
+        GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, fboA.fb);
         GLES20.glViewport(0, 0, screenW, screenH);
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT);
-
         long next = "images".equals(cfg.mode) ? drawImages() : drawVideo();
-        // animated filters redraw every frame so uTime keeps advancing
+
+        // apply the enabled filter chain, last pass to the screen
+        renderChain();
+
+        // animated filters/motions redraw every frame so uTime keeps advancing
         if (isAnimated() && contentPresent()) {
             return 0L;
         }
         return next;
     }
 
+    // ping-pongs fbo a through the enabled filters; the final pass targets the screen
+    private void renderChain() {
+        int readTex = fboA.tex;
+        Fbo readFbo = fboA;
+        int drawn = 0;
+        int total = 0;
+        for (WpConfig.FilterEntry f : cfg.filters) {
+            if (f.enabled && !"none".equals(f.type)) total++;
+        }
+        if (total == 0) {
+            // passthrough: copy the source to the screen
+            bindTarget(0);
+            drawQuad(prog2d, GLES20.GL_TEXTURE_2D, fboA.tex, identityMatrix, FULL, 1f, null);
+            return;
+        }
+        for (WpConfig.FilterEntry f : cfg.filters) {
+            if (!f.enabled || "none".equals(f.type)) continue;
+            boolean last = (drawn == total - 1);
+            Fbo writeFbo = (readFbo == fboA) ? fboB : fboA;
+            bindTarget(last ? 0 : writeFbo.fb);
+            drawQuad(prog2d, GLES20.GL_TEXTURE_2D, readTex, identityMatrix, FULL, 1f, f);
+            if (!last) {
+                readTex = writeFbo.tex;
+                readFbo = writeFbo;
+            }
+            drawn++;
+        }
+    }
+
+    private void bindTarget(int fb) {
+        GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, fb);
+        GLES20.glViewport(0, 0, screenW, screenH);
+    }
+
     @Override
     public void onSurfaceDestroyed() {
         releaseVideo();
         releaseImages();
+        deleteFbos();
         if (prog2d != null) prog2d.delete();
         if (progOes != null) progOes.delete();
+    }
+
+    // ---- offscreen targets ----
+
+    private void createFbos(int w, int h) {
+        deleteFbos();
+        fboA = Fbo.create(w, h);
+        fboB = Fbo.create(w, h);
+    }
+
+    private void deleteFbos() {
+        if (fboA != null) {
+            fboA.delete();
+            fboA = null;
+        }
+        if (fboB != null) {
+            fboB.delete();
+            fboB = null;
+        }
     }
 
     // ---- video ----
@@ -187,7 +259,7 @@ class SceneRenderer implements GLRenderThread.Renderer {
         }
         if (videoW > 0 && videoH > 0) {
             float[] s = computeScale(videoW, videoH, cfg.videoScale, cfg.videoOffsetX, cfg.videoOffsetY);
-            drawQuad(progOes, GLES11Ext.GL_TEXTURE_EXTERNAL_OES, oesTexId, videoMatrix, s, 1f);
+            drawQuad(progOes, GLES11Ext.GL_TEXTURE_EXTERNAL_OES, oesTexId, videoMatrix, s, 1f, null);
         }
         // demand-driven: redraw only when a new decoded frame arrives
         return Long.MAX_VALUE;
@@ -278,7 +350,7 @@ class SceneRenderer implements GLRenderThread.Renderer {
         int count = cfg.imagePaths.size();
 
         float[] sa = computeScale(texAw, texAh, cfg.imageScale, cfg.imageOffsetX, cfg.imageOffsetY);
-        drawQuad(prog2d, GLES20.GL_TEXTURE_2D, texA, imageMatrix, sa, 1f);
+        drawQuad(prog2d, GLES20.GL_TEXTURE_2D, texA, imageMatrix, sa, 1f, null);
 
         if (count > 1) {
             if (!transitioning && now - lastShownAt >= cfg.imageDurationMs) {
@@ -312,7 +384,7 @@ class SceneRenderer implements GLRenderThread.Renderer {
                     float[] sb = computeScale(texBw, texBh, cfg.imageScale, cfg.imageOffsetX, cfg.imageOffsetY);
                     GLES20.glEnable(GLES20.GL_BLEND);
                     GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA);
-                    drawQuad(prog2d, GLES20.GL_TEXTURE_2D, texB, imageMatrix, sb, t);
+                    drawQuad(prog2d, GLES20.GL_TEXTURE_2D, texB, imageMatrix, sb, t, null);
                     GLES20.glDisable(GLES20.GL_BLEND);
                 }
             }
@@ -512,7 +584,9 @@ class SceneRenderer implements GLRenderThread.Renderer {
         return Math.max(lo, Math.min(hi, v));
     }
 
-    private void drawQuad(Prog p, int target, int texId, float[] texMatrix, float[] s, float alpha) {
+    // draws the quad with the given source texture. fe == null means no filter
+    // (used for the source pass); otherwise fe supplies the filter and its params.
+    private void drawQuad(Prog p, int target, int texId, float[] texMatrix, float[] s, float alpha, WpConfig.FilterEntry fe) {
         if (p == null || p.id == 0) return;
         GLES20.glUseProgram(p.id);
 
@@ -528,27 +602,30 @@ class SceneRenderer implements GLRenderThread.Renderer {
         GLES20.glUniform2f(p.uUvOffset, s[2], s[3]);
         GLES20.glUniform2f(p.uPosScale, s[4], s[5]);
         GLES20.glUniform1f(p.uAlpha, alpha);
-
-        int filter = filterIndex(cfg.filterType);
-        GLES20.glUniform1i(p.uFilter, filter);
-        color(p.uColorA, cfg.duotoneShadow);
-        color(p.uColorB, cfg.duotoneHighlight);
-        color(p.uColorC, cfg.gradientMid);
-        GLES20.glUniform1f(p.uScanCount, cfg.scanCount);
-        GLES20.glUniform1f(p.uScanStrength, cfg.scanStrength);
-        GLES20.glUniform1f(p.uCrtMask, cfg.crtMask);
-        GLES20.glUniform1f(p.uAmount, "grayscale".equals(cfg.filterType) ? cfg.grayAmount : cfg.sepiaAmount);
-        GLES20.glUniform1f(p.uLevels, cfg.posterizeLevels);
-        GLES20.glUniform1f(p.uPixelSize, cfg.pixelSize);
-        GLES20.glUniform1f(p.uHalftone, cfg.halftoneScale);
-        GLES20.glUniform1f(p.uVignette, cfg.vignetteStrength);
-        GLES20.glUniform1f(p.uVignetteRadius, cfg.vignetteRadius);
-        GLES20.glUniform1f(p.uChromatic, cfg.chromaticAmount);
-        GLES20.glUniform1f(p.uGrain, cfg.grainAmount);
-        GLES20.glUniform1f(p.uGlitch, cfg.glitchAmount);
-        GLES20.glUniform1f(p.uVhs, cfg.vhsAmount);
         GLES20.glUniform1f(p.uTime, (SystemClock.uptimeMillis() - startTimeMs) / 1000f);
         GLES20.glUniform2f(p.uResolution, screenW, screenH);
+
+        if (fe == null) {
+            GLES20.glUniform1i(p.uFilter, 0);
+        } else {
+            GLES20.glUniform1i(p.uFilter, filterIndex(fe.type));
+            color(p.uColorA, fe.colorA);
+            color(p.uColorB, fe.colorB);
+            color(p.uColorC, fe.colorC);
+            GLES20.glUniform1f(p.uScanCount, fe.scanCount);
+            GLES20.glUniform1f(p.uScanStrength, fe.scanStrength);
+            GLES20.glUniform1f(p.uCrtMask, fe.crtMask);
+            GLES20.glUniform1f(p.uAmount, fe.amount);
+            GLES20.glUniform1f(p.uLevels, fe.levels);
+            GLES20.glUniform1f(p.uPixelSize, fe.pixelSize);
+            GLES20.glUniform1f(p.uHalftone, fe.halftone);
+            GLES20.glUniform1f(p.uVignette, fe.vignette);
+            GLES20.glUniform1f(p.uVignetteRadius, fe.vignetteRadius);
+            GLES20.glUniform1f(p.uChromatic, fe.chromatic);
+            GLES20.glUniform1f(p.uGrain, fe.grain);
+            GLES20.glUniform1f(p.uGlitch, fe.glitch);
+            GLES20.glUniform1f(p.uVhs, fe.vhs);
+        }
 
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
         GLES20.glBindTexture(target, texId);
@@ -588,10 +665,11 @@ class SceneRenderer implements GLRenderThread.Renderer {
 
     // animated filters and motions need continuous redraws so time advances
     private boolean isAnimated() {
-        return !"none".equals(cfg.motionType)
-                || "filmgrain".equals(cfg.filterType)
-                || "glitch".equals(cfg.filterType)
-                || "vhs".equals(cfg.filterType);
+        if (!"none".equals(cfg.motionType)) return true;
+        for (WpConfig.FilterEntry f : cfg.filters) {
+            if (f.enabled && f.isAnimated()) return true;
+        }
+        return false;
     }
 
     private boolean contentPresent() {
@@ -649,6 +727,42 @@ class SceneRenderer implements GLRenderThread.Renderer {
 
         void delete() {
             if (id != 0) GLES20.glDeleteProgram(id);
+        }
+    }
+
+    // an offscreen render target (color texture + framebuffer) at screen size.
+    private static final class Fbo {
+        final int fb;
+        final int tex;
+
+        private Fbo(int fb, int tex) {
+            this.fb = fb;
+            this.tex = tex;
+        }
+
+        static Fbo create(int w, int h) {
+            int[] tx = new int[1];
+            GLES20.glGenTextures(1, tx, 0);
+            GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, tx[0]);
+            GLES20.glTexImage2D(GLES20.GL_TEXTURE_2D, 0, GLES20.GL_RGBA, w, h, 0,
+                    GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, null);
+            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR);
+            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR);
+            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE);
+            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE);
+
+            int[] fb = new int[1];
+            GLES20.glGenFramebuffers(1, fb, 0);
+            GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, fb[0]);
+            GLES20.glFramebufferTexture2D(GLES20.GL_FRAMEBUFFER, GLES20.GL_COLOR_ATTACHMENT0,
+                    GLES20.GL_TEXTURE_2D, tx[0], 0);
+            GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0);
+            return new Fbo(fb[0], tx[0]);
+        }
+
+        void delete() {
+            GLES20.glDeleteFramebuffers(1, new int[]{fb}, 0);
+            GLES20.glDeleteTextures(1, new int[]{tex}, 0);
         }
     }
 }
