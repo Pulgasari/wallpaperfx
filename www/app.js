@@ -63,7 +63,10 @@ const state = {
     glitchAmount: 0.5,
     vhsAmount: 0.6,
     parallaxEnabled: false,
-    parallaxAmount: 0.15
+    parallaxAmount: 0.15,
+    motionType: 'none',
+    motionAmount: 0.5,
+    motionSpeed: 0.5
 };
 
 // ---- helpers ----
@@ -88,6 +91,83 @@ function rgbToHex(rgb) {
 function hexToRgb(hex) {
     const m = hex.replace('#', '');
     return [parseInt(m.slice(0, 2), 16), parseInt(m.slice(2, 4), 16), parseInt(m.slice(4, 6), 16)];
+}
+
+// ---- theme engine: derive every shade from bg / fg / accent ----
+
+const themeSettings = { mode: 'system', accent: '#f0ba48', rounded: true };
+
+function mixHex(a, b, t) {
+    const x = hexToRgb(a);
+    const y = hexToRgb(b);
+    return rgbToHex(x.map((v, i) => Math.round(v + (y[i] - v) * t)));
+}
+
+function rgbaOf(hex, alpha) {
+    const [r, g, b] = hexToRgb(hex);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+function readableInk(hex) {
+    const [r, g, b] = hexToRgb(hex).map((v) => v / 255);
+    // perceived luminance; dark ink on bright accents, light ink on dark ones
+    return 0.299 * r + 0.587 * g + 0.114 * b > 0.6 ? '#1a1508' : '#ffffff';
+}
+
+function resolvedThemeMode() {
+    if (themeSettings.mode === 'dark' || themeSettings.mode === 'light') return themeSettings.mode;
+    return window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
+function applyTheme() {
+    const dark = resolvedThemeMode() === 'dark';
+    const bg = dark ? '#0d0f16' : '#eef0f5';
+    const fg = dark ? '#e9ecf5' : '#14161d';
+    const accent = themeSettings.accent;
+    const rounded = themeSettings.rounded;
+    const r = document.documentElement.style;
+    r.setProperty('--text', fg);
+    r.setProperty('--muted', mixHex(bg, fg, 0.62));
+    // nested surfaces are translucent fg overlays, so depth stacks in both themes
+    r.setProperty('--card', rgbaOf(fg, 0.05));
+    r.setProperty('--card-2', rgbaOf(fg, 0.09));
+    r.setProperty('--line', rgbaOf(fg, 0.15));
+    r.setProperty('--accent', accent);
+    r.setProperty('--accent-ink', readableInk(accent));
+    r.setProperty('--sheet-bg', rgbaOf(bg, 0.82));
+    r.setProperty('--radius', rounded ? '14px' : '3px');
+    r.setProperty('--radius-lg', rounded ? '18px' : '4px');
+    document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+}
+
+function initTheme() {
+    try {
+        Object.assign(themeSettings, JSON.parse(localStorage.getItem('wpfx_theme') || '{}'));
+    } catch (e) {}
+    applyTheme();
+
+    const save = () => {
+        try {
+            localStorage.setItem('wpfx_theme', JSON.stringify(themeSettings));
+        } catch (e) {}
+    };
+    const mode = $('#themeMode');
+    const accent = $('#accentColor');
+    const rounded = $('#rounded');
+    if (mode) mode.value = themeSettings.mode;
+    if (accent) accent.value = themeSettings.accent;
+    if (rounded) rounded.checked = themeSettings.rounded;
+
+    if (mode) mode.addEventListener('change', (e) => { themeSettings.mode = e.target.value; applyTheme(); save(); });
+    if (accent) accent.addEventListener('input', (e) => { themeSettings.accent = e.target.value; applyTheme(); save(); });
+    if (rounded) rounded.addEventListener('change', (e) => { themeSettings.rounded = e.target.checked; applyTheme(); save(); });
+
+    // follow the system theme live while in system mode
+    if (window.matchMedia) {
+        matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+            if (themeSettings.mode === 'system') applyTheme();
+        });
+    }
 }
 
 function hasMedia() {
@@ -121,10 +201,16 @@ const ANIMATED_FILTERS = ['filmgrain', 'glitch', 'vhs'];
 function renderFilterParams() {
     // data-filter may list several filters (space separated) that share a group
     $$('.filter-params').forEach((g) => {
+        if (!g.dataset.filter) return;
         g.hidden = !g.dataset.filter.split(' ').includes(state.filterType);
     });
     const note = document.querySelector('[data-filter-note]');
     if (note) note.hidden = !ANIMATED_FILTERS.includes(state.filterType);
+}
+
+function renderMotionParams() {
+    const on = state.motionType !== 'none';
+    $$('[data-motion]').forEach((el) => (el.hidden = !on));
 }
 
 function renderImageList() {
@@ -213,6 +299,13 @@ function renderAll() {
     $('#parallaxEnabled').checked = state.parallaxEnabled;
     $('#parallaxAmount').value = state.parallaxAmount;
     setOut('parallaxAmount', state.parallaxAmount.toFixed(2));
+
+    $('#motionType').value = state.motionType;
+    $('#motionAmount').value = state.motionAmount;
+    $('#motionSpeed').value = state.motionSpeed;
+    setOut('motionAmount', state.motionAmount.toFixed(2));
+    setOut('motionSpeed', state.motionSpeed.toFixed(2));
+    renderMotionParams();
 }
 
 // ---- wiring controls -> state ----
@@ -313,6 +406,13 @@ function bind() {
         setOut('parallaxAmount', state.parallaxAmount.toFixed(2));
     });
 
+    $('#motionType').addEventListener('change', (e) => {
+        state.motionType = e.target.value;
+        renderMotionParams();
+    });
+    rng('#motionAmount', 'motionAmount', 2);
+    rng('#motionSpeed', 'motionSpeed', 2);
+
     $('#save').addEventListener('click', save);
     $('#apply').addEventListener('click', apply);
 }
@@ -358,6 +458,7 @@ async function init() {
     }
     bind();
     renderAll();
+    initTheme();
     initSheet();
 
     // live preview mirrors the same shaders on the selected media

@@ -71,6 +71,12 @@ public class WpConfig {
     public boolean parallaxEnabled = false;
     public float parallaxAmount = 0.15f;
 
+    // motion: time-based background movement (cover mode only).
+    // type: none | zoom | breathe | drift | sway | shake
+    public String motionType = "none";
+    public float motionAmount = 0.5f;
+    public float motionSpeed = 0.5f;
+
     public static File file(Context ctx) {
         return new File(ctx.getFilesDir(), FILE_NAME);
     }
@@ -142,6 +148,9 @@ public class WpConfig {
 
         o.put("parallaxEnabled", parallaxEnabled);
         o.put("parallaxAmount", parallaxAmount);
+        o.put("motionType", motionType);
+        o.put("motionAmount", motionAmount);
+        o.put("motionSpeed", motionSpeed);
         return o;
     }
 
@@ -190,6 +199,9 @@ public class WpConfig {
 
         parallaxEnabled = o.optBoolean("parallaxEnabled", parallaxEnabled);
         parallaxAmount = (float) o.optDouble("parallaxAmount", parallaxAmount);
+        motionType = o.optString("motionType", motionType);
+        motionAmount = (float) o.optDouble("motionAmount", motionAmount);
+        motionSpeed = (float) o.optDouble("motionSpeed", motionSpeed);
     }
 
     private static JSONArray intArray(int[] v) {

@@ -263,6 +263,56 @@
             <input id="parallaxAmount" type="range" min="0" max="0.5" step="0.01" value="0.15" />
         </label>
     </section>
+
+    <!-- motion panel -->
+    <section class="card">
+        <h2>Bewegung</h2>
+        <label class="field">
+            <span>Typ</span>
+            <select id="motionType">
+                <option value="none">Kein</option>
+                <option value="zoom">Zoom (rein/raus)</option>
+                <option value="breathe">Atmen</option>
+                <option value="drift">Drift</option>
+                <option value="sway">Schaukeln</option>
+                <option value="shake">Wackeln</option>
+            </select>
+        </label>
+        <div data-motion hidden>
+            <label class="field">
+                <span>Stärke <em data-out="motionAmount">0.50</em></span>
+                <input id="motionAmount" type="range" min="0" max="1" step="0.01" value="0.5" />
+            </label>
+            <label class="field">
+                <span>Tempo <em data-out="motionSpeed">0.50</em></span>
+                <input id="motionSpeed" type="range" min="0" max="1" step="0.01" value="0.5" />
+            </label>
+        </div>
+        <p class="muted" hidden data-motion>
+            bewegung rendert kontinuierlich solange sichtbar, verbraucht mehr akku.
+        </p>
+    </section>
+
+    <!-- app settings panel -->
+    <section class="card">
+        <h2>App</h2>
+        <label class="field">
+            <span>Theme</span>
+            <select id="themeMode">
+                <option value="system">System</option>
+                <option value="dark">Dunkel</option>
+                <option value="light">Hell</option>
+            </select>
+        </label>
+        <label class="field">
+            <span>Akzentfarbe</span>
+            <input id="accentColor" type="color" value="#f0ba48" />
+        </label>
+        <label class="field row">
+            <span>Abgerundet</span>
+            <input id="rounded" type="checkbox" checked />
+        </label>
+    </section>
     </div>
 
     <footer class="sheet-actions">

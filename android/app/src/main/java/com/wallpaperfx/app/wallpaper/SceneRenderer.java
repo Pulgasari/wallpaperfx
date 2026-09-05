@@ -460,8 +460,52 @@ class SceneRenderer implements GLRenderThread.Renderer {
                 float room = clamp(cfg.parallaxAmount, 0f, 0.9f);
                 uvOffX += (xOffset - 0.5f) * room;
             }
+            float[] s = {uvScaleX, uvScaleY, uvOffX, uvOffY, posScaleX, posScaleY};
+            applyMotion(s);
+            return s;
         }
         return new float[]{uvScaleX, uvScaleY, uvOffX, uvOffY, posScaleX, posScaleY};
+    }
+
+    // folds a time-based zoom/pan into the cover-mode uv scale/offset. mirrored in
+    // www/preview.js applyMotion; keep the two identical.
+    private void applyMotion(float[] s) {
+        if ("none".equals(cfg.motionType)) return;
+        float t = (SystemClock.uptimeMillis() - startTimeMs) / 1000f;
+        float a = clamp(cfg.motionAmount, 0f, 1f);
+        float sp = 0.3f + clamp(cfg.motionSpeed, 0f, 1f) * 1.2f;
+        float zoom = 1f, panX = 0f, panY = 0f;
+        switch (cfg.motionType) {
+            case "zoom":
+                zoom = 1f - 0.18f * a * (0.5f - 0.5f * (float) Math.cos(t * sp * 0.6f));
+                break;
+            case "breathe":
+                zoom = 1f - 0.12f * a * (0.5f + 0.5f * (float) Math.sin(t * sp));
+                break;
+            case "drift":
+                zoom = 1f - 0.18f * a;
+                panX = (float) Math.sin(t * sp * 0.5f);
+                panY = (float) Math.cos(t * sp * 0.37f);
+                break;
+            case "sway":
+                zoom = 1f - 0.10f * a;
+                panX = (float) Math.sin(t * sp * 0.8f);
+                panY = 0.2f * (float) Math.sin(t * sp * 0.4f);
+                break;
+            case "shake":
+                zoom = 1f - 0.08f * a;
+                panX = 0.5f * (float) (Math.sin(t * 17f) + Math.sin(t * 29f));
+                panY = 0.5f * (float) (Math.sin(t * 23f) + Math.sin(t * 31f));
+                break;
+            default:
+                return;
+        }
+        s[0] *= zoom;
+        s[1] *= zoom;
+        float maxPanX = (1f - s[0]) * 0.5f;
+        float maxPanY = (1f - s[1]) * 0.5f;
+        s[2] = clamp(s[2] + panX * maxPanX * a, -maxPanX, maxPanX);
+        s[3] = clamp(s[3] + panY * maxPanY * a, -maxPanY, maxPanY);
     }
 
     private static float clamp(float v, float lo, float hi) {
@@ -542,9 +586,10 @@ class SceneRenderer implements GLRenderThread.Renderer {
         }
     }
 
-    // animated filters need continuous redraws so uTime advances
+    // animated filters and motions need continuous redraws so time advances
     private boolean isAnimated() {
-        return "filmgrain".equals(cfg.filterType)
+        return !"none".equals(cfg.motionType)
+                || "filmgrain".equals(cfg.filterType)
                 || "glitch".equals(cfg.filterType)
                 || "vhs".equals(cfg.filterType);
     }

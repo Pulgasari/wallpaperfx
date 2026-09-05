@@ -38,6 +38,11 @@ kann kein Live-Wallpaper sein. Deshalb der Split:
    logisch identisch bleiben.
 4. **Parallax** — optionale Verschiebung beim Homescreen-Wischen
    (`onOffsetsChanged`), mit einstellbarer Stärke (cover-modus).
+   **Bewegung (motions)** — zeitbasiert: `zoom`, `breathe`, `drift`, `sway`,
+   `shake`; als zoom/pan in den uv-transform gefaltet, cover-modus, rendert
+   kontinuierlich solange aktiv. **App-Settings** — theme (system/dunkel/hell),
+   akzentfarbe, abgerundet; farben werden aus bg/fg/accent abgeleitet
+   (nur ui, in localStorage, nicht teil der wallpaper-config).
 5. **Live-Preview** — WebGL-Canvas in der UI, spiegelt dieselben Shader
    (Skalierung, Offset, Filter) live auf dem gewählten Medium.
 6. **CI** — GitHub Actions baut bei jedem Push ein Debug-APK

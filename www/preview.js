@@ -316,8 +316,46 @@ const Preview = (function () {
             }
             uvOffX = clamp(offX, -1, 1) * (1 - uvScaleX) * 0.5;
             uvOffY = clamp(offY, -1, 1) * (1 - uvScaleY) * 0.5;
+            const s = [uvScaleX, uvScaleY, uvOffX, uvOffY, posScaleX, posScaleY];
+            applyMotion(s);
+            return s;
         }
         return [uvScaleX, uvScaleY, uvOffX, uvOffY, posScaleX, posScaleY];
+    }
+
+    // mirrors SceneRenderer.applyMotion; keep the two identical
+    function applyMotion(s) {
+        const type = state.motionType || 'none';
+        if (type === 'none') return;
+        const t = performance.now() / 1000;
+        const a = clamp(state.motionAmount, 0, 1);
+        const sp = 0.3 + clamp(state.motionSpeed, 0, 1) * 1.2;
+        let zoom = 1, panX = 0, panY = 0;
+        if (type === 'zoom') {
+            zoom = 1 - 0.18 * a * (0.5 - 0.5 * Math.cos(t * sp * 0.6));
+        } else if (type === 'breathe') {
+            zoom = 1 - 0.12 * a * (0.5 + 0.5 * Math.sin(t * sp));
+        } else if (type === 'drift') {
+            zoom = 1 - 0.18 * a;
+            panX = Math.sin(t * sp * 0.5);
+            panY = Math.cos(t * sp * 0.37);
+        } else if (type === 'sway') {
+            zoom = 1 - 0.10 * a;
+            panX = Math.sin(t * sp * 0.8);
+            panY = 0.2 * Math.sin(t * sp * 0.4);
+        } else if (type === 'shake') {
+            zoom = 1 - 0.08 * a;
+            panX = 0.5 * (Math.sin(t * 17) + Math.sin(t * 29));
+            panY = 0.5 * (Math.sin(t * 23) + Math.sin(t * 31));
+        } else {
+            return;
+        }
+        s[0] *= zoom;
+        s[1] *= zoom;
+        const maxPanX = (1 - s[0]) * 0.5;
+        const maxPanY = (1 - s[1]) * 0.5;
+        s[2] = clamp(s[2] + panX * maxPanX * a, -maxPanX, maxPanX);
+        s[3] = clamp(s[3] + panY * maxPanY * a, -maxPanY, maxPanY);
     }
 
     function clamp(v, lo, hi) {
