@@ -433,3 +433,81 @@ input[type="color"] {
     height: 24px;
     accent-color: var(--accent);
 }
+
+/* ---- presets ---- */
+
+.preset-group {
+    margin-top: 12px;
+}
+
+.preset-group h3 {
+    margin: 0 0 6px;
+    font-size: 13px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.preset-add {
+    display: flex;
+    gap: 8px;
+}
+
+.preset-name {
+    flex: 1;
+    min-width: 0;
+    padding: 10px;
+    background: var(--card-2);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    font-size: 14px;
+}
+
+.preset-add .btn {
+    width: auto;
+    flex: none;
+    padding: 10px 14px;
+}
+
+.preset-list {
+    list-style: none;
+    margin: 8px 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.preset-empty {
+    color: var(--muted);
+    font-size: 13px;
+}
+
+.preset-list li {
+    display: flex;
+    gap: 8px;
+}
+
+.preset-load {
+    flex: 1;
+    text-align: left;
+    padding: 9px 12px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--card-2);
+    color: var(--text);
+    font-size: 14px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.preset-del {
+    flex: none;
+    width: 36px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: transparent;
+    color: var(--text);
+}

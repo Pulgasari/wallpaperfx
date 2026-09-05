@@ -47,6 +47,10 @@ kann kein Live-Wallpaper sein. Deshalb der Split:
    (nur ui, in localStorage, nicht teil der wallpaper-config).
 5. **Live-Preview** — WebGL-Canvas in der UI, spiegelt dieselben Shader
    (Skalierung, Offset, Filter) live auf dem gewählten Medium.
+5b. **UI** — vollbild-preview als hintergrund, gläsernes bottom-sheet; bilder &
+   filter als quadrat-kacheln (thumbnails, drag-reorder, aktivieren, entfernen);
+   theme (system/dunkel/hell) + akzentfarbe + abgerundet + kachelgröße; presets
+   für quelle / config / wallpaper (localStorage).
 6. **CI** — GitHub Actions baut bei jedem Push ein Debug-APK
    (`.github/workflows/android.yml`, Artefakt `wallpaperfx-debug-apk`).
 

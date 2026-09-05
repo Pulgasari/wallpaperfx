@@ -414,6 +414,108 @@ function initTheme() {
     }
 }
 
+// ---- presets: source / config / wallpaper (localStorage) ----
+
+const SOURCE_KEYS = ['mode', 'videoPath', 'images'];
+const CONFIG_KEYS = ['videoScale', 'videoOffsetX', 'videoOffsetY', 'videoSpeed',
+    'imageOrder', 'imageDurationMs', 'imageTransitionMs', 'imageScale', 'imageOffsetX', 'imageOffsetY',
+    'filters', 'parallaxEnabled', 'parallaxAmount', 'motionType', 'motionAmount', 'motionSpeed'];
+const PRESET_KEYS = { source: SOURCE_KEYS, config: CONFIG_KEYS, wallpaper: SOURCE_KEYS.concat(CONFIG_KEYS) };
+
+const clone = (v) => JSON.parse(JSON.stringify(v));
+
+function presetsLoad(kind) {
+    try {
+        return JSON.parse(localStorage.getItem('wpfx_presets_' + kind) || '[]');
+    } catch (e) {
+        return [];
+    }
+}
+
+function presetsStore(kind, arr) {
+    try {
+        localStorage.setItem('wpfx_presets_' + kind, JSON.stringify(arr));
+    } catch (e) {}
+}
+
+function collectPreset(kind) {
+    const data = {};
+    PRESET_KEYS[kind].forEach((k) => (data[k] = clone(state[k])));
+    return data;
+}
+
+function applyPreset(kind, data) {
+    PRESET_KEYS[kind].forEach((k) => {
+        if (data[k] === undefined) return;
+        const v = clone(data[k]);
+        // mutate arrays in place so the drag utilities keep their list reference
+        if (Array.isArray(state[k]) && Array.isArray(v)) {
+            state[k].splice(0, state[k].length, ...v);
+        } else {
+            state[k] = v;
+        }
+    });
+    selectedFilter = null;
+    renderAll();
+    syncPreview();
+}
+
+function renderPresets(kind) {
+    const group = document.querySelector(`.preset-group[data-kind="${kind}"]`);
+    if (!group) return;
+    const ul = group.querySelector('.preset-list');
+    ul.innerHTML = '';
+    const list = presetsLoad(kind);
+    if (list.length === 0) {
+        const li = document.createElement('li');
+        li.className = 'preset-empty';
+        li.textContent = 'keine';
+        ul.append(li);
+        return;
+    }
+    list.forEach((p, i) => {
+        const li = document.createElement('li');
+        const load = document.createElement('button');
+        load.type = 'button';
+        load.className = 'preset-load';
+        load.textContent = p.name;
+        load.addEventListener('click', () => { applyPreset(kind, p.data); setStatus('geladen: ' + p.name); });
+        const del = document.createElement('button');
+        del.type = 'button';
+        del.className = 'preset-del';
+        del.textContent = '✕';
+        del.title = 'löschen';
+        del.addEventListener('click', () => {
+            const arr = presetsLoad(kind);
+            arr.splice(i, 1);
+            presetsStore(kind, arr);
+            renderPresets(kind);
+        });
+        li.append(load, del);
+        ul.append(li);
+    });
+}
+
+function initPresets() {
+    $$('.preset-group').forEach((group) => {
+        const kind = group.dataset.kind;
+        group.querySelector('.preset-save').addEventListener('click', () => {
+            const input = group.querySelector('.preset-name');
+            const arr = presetsLoad(kind);
+            const name = (input.value || '').trim() || 'preset ' + (arr.length + 1);
+            const existing = arr.find((p) => p.name === name);
+            const data = collectPreset(kind);
+            if (existing) existing.data = data;
+            else arr.push({ name, data });
+            presetsStore(kind, arr);
+            input.value = '';
+            renderPresets(kind);
+            setStatus('gespeichert: ' + name);
+        });
+        renderPresets(kind);
+    });
+}
+
 function hasMedia() {
     return (state.mode === 'video' && !!state.videoPath) ||
         (state.mode === 'images' && state.images.some((i) => i.enabled));
@@ -660,6 +762,7 @@ async function init() {
     renderAll();
     initTheme();
     initSheet();
+    initPresets();
 
     // live preview mirrors the same shaders on the selected media
     if (typeof Preview !== 'undefined' && Preview.init()) {
