@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Launcher</string>
+    <string name="title_activity_main">Launcher</string>
+    <string name="package_name">com.launcher.app</string>
+    <string name="custom_url_scheme">com.launcher.app</string>
+</resources>
