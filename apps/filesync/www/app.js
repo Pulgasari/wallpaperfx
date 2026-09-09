@@ -11,6 +11,7 @@
         // browser fallback: fake identity/pick, simulate a transfer with progress.
         const listeners = {};
         const emit = (ev, data) => (listeners[ev] || []).forEach(fn => fn(data));
+        let mockAuto = { enabled: false, tree: '', host: '', port: 53317, protocol: 'https', ssid: '', lastSync: 0 };
         return {
             async getIdentity() { return { alias: 'Browser', fingerprint: 'dev' }; },
             async pickFiles() {
@@ -30,6 +31,11 @@
                 }, 300);
             },
             async stopDiscovery() {},
+            async pickFolder() { mockAuto.tree = 'tree://mock'; return { uri: mockAuto.tree, name: 'Kamera' }; },
+            async startAutoSync(cfg) { mockAuto = Object.assign(mockAuto, cfg, { enabled: true }); },
+            async stopAutoSync() { mockAuto.enabled = false; },
+            async syncNow() {},
+            async getAutoSyncState() { return Object.assign({ lastSync: 0 }, mockAuto); },
             async send({ files }) {
                 const total = files.reduce((s, f) => s + Math.max(0, f.size), 0);
                 let sent = 0;
@@ -176,6 +182,56 @@
         }
     }
 
+    // auto-sync state (mirrors the native SyncService prefs)
+    let autoState = { enabled: false, tree: '', host: '', port: 53317, protocol: 'https', ssid: '', lastSync: 0 };
+    let folderName = '';
+
+    function renderAutoSync() {
+        $('folderBtn').textContent = folderName ? ('Ordner: ' + folderName)
+            : (autoState.tree ? 'Ordner gewählt' : 'Ordner wählen');
+        if (!document.activeElement || document.activeElement.id !== 'ssid') $('ssid').value = autoState.ssid || '';
+        $('autoToggle').textContent = autoState.enabled ? 'Deaktivieren' : 'Aktivieren';
+        $('syncNowBtn').hidden = !autoState.enabled;
+        let status = 'aus';
+        if (autoState.enabled) {
+            status = 'aktiv';
+            if (autoState.lastSync) status += ' · zuletzt ' + new Date(autoState.lastSync).toLocaleTimeString();
+        }
+        $('autoStatus').textContent = status;
+    }
+
+    async function pickFolder() {
+        try {
+            const res = await plugin.pickFolder();
+            if (res && res.uri) { autoState.tree = res.uri; folderName = res.name || ''; renderAutoSync(); }
+        } catch (e) { toast('ordner-auswahl abgebrochen'); }
+    }
+
+    async function toggleAutoSync() {
+        if (autoState.enabled) {
+            await plugin.stopAutoSync();
+            autoState.enabled = false;
+            renderAutoSync();
+            return;
+        }
+        const target = parseTarget();
+        if (!target) { toast('erst ein ziel oben eintragen/wählen'); return; }
+        if (!autoState.tree) { toast('erst einen ordner wählen'); return; }
+        try {
+            await plugin.startAutoSync({
+                tree: autoState.tree, host: target.host, port: target.port,
+                protocol: target.protocol, pin: $('pin').value.trim(), ssid: $('ssid').value.trim(),
+            });
+            await refreshAutoState();
+            toast('auto-sync aktiv');
+        } catch (e) { toast(e && e.message ? e.message : 'auto-sync fehlgeschlagen'); }
+    }
+
+    async function refreshAutoState() {
+        try { autoState = Object.assign(autoState, await plugin.getAutoSyncState()); } catch {}
+        renderAutoSync();
+    }
+
     function renderFiles() {
         const ul = $('fileList');
         ul.innerHTML = '';
@@ -253,17 +309,22 @@
         renderRecents();
         renderDevices();
         renderFiles();
+        renderAutoSync();
         plugin.addListener('progress', showProgress);
         plugin.addListener('device', onDevice);
         $('pickBtn').addEventListener('click', pick);
         $('sendBtn').addEventListener('click', send);
         $('rescanBtn').addEventListener('click', rescan);
+        $('folderBtn').addEventListener('click', pickFolder);
+        $('autoToggle').addEventListener('click', toggleAutoSync);
+        $('syncNowBtn').addEventListener('click', async () => { try { await plugin.syncNow(); toast('synchronisiere…'); } catch {} });
         $('host').addEventListener('input', updateSendable);
         try {
             const id = await plugin.getIdentity();
             if (id && id.alias) $('identity').textContent = 'dieses Gerät: ' + id.alias;
         } catch {}
         try { await plugin.startDiscovery(); } catch {}
+        await refreshAutoState();
         updateSendable();
     }
 

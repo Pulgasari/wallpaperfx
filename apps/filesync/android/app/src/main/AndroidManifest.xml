@@ -22,6 +22,12 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- auto-sync: foreground service that uploads new files while on wi-fi -->
+        <service
+            android:name=".bridge.SyncService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
     </application>
 
     <!-- lan file transfer: talk to the desktop receiver over the local network -->
@@ -30,4 +36,10 @@
     <!-- udp multicast discovery (announce/listen on 224.0.0.167) -->
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+    <!-- auto-sync foreground service -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- optional: only used to read the current wi-fi ssid for the trusted-ssid gate -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
 </manifest>

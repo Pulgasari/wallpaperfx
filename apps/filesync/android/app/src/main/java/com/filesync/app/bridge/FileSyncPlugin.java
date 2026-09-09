@@ -1,53 +1,51 @@
 package com.filesync.app.bridge;
 
+import android.Manifest;
 import android.content.ClipData;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
+import android.provider.DocumentsContract;
 import android.provider.OpenableColumns;
 
 import androidx.activity.result.ActivityResult;
+import androidx.core.content.ContextCompat;
 
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
+import com.getcapacitor.PermissionState;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.ActivityCallback;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import com.getcapacitor.annotation.Permission;
+import com.getcapacitor.annotation.PermissionCallback;
 
 import org.json.JSONObject;
 
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.net.URLEncoder;
-import java.security.SecureRandom;
-import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-import javax.net.ssl.HostnameVerifier;
-import javax.net.ssl.HttpsURLConnection;
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.SSLSocketFactory;
-import javax.net.ssl.TrustManager;
-import javax.net.ssl.X509TrustManager;
-
-// sender side of the localsend v2 flow (see PROTOCOL.md). two jobs:
+// sender side of the localsend v2 flow (see PROTOCOL.md). jobs:
 //  - pickFiles(): SAF multi-select, returns {uri,name,size,mime} per file
-//  - send(): prepare-upload then stream each file to the desktop receiver,
-//    emitting "progress" events. the desktop uses a self-signed cert, so https
-//    is trusted by fingerprint model here we trust-all on the lan (v0).
-@CapacitorPlugin(name = "FileSync")
+//  - send(): hand the picked files to the shared LocalSend client, emitting
+//    "progress" events
+//  - startDiscovery()/stopDiscovery(): multicast device discovery
+// the actual http(s) upload lives in LocalSend.java (shared with SyncService).
+@CapacitorPlugin(
+    name = "FileSync",
+    permissions = {
+        @Permission(alias = "notifications", strings = { Manifest.permission.POST_NOTIFICATIONS }),
+        @Permission(alias = "location", strings = { Manifest.permission.ACCESS_FINE_LOCATION })
+    }
+)
 public class FileSyncPlugin extends Plugin {
 
-    private static final String API = "/api/localsend/v2";
-    private static final int BUF = 64 * 1024;
+    private static final String PREFS = "filesync";
 
     private Discovery discovery;
 
@@ -131,6 +129,105 @@ public class FileSyncPlugin extends Plugin {
         super.handleOnDestroy();
     }
 
+    // ---- auto-sync (background foreground-service) ----
+
+    @PluginMethod
+    public void pickFolder(PluginCall call) {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+        startActivityForResult(call, intent, "pickFolderResult");
+    }
+
+    @ActivityCallback
+    private void pickFolderResult(PluginCall call, ActivityResult result) {
+        if (call == null) return;
+        Intent data = result.getData();
+        if (result.getResultCode() != android.app.Activity.RESULT_OK || data == null || data.getData() == null) {
+            call.resolve(new JSObject().put("uri", (String) null));
+            return;
+        }
+        Uri tree = data.getData();
+        try {
+            getContext().getContentResolver().takePersistableUriPermission(tree, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        } catch (Exception ignored) {}
+        JSObject ret = new JSObject();
+        ret.put("uri", tree.toString());
+        ret.put("name", treeName(tree));
+        call.resolve(ret);
+    }
+
+    private String treeName(Uri tree) {
+        try {
+            String docId = DocumentsContract.getTreeDocumentId(tree); // e.g. "primary:Pictures/Cam"
+            int cut = Math.max(docId.lastIndexOf('/'), docId.lastIndexOf(':'));
+            return cut >= 0 && cut < docId.length() - 1 ? docId.substring(cut + 1) : docId;
+        } catch (Exception e) {
+            return "Ordner";
+        }
+    }
+
+    @PluginMethod
+    public void startAutoSync(PluginCall call) {
+        SharedPreferences sp = getContext().getSharedPreferences(PREFS, 0);
+        sp.edit()
+            .putBoolean(SyncService.K_ENABLED, true)
+            .putString(SyncService.K_TREE, call.getString("tree", sp.getString(SyncService.K_TREE, "")))
+            .putString(SyncService.K_HOST, call.getString("host", ""))
+            .putInt(SyncService.K_PORT, call.getInt("port", 53317))
+            .putString(SyncService.K_PROTO, call.getString("protocol", "https"))
+            .putString(SyncService.K_PIN, call.getString("pin", ""))
+            .putString(SyncService.K_SSID, call.getString("ssid", ""))
+            .apply();
+
+        // notifications (33+) so the foreground notice shows; location only if an
+        // ssid gate is set (reading the current ssid needs it).
+        List<String> aliases = new ArrayList<>();
+        if (getPermissionState("notifications") != PermissionState.GRANTED) aliases.add("notifications");
+        String ssid = call.getString("ssid", "");
+        if (ssid != null && !ssid.isEmpty() && getPermissionState("location") != PermissionState.GRANTED) aliases.add("location");
+        if (aliases.isEmpty()) { launchService(null); call.resolve(); }
+        else requestPermissionForAliases(aliases.toArray(new String[0]), call, "afterAutoSyncPerms");
+    }
+
+    @PermissionCallback
+    private void afterAutoSyncPerms(PluginCall call) {
+        launchService(null);
+        call.resolve();
+    }
+
+    private void launchService(String action) {
+        Intent i = new Intent(getContext(), SyncService.class);
+        if (action != null) i.setAction(action);
+        ContextCompat.startForegroundService(getContext(), i);
+    }
+
+    @PluginMethod
+    public void stopAutoSync(PluginCall call) {
+        getContext().getSharedPreferences(PREFS, 0).edit().putBoolean(SyncService.K_ENABLED, false).apply();
+        getContext().stopService(new Intent(getContext(), SyncService.class));
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void syncNow(PluginCall call) {
+        launchService(SyncService.ACTION_RUN_NOW);
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void getAutoSyncState(PluginCall call) {
+        SharedPreferences sp = getContext().getSharedPreferences(PREFS, 0);
+        JSObject o = new JSObject();
+        o.put("enabled", sp.getBoolean(SyncService.K_ENABLED, false));
+        o.put("tree", sp.getString(SyncService.K_TREE, ""));
+        o.put("host", sp.getString(SyncService.K_HOST, ""));
+        o.put("port", sp.getInt(SyncService.K_PORT, 53317));
+        o.put("protocol", sp.getString(SyncService.K_PROTO, "https"));
+        o.put("ssid", sp.getString(SyncService.K_SSID, ""));
+        o.put("lastSync", sp.getLong(SyncService.K_LAST, 0));
+        call.resolve(o);
+    }
+
     // ---- file picking ----
 
     @PluginMethod
@@ -212,97 +309,28 @@ public class FileSyncPlugin extends Plugin {
     }
 
     private void doSend(PluginCall call, String protocol, String host, int port, String pin, JSArray files) throws Exception {
-        String base = protocol + "://" + host + ":" + port;
-
-        // parse the file list the ui gave us; measure the total for progress
-        List<JSObject> items = new ArrayList<>();
-        long total = 0;
+        // build file specs from what the ui gave us, then hand off to the shared client
+        List<LocalSend.FileSpec> specs = new ArrayList<>();
         for (int i = 0; i < files.length(); i++) {
             JSObject f = JSObject.fromJSONObject(files.getJSONObject(i));
-            items.add(f);
-            long s = f.getLong("size");
-            if (s > 0) total += s;
+            specs.add(new LocalSend.FileSpec(
+                f.getString("name", "file"),
+                f.getString("mime", "application/octet-stream"),
+                f.getLong("size"),
+                Uri.parse(f.getString("uri"))));
         }
-
-        // 1) prepare-upload: announce the files, receive a session + per-file tokens
-        JSONObject info = new JSONObject();
-        info.put("alias", deviceAlias());
-        info.put("version", "2.1");
-        info.put("deviceModel", Build.MODEL);
-        info.put("deviceType", "mobile");
-        info.put("fingerprint", fingerprint());
-        info.put("port", port);
-        info.put("protocol", protocol);
-
-        JSONObject filesObj = new JSONObject();
-        for (int i = 0; i < items.size(); i++) {
-            JSObject f = items.get(i);
-            String id = String.valueOf(i);
-            long size = f.getLong("size");
-            JSONObject meta = new JSONObject();
-            meta.put("id", id);
-            meta.put("fileName", f.getString("name", "file"));
-            meta.put("size", size < 0 ? 0 : size);
-            meta.put("fileType", f.getString("mime", "application/octet-stream"));
-            filesObj.put(id, meta);
+        JSONObject info = LocalSend.mobileInfo(deviceAlias(), fingerprint(), port, protocol);
+        try {
+            int sent = LocalSend.send(getContext(), protocol, host, port, pin, info, specs, this::emitProgress);
+            JSObject ret = new JSObject();
+            ret.put("sent", sent);
+            call.resolve(ret);
+        } catch (LocalSend.SendException e) {
+            // 401 = the receiver wants a (correct) pin; surface it so the ui can prompt.
+            if (e.code == 401) { call.reject("pin", "PIN_REQUIRED"); return; }
+            if (e.code == 403) { call.reject("empfaenger hat abgelehnt"); return; }
+            call.reject(e.getMessage() == null ? "senden fehlgeschlagen" : e.getMessage());
         }
-        JSONObject prepare = new JSONObject();
-        prepare.put("info", info);
-        prepare.put("files", filesObj);
-
-        String prepareUrl = base + API + "/prepare-upload";
-        if (pin != null && !pin.isEmpty()) prepareUrl += "?pin=" + enc(pin);
-        HttpURLConnection pc = open(prepareUrl, "POST", "application/json");
-        writeBytes(pc, prepare.toString().getBytes("UTF-8"));
-        int pcode = pc.getResponseCode();
-        String prespBody = readBody(pc);
-        pc.disconnect();
-        // 401 = the receiver wants a (correct) pin; surface it so the ui can prompt.
-        if (pcode == 401) { call.reject("pin", "PIN_REQUIRED"); return; }
-        if (pcode == 403 || pcode == 204) { call.reject("empfaenger hat abgelehnt"); return; }
-        if (pcode != 200) { call.reject("prepare-upload fehlgeschlagen (" + pcode + ")"); return; }
-        JSONObject presp = new JSONObject(prespBody);
-        String sessionId = presp.getString("sessionId");
-        JSONObject tokens = presp.getJSONObject("files");
-
-        // 2) upload each file body to /upload?sessionId&fileId&token, streaming
-        long sentTotal = 0;
-        for (int i = 0; i < items.size(); i++) {
-            JSObject f = items.get(i);
-            String id = String.valueOf(i);
-            if (!tokens.has(id)) continue; // receiver skipped this file
-            String token = tokens.getString(id);
-            String name = f.getString("name", "file");
-            long size = f.getLong("size");
-            Uri uri = Uri.parse(f.getString("uri"));
-
-            String q = "?sessionId=" + enc(sessionId) + "&fileId=" + enc(id) + "&token=" + enc(token);
-            HttpURLConnection uc = open(base + API + "/upload" + q, "POST", "application/octet-stream");
-            if (size >= 0) uc.setFixedLengthStreamingMode(size);
-            else uc.setChunkedStreamingMode(0);
-
-            try (InputStream in = getContext().getContentResolver().openInputStream(uri);
-                 OutputStream out = uc.getOutputStream()) {
-                if (in == null) throw new Exception("konnte datei nicht lesen: " + name);
-                byte[] buf = new byte[BUF];
-                long fileSent = 0;
-                int n;
-                while ((n = in.read(buf)) != -1) {
-                    out.write(buf, 0, n);
-                    fileSent += n;
-                    sentTotal += n;
-                    emitProgress(i, items.size(), name, fileSent, size, sentTotal, total);
-                }
-                out.flush();
-            }
-            int ucode = uc.getResponseCode();
-            uc.disconnect();
-            if (ucode != 200) { call.reject("upload fehlgeschlagen bei " + name + " (" + ucode + ")"); return; }
-        }
-
-        JSObject ret = new JSObject();
-        ret.put("sent", items.size());
-        call.resolve(ret);
     }
 
     private void emitProgress(int index, int count, String name, long fileSent, long fileTotal, long sent, long total) {
@@ -315,59 +343,5 @@ public class FileSyncPlugin extends Plugin {
         p.put("sent", sent);
         p.put("total", total);
         notifyListeners("progress", p);
-    }
-
-    // ---- http helpers ----
-
-    private HttpURLConnection open(String urlStr, String method, String contentType) throws Exception {
-        URL url = new URL(urlStr);
-        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-        if (conn instanceof HttpsURLConnection) {
-            // desktop uses a self-signed cert; on the trusted lan we accept it (v0).
-            HttpsURLConnection https = (HttpsURLConnection) conn;
-            https.setSSLSocketFactory(trustAllFactory());
-            https.setHostnameVerifier(ALLOW_ALL);
-        }
-        conn.setRequestMethod(method);
-        conn.setConnectTimeout(10000);
-        conn.setReadTimeout(60000);
-        conn.setDoOutput(true);
-        conn.setRequestProperty("Content-Type", contentType);
-        return conn;
-    }
-
-    private void writeBytes(HttpURLConnection conn, byte[] body) throws Exception {
-        conn.setFixedLengthStreamingMode(body.length);
-        try (OutputStream os = conn.getOutputStream()) { os.write(body); }
-    }
-
-    private String readBody(HttpURLConnection conn) throws Exception {
-        InputStream is = conn.getResponseCode() >= 400 ? conn.getErrorStream() : conn.getInputStream();
-        if (is == null) return "";
-        java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
-        byte[] buf = new byte[4096];
-        int n;
-        while ((n = is.read(buf)) != -1) bos.write(buf, 0, n);
-        is.close();
-        return bos.toString("UTF-8");
-    }
-
-    private static String enc(String s) throws Exception {
-        return URLEncoder.encode(s, "UTF-8");
-    }
-
-    private static final HostnameVerifier ALLOW_ALL = (hostname, session) -> true;
-
-    private static SSLSocketFactory trustAllFactory() throws Exception {
-        TrustManager[] trustAll = new TrustManager[]{
-            new X509TrustManager() {
-                public void checkClientTrusted(X509Certificate[] c, String a) {}
-                public void checkServerTrusted(X509Certificate[] c, String a) {}
-                public X509Certificate[] getAcceptedIssuers() { return new X509Certificate[0]; }
-            }
-        };
-        SSLContext ctx = SSLContext.getInstance("TLS");
-        ctx.init(null, trustAll, new SecureRandom());
-        return ctx.getSocketFactory();
     }
 }

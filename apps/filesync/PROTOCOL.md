@@ -45,6 +45,12 @@ On multicast datagrams only, an extra `"announce": true|false` is added.
 
 ## Upload flow
 
+### 0. pin (optional)
+
+when the receiver has a pin configured, the sender must pass it as a query
+param on prepare-upload: `POST .../prepare-upload?pin=<pin>`. a missing/wrong pin
+is answered `401`, and the sender prompts the user and retries.
+
 ### 1. `POST /api/localsend/v2/prepare-upload`
 
 request:
@@ -91,5 +97,5 @@ aborts the session; the receiver removes any partial files.
 ## Known v0 deviations from full LocalSend
 
 - fingerprint is a stable random per-install id, not the tls cert hash.
-- no PIN flow, no `prepare-download`/`download` (reverse direction), no request
-  of file previews/thumbnails.
+- no `prepare-download`/`download` (reverse direction), no file previews/thumbnails.
+- the pin is passed once per prepare-upload (no separate session-pin handshake).

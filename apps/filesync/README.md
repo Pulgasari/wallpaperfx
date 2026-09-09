@@ -11,18 +11,27 @@ Zwei Teile, gleicher JS-Stack wie der Rest:
 Arbeitsname/-ID vorläufig (`com.filesync.app`, "FileSync"), wird später zu
 `<Brand> …`.
 
-## v0
+## Features
 
-- Manuelles Pairing: Adresse (`ip:port`) am Handy eingeben; die Desktop-App zeigt
-  Adresse **und** QR. Zuletzt genutzte Ziele werden gemerkt.
-- Senden mit Fortschrittsanzeige, mehrere Dateien.
-- Empfänger: Zielordner + Gerätename einstellbar, automatisch annehmen (an/aus),
+- **Pairing**: Adresse (`ip:port`) am Handy eingeben oder ein im WLAN entdecktes
+  Gerät antippen; die Desktop-App zeigt Adresse **und** QR. Zuletzt genutzte
+  Ziele werden gemerkt.
+- **Senden** mit Fortschrittsanzeige, mehrere Dateien.
+- **Auto-Discovery**: Geräte finden sich per UDP-Multicast (224.0.0.167) selbst
+  im WLAN; die Liste zeigt sie zum Antippen.
+- **PIN**: der Empfänger kann eine PIN verlangen; ohne/mit falscher PIN → der
+  Sender fragt nach.
+- **Auto-Sync**: ein gewählter Ordner wird im WLAN (optional nur bei einer
+  bestimmten SSID) automatisch an das Ziel gesendet — als Android-
+  Foreground-Service, sobald neue Dateien auftauchen.
+- **Empfänger**: Zielordner + Gerätename + PIN + automatisch annehmen (an/aus),
   Empfangsverlauf, entdeckte Geräte.
-- Protokoll: LocalSend v2 (Details in `PROTOCOL.md`), d.h. interoperabel mit
+- **Protokoll**: LocalSend v2 (Details in `PROTOCOL.md`), interoperabel mit
   bestehenden LocalSend-Apps.
 
-Später: mDNS-Auto-Discovery (Geräte finden sich selbst), Auto-Sync wenn beide im
-selben WLAN (Android-Foreground-Service), Gegenrichtung Desktop→Handy.
+Später: Gegenrichtung Desktop→Handy, Zertifikats-Pinning per Fingerprint statt
+trust-all, rekursiver Ordner-Scan (Auto-Sync scannt v0 nur die oberste Ebene),
+QR-Scan am Handy.
 
 ## Desktop starten
 
@@ -61,7 +70,8 @@ cd android && ./gradlew assembleDebug
 ## Sicherheit (v0)
 
 Für das vertraute Heimnetz gedacht. Der Desktop nutzt ein selbst-signiertes
-Zertifikat, das der Client im LAN vertraut (trust-all). Es gibt noch kein
-PIN/Pairing-Secret — jeder im selben Netz, der die Adresse kennt, kann senden
-(bei „automatisch annehmen" auch ohne Rückfrage). Ein Pairing-Token/PIN ist ein
-nächster Schritt.
+Zertifikat, das der Client im LAN vertraut (trust-all — der Fingerprint wird noch
+nicht gepinnt). Eine optionale **PIN** am Empfänger schützt vor ungewolltem
+Senden; ohne gesetzte PIN kann bei „automatisch annehmen" jeder im selben Netz,
+der die Adresse kennt, senden. Nächste Härtung: Fingerprint-Pinning statt
+trust-all.

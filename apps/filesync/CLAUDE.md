@@ -29,11 +29,22 @@ build.
 
 ## Android side
 
+- `bridge/LocalSend.java` — the shared sender client (prepare-upload + streamed
+  upload, trust-all tls, `SendException` codes: 401 pin, 403 declined). used by
+  both the plugin and the service; the http logic lives here only.
 - `bridge/FileSyncPlugin.java`:
   - `pickFiles()` → SAF multi-select, returns `{uri,name,size,mime}` per file.
-  - `send({host,port,protocol,files})` → prepare-upload then stream each file,
-    emitting `progress` events. runs off the main thread.
+  - `send({host,port,protocol,pin,files})` → hands off to `LocalSend`, emitting
+    `progress` events. runs off the main thread. 401 → rejects with `PIN_REQUIRED`.
   - `getIdentity()` → `{alias, fingerprint}` (fingerprint persisted in prefs).
+  - `startDiscovery()/stopDiscovery()` → emit `device` events (see `Discovery.java`).
+  - `pickFolder()/startAutoSync()/stopAutoSync()/syncNow()/getAutoSyncState()` →
+    drive `SyncService` (config in the shared `filesync` prefs).
+- `bridge/Discovery.java` — udp multicast (MulticastLock + MulticastSocket on
+  224.0.0.167:53317), learns peer ip from the datagram source.
+- `bridge/SyncService.java` — foreground service (type `dataSync`): on wi-fi
+  (optionally gated to a trusted ssid) scans the chosen tree uri for files newer
+  than `lastSync` and uploads them via `LocalSend`. top level only (no recursion, v0).
 - https to the desktop's self-signed cert is trusted-all on the lan (v0); see the
   security note in `PROTOCOL.md`.
 - `res/xml/network_security_config.xml` permits cleartext (http) so lan transfer

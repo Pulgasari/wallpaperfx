@@ -4,6 +4,8 @@
     --line: rgba(255,255,255,0.10); --card: #16161b; --accent: #4f8cff; --accent-fg: #fff;
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+/* author display rules (e.g. .chip) would otherwise beat the ua [hidden] rule */
+[hidden] { display: none !important; }
 html, body { margin: 0; height: 100%; }
 body {
     background: radial-gradient(120% 90% at 50% 0%, var(--bg-2), var(--bg) 60%);
@@ -52,6 +54,10 @@ input:focus { outline: none; border-color: var(--accent); }
     display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 999px;
     border: 1px solid var(--line); background: var(--bg); color: var(--fg); font-size: 13px; font-weight: 600; cursor: pointer;
 }
+
+.ssid-row { display: flex; flex-direction: column; gap: 6px; margin: 12px 0 8px; }
+.ssid-row input { width: 100%; }
+.auto-actions { display: flex; gap: 8px; margin-top: 6px; }
 
 .device-list { list-style: none; margin: 0; padding: 0; }
 .device-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 2px; border-bottom: 1px solid var(--line); cursor: pointer; }

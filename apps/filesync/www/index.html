@@ -53,6 +53,24 @@
         <p id="filesEmpty" class="muted">keine dateien gewählt</p>
     </section>
 
+    <!-- ===== auto-sync ===== -->
+    <section class="card">
+        <div class="card-head">
+            <h2>Auto-Sync (WLAN)</h2>
+            <span id="autoStatus" class="muted small">aus</span>
+        </div>
+        <button id="folderBtn" class="chip">Ordner wählen</button>
+        <label class="ssid-row">
+            <span class="muted small">Nur in diesem WLAN (optional)</span>
+            <input id="ssid" type="text" autocapitalize="off" autocomplete="off" spellcheck="false" placeholder="SSID (leer = jedes WLAN)" />
+        </label>
+        <p class="muted small">Neue Dateien im Ordner werden im WLAN automatisch an das oben gewählte Ziel gesendet.</p>
+        <div class="auto-actions">
+            <button id="autoToggle" class="chip">Aktivieren</button>
+            <button id="syncNowBtn" class="chip" hidden>Jetzt synchronisieren</button>
+        </div>
+    </section>
+
     <!-- ===== send ===== -->
     <section class="send-area">
         <div id="progress" class="progress" hidden>
