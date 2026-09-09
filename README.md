@@ -1,4 +1,4 @@
-# Monorepo: Wallpapers + Launcher + FileSync
+# Monorepo: Wallpapers + Launcher + FileSync + Browser
 
 Mehrere eigenständige Apps in einem Repo, alle mit demselben Stack (Capacitor /
 Web-UI in reinem JS + nativer Teil). Jede App liegt in ihrem eigenen Ordner
@@ -13,12 +13,16 @@ apps/
   filesync/     dateien handy -> desktop im lan (localsend-kompatibel)
                 android-sender + node-desktop-empfaenger
                 -> details: apps/filesync/README.md
+  browser/      minimalistischer browser (system-webview), pille-ui,
+                tabs/gruppen/lesezeichen, 2-token-theme
+                -> details: apps/browser/README.md
 .github/workflows/android.yml   baut die android-apps (matrix), lädt je ein debug-apk
 .github/workflows/desktop.yml   testet den filesync-desktop-daemon (node)
 ```
 
 Die App-Namen/IDs sind vorläufig (`com.wallpaperfx.app`, `com.launcher.app`,
-`com.filesync.app`) und werden zu `<Brand> …`, sobald ein Brand feststeht.
+`com.filesync.app`, `com.browser.app`) und werden zu `<Brand> …`, sobald ein
+Brand feststeht.
 
 ## Warum getrennte Ordner statt npm-workspace
 

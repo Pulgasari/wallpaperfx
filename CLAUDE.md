@@ -20,9 +20,15 @@ project under `apps/`:
   (`apps/filesync/desktop/`) over a LocalSend-v2 subset. This is a two-endpoint
   pair, not a single app; the wire protocol is the invariant in
   `apps/filesync/PROTOCOL.md`. Its own notes live in `apps/filesync/CLAUDE.md`.
+- `apps/browser/` — a minimalist browser on the system WebView. A transparent
+  Capacitor **chrome** WebView (pill/url/tabs, `www/`) sits over native
+  **content** WebViews (one per tab); collapse/expand resizes the chrome instead
+  of touch pass-through. The layering is the invariant in
+  `apps/browser/ARCHITECTURE.md`. Its own notes live in `apps/browser/CLAUDE.md`.
 
 App names/ids are provisional (`com.wallpaperfx.app`, `com.launcher.app`,
-`com.filesync.app`); they get rebranded to `<brand> …` once a brand is chosen.
+`com.filesync.app`, `com.browser.app`); they get rebranded to `<brand> …` once a
+brand is chosen.
 
 ## Layout invariant: apps are self-contained, not a workspace
 
