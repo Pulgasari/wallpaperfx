@@ -10,7 +10,7 @@
   "scripts": {
     "start": "node src/index.js",
     "check": "node --check src/index.js && node --check src/server.js && node --check src/discovery.js && node --check src/device.js && node --check src/webui.js",
-    "test": "node test/transfer.test.js && node test/discovery.test.js"
+    "test": "node test/transfer.test.js && node test/discovery.test.js && node test/fingerprint.test.js"
   },
   "keywords": [
     "localsend",

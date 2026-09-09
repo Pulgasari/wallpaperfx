@@ -18,8 +18,11 @@ Auto-sync and the reverse direction are later phases.
 ## Transport
 
 - one tcp server per device on port **53317** (configurable), `https` (self-signed)
-  or `http`. the desktop defaults to https; the android client trusts the
-  self-signed cert on the lan (v0 trust-all, pinned-by-fingerprint model later).
+  or `http`. the desktop defaults to https. when the client knows the server's
+  `fingerprint` (from discovery or a `filesync://` uri) it **pins** the tls cert:
+  the leaf cert's sha256 must equal the fingerprint, else the connection is
+  refused. a manually typed target with no known fingerprint falls back to
+  trust-all on the lan (v0).
 - api base path: `/api/localsend/v2`.
 - discovery is udp multicast on `224.0.0.167:53317` (announce datagrams). v0 uses
   manual pairing (ip / `filesync://` uri), so discovery is optional.
@@ -94,8 +97,15 @@ aborts the session; the receiver removes any partial files.
   auto-accept off → the request is held until the local web ui accepts/declines
   (60s timeout → decline).
 
+## Fingerprint
+
+with https the `fingerprint` is the **sha256 of the server's tls certificate**
+(lowercase hex of the DER), computed identically on both ends
+(`desktop/src/device.js` `certFingerprint`, android `LocalSend.sha256Hex`). over
+plain http (no cert) it falls back to a stable random per-install id and pinning
+does not apply.
+
 ## Known v0 deviations from full LocalSend
 
-- fingerprint is a stable random per-install id, not the tls cert hash.
 - no `prepare-download`/`download` (reverse direction), no file previews/thumbnails.
 - the pin is passed once per prepare-upload (no separate session-pin handshake).

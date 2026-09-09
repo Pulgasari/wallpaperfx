@@ -30,8 +30,9 @@ build.
 ## Android side
 
 - `bridge/LocalSend.java` — the shared sender client (prepare-upload + streamed
-  upload, trust-all tls, `SendException` codes: 401 pin, 403 declined). used by
-  both the plugin and the service; the http logic lives here only.
+  upload, `SendException` codes: 401 pin, 403 declined). tls: when a fingerprint
+  is passed it **pins** the leaf cert (sha256 == fingerprint), else trust-all.
+  used by both the plugin and the service; the http logic lives here only.
 - `bridge/FileSyncPlugin.java`:
   - `pickFiles()` → SAF multi-select, returns `{uri,name,size,mime}` per file.
   - `send({host,port,protocol,pin,files})` → hands off to `LocalSend`, emitting
@@ -45,8 +46,8 @@ build.
 - `bridge/SyncService.java` — foreground service (type `dataSync`): on wi-fi
   (optionally gated to a trusted ssid) scans the chosen tree uri for files newer
   than `lastSync` and uploads them via `LocalSend`. top level only (no recursion, v0).
-- https to the desktop's self-signed cert is trusted-all on the lan (v0); see the
-  security note in `PROTOCOL.md`.
+- https to the desktop's self-signed cert is pinned by fingerprint when known
+  (discovery / `filesync://` uri), else trust-all; see `PROTOCOL.md`.
 - `res/xml/network_security_config.xml` permits cleartext (http) so lan transfer
   works; TLS trust is handled in code, not by the system config.
 

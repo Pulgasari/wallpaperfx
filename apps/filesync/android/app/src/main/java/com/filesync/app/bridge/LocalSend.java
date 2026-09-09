@@ -12,7 +12,9 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
+import java.security.MessageDigest;
 import java.security.SecureRandom;
+import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.List;
 
@@ -52,8 +54,11 @@ public class LocalSend {
     }
 
     // prepare-upload then stream each file body. returns the number of files sent.
+    // when fingerprint is non-empty and protocol is https, the server's tls cert is
+    // pinned to that sha256 (self-signed but verified); empty = trust-all (v0 fallback
+    // for a manually typed target with no known fingerprint).
     public static int send(Context ctx, String protocol, String host, int port, String pin,
-                           JSONObject info, List<FileSpec> files, Progress cb) throws Exception {
+                           String fingerprint, JSONObject info, List<FileSpec> files, Progress cb) throws Exception {
         String base = protocol + "://" + host + ":" + port;
 
         long total = 0;
@@ -75,7 +80,7 @@ public class LocalSend {
 
         String prepareUrl = base + API + "/prepare-upload";
         if (pin != null && !pin.isEmpty()) prepareUrl += "?pin=" + enc(pin);
-        HttpURLConnection pc = open(prepareUrl, "POST", "application/json");
+        HttpURLConnection pc = open(prepareUrl, "POST", "application/json", fingerprint);
         writeBytes(pc, prepare.toString().getBytes("UTF-8"));
         int pcode = pc.getResponseCode();
         String prespBody = readBody(pc);
@@ -96,7 +101,7 @@ public class LocalSend {
             FileSpec f = files.get(i);
 
             String q = "?sessionId=" + enc(sessionId) + "&fileId=" + enc(id) + "&token=" + enc(token);
-            HttpURLConnection uc = open(base + API + "/upload" + q, "POST", "application/octet-stream");
+            HttpURLConnection uc = open(base + API + "/upload" + q, "POST", "application/octet-stream", fingerprint);
             if (f.size >= 0) uc.setFixedLengthStreamingMode(f.size);
             else uc.setChunkedStreamingMode(0);
 
@@ -136,13 +141,17 @@ public class LocalSend {
 
     // ---- http helpers ----
 
-    private static HttpURLConnection open(String urlStr, String method, String contentType) throws Exception {
+    private static HttpURLConnection open(String urlStr, String method, String contentType, String fingerprint) throws Exception {
         URL url = new URL(urlStr);
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         if (conn instanceof HttpsURLConnection) {
-            // desktop uses a self-signed cert; on the trusted lan we accept it (v0).
+            // desktop cert is self-signed. if we know its fingerprint, pin it (verified);
+            // otherwise fall back to trust-all on the lan (v0). the cn is "filesync",
+            // not the ip, so the hostname verifier stays permissive either way -- the
+            // pinned fingerprint is what establishes identity.
             HttpsURLConnection https = (HttpsURLConnection) conn;
-            https.setSSLSocketFactory(trustAllFactory());
+            boolean pin = fingerprint != null && !fingerprint.isEmpty();
+            https.setSSLSocketFactory(pin ? pinningFactory(fingerprint) : trustAllFactory());
             https.setHostnameVerifier(ALLOW_ALL);
         }
         conn.setRequestMethod(method);
@@ -174,6 +183,39 @@ public class LocalSend {
     }
 
     private static final HostnameVerifier ALLOW_ALL = (hostname, session) -> true;
+
+    // pin the server's leaf cert to an expected sha256 (lowercase hex of the DER).
+    private static SSLSocketFactory pinningFactory(String expectedHex) throws Exception {
+        TrustManager[] tm = new TrustManager[]{
+            new X509TrustManager() {
+                public void checkClientTrusted(X509Certificate[] c, String a) {}
+                public void checkServerTrusted(X509Certificate[] chain, String a) throws CertificateException {
+                    if (chain == null || chain.length == 0) throw new CertificateException("no server certificate");
+                    if (!sha256Hex(chain[0]).equalsIgnoreCase(expectedHex)) {
+                        throw new CertificateException("certificate fingerprint mismatch");
+                    }
+                }
+                public X509Certificate[] getAcceptedIssuers() { return new X509Certificate[0]; }
+            }
+        };
+        SSLContext ctx = SSLContext.getInstance("TLS");
+        ctx.init(null, tm, new SecureRandom());
+        return ctx.getSocketFactory();
+    }
+
+    private static String sha256Hex(X509Certificate cert) throws CertificateException {
+        try {
+            byte[] d = MessageDigest.getInstance("SHA-256").digest(cert.getEncoded());
+            StringBuilder sb = new StringBuilder(d.length * 2);
+            for (byte b : d) {
+                sb.append(Character.forDigit((b >> 4) & 0xf, 16));
+                sb.append(Character.forDigit(b & 0xf, 16));
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            throw new CertificateException(e);
+        }
+    }
 
     private static SSLSocketFactory trustAllFactory() throws Exception {
         TrustManager[] trustAll = new TrustManager[]{

@@ -26,10 +26,12 @@ function readBody(req) {
     });
 }
 
-// the string a phone scans to pair without typing an ip.
+// the string a phone scans to pair without typing an ip (carries the fingerprint
+// so the phone can pin the tls cert).
 export function pairingUri(ctx) {
     const { ip, port, protocol } = ctx.address();
-    const q = new URLSearchParams({ fingerprint: ctx.config.fingerprint, protocol, alias: ctx.config.alias });
+    const fp = ctx.fingerprint || ctx.config.fingerprint;
+    const q = new URLSearchParams({ fingerprint: fp, protocol, alias: ctx.config.alias });
     return `filesync://${ip}:${port}?${q.toString()}`;
 }
 
@@ -52,7 +54,7 @@ export function startWebUi(ctx) {
         return {
             device: ctx.deviceInfo(),
             address: ctx.address(),
-            fingerprint: ctx.config.fingerprint,
+            fingerprint: ctx.fingerprint || ctx.config.fingerprint,
             config: { alias: ctx.config.alias, targetDir: ctx.config.targetDir, autoAccept: ctx.config.autoAccept, pin: ctx.config.pin },
             pairingUri: pairingUri(ctx),
             qr: await QRCode.toDataURL(pairingUri(ctx), { margin: 1, width: 240 }),

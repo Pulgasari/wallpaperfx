@@ -5,7 +5,7 @@ import { EventEmitter } from 'node:events';
 import { networkInterfaces } from 'node:os';
 import QRCode from 'qrcode';
 import { PROTOCOL_VERSION, DEFAULT_PORT, DEVICE_TYPE, DEVICE_MODEL } from './protocol.js';
-import { loadConfig, getOrCreateCert } from './device.js';
+import { loadConfig, getOrCreateCert, certFingerprint } from './device.js';
 import { createReceiver } from './server.js';
 import { startDiscovery } from './discovery.js';
 import { startWebUi, pairingUri } from './webui.js';
@@ -60,19 +60,23 @@ async function main() {
     const log = msg => console.log(`[filesync] ${msg}`);
     const protocol = args.tls ? 'https' : 'http';
 
+    const tls = args.tls ? getOrCreateCert(config) : null;
+    // with tls the identity/pin target is the cert hash (so a client can pin it);
+    // over plain http there is nothing to pin, so fall back to the random device id.
+    const fingerprint = tls ? certFingerprint(tls.cert) : config.fingerprint;
+
     const deviceInfo = () => ({
         alias: config.alias,
         version: PROTOCOL_VERSION,
         deviceModel: DEVICE_MODEL,
         deviceType: DEVICE_TYPE,
-        fingerprint: config.fingerprint,
+        fingerprint,
         port: args.port,
         protocol,
         download: false,
     });
     const address = () => ({ ip: lanIp(), port: args.port, protocol });
 
-    const tls = args.tls ? getOrCreateCert(config) : null;
     const receiver = createReceiver({ config, deviceInfo, events, log, tls });
 
     receiver.server.on('error', err => {
@@ -81,10 +85,10 @@ async function main() {
     });
     receiver.server.listen(args.port, '0.0.0.0', () => log(`receiver on ${protocol}://${address().ip}:${args.port}`));
 
-    if (args.discovery) startDiscovery({ deviceInfo, port: args.port, events, log, fingerprint: config.fingerprint });
-    if (args.ui) startWebUi({ config, address, deviceInfo, events, receiver, log, uiPort: args.uiPort });
+    if (args.discovery) startDiscovery({ deviceInfo, port: args.port, events, log, fingerprint });
+    if (args.ui) startWebUi({ config, address, deviceInfo, events, receiver, log, uiPort: args.uiPort, fingerprint });
 
-    const ctx = { config, address };
+    const ctx = { config, address, fingerprint };
     const uri = pairingUri(ctx);
     log(`saving files to ${config.targetDir}`);
     log(`pair by scanning this qr (or enter ${address().ip}:${args.port} on the phone):`);

@@ -176,6 +176,7 @@ public class FileSyncPlugin extends Plugin {
             .putInt(SyncService.K_PORT, call.getInt("port", 53317))
             .putString(SyncService.K_PROTO, call.getString("protocol", "https"))
             .putString(SyncService.K_PIN, call.getString("pin", ""))
+            .putString(SyncService.K_FP, call.getString("fingerprint", ""))
             .putString(SyncService.K_SSID, call.getString("ssid", ""))
             .apply();
 
@@ -293,6 +294,7 @@ public class FileSyncPlugin extends Plugin {
         final int port = call.getInt("port", 53317);
         final String protocol = call.getString("protocol", "http");
         final String pin = call.getString("pin", "");
+        final String fingerprint = call.getString("fingerprint", "");
         final JSArray files = call.getArray("files");
         if (host == null || host.isEmpty() || files == null || files.length() == 0) {
             call.reject("host and files are required");
@@ -301,14 +303,14 @@ public class FileSyncPlugin extends Plugin {
         // network must not run on the main thread
         new Thread(() -> {
             try {
-                doSend(call, protocol, host, port, pin, files);
+                doSend(call, protocol, host, port, pin, fingerprint, files);
             } catch (Exception e) {
                 call.reject(e.getMessage() == null ? "send failed" : e.getMessage());
             }
         }, "filesync-send").start();
     }
 
-    private void doSend(PluginCall call, String protocol, String host, int port, String pin, JSArray files) throws Exception {
+    private void doSend(PluginCall call, String protocol, String host, int port, String pin, String fingerprint, JSArray files) throws Exception {
         // build file specs from what the ui gave us, then hand off to the shared client
         List<LocalSend.FileSpec> specs = new ArrayList<>();
         for (int i = 0; i < files.length(); i++) {
@@ -321,7 +323,7 @@ public class FileSyncPlugin extends Plugin {
         }
         JSONObject info = LocalSend.mobileInfo(deviceAlias(), fingerprint(), port, protocol);
         try {
-            int sent = LocalSend.send(getContext(), protocol, host, port, pin, info, specs, this::emitProgress);
+            int sent = LocalSend.send(getContext(), protocol, host, port, pin, fingerprint, info, specs, this::emitProgress);
             JSObject ret = new JSObject();
             ret.put("sent", sent);
             call.resolve(ret);

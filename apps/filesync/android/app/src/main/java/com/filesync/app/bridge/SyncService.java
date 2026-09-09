@@ -43,6 +43,7 @@ public class SyncService extends Service {
     public static final String K_PORT = "as_port";
     public static final String K_PROTO = "as_proto";
     public static final String K_PIN = "as_pin";
+    public static final String K_FP = "as_fp";
     public static final String K_SSID = "as_ssid";
     public static final String K_LAST = "as_last";
     public static final String ACTION_RUN_NOW = "com.filesync.app.RUN_NOW";
@@ -143,6 +144,7 @@ public class SyncService extends Service {
         int port = sp.getInt(K_PORT, 53317);
         String proto = sp.getString(K_PROTO, "https");
         String pin = sp.getString(K_PIN, "");
+        String fp = sp.getString(K_FP, "");
         long last = sp.getLong(K_LAST, 0);
 
         Uri tree = Uri.parse(treeStr);
@@ -177,7 +179,7 @@ public class SyncService extends Service {
 
         updateNotification(statusText("sende " + specs.size() + " Datei(en)…"));
         JSONObject info = LocalSend.mobileInfo(deviceAlias(), fingerprint(sp), 53317, "http");
-        LocalSend.send(getApplicationContext(), proto, host, port, pin, info, specs, null);
+        LocalSend.send(getApplicationContext(), proto, host, port, pin, fp, info, specs, null);
 
         sp.edit().putLong(K_LAST, newest).apply();
         updateNotification(statusText(specs.size() + " Datei(en) gesendet"));

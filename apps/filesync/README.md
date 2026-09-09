@@ -29,9 +29,8 @@ Arbeitsname/-ID vorläufig (`com.filesync.app`, "FileSync"), wird später zu
 - **Protokoll**: LocalSend v2 (Details in `PROTOCOL.md`), interoperabel mit
   bestehenden LocalSend-Apps.
 
-Später: Gegenrichtung Desktop→Handy, Zertifikats-Pinning per Fingerprint statt
-trust-all, rekursiver Ordner-Scan (Auto-Sync scannt v0 nur die oberste Ebene),
-QR-Scan am Handy.
+Später: Gegenrichtung Desktop→Handy, rekursiver Ordner-Scan (Auto-Sync scannt v0
+nur die oberste Ebene), QR-Scan am Handy.
 
 ## Desktop starten
 
@@ -70,8 +69,9 @@ cd android && ./gradlew assembleDebug
 ## Sicherheit (v0)
 
 Für das vertraute Heimnetz gedacht. Der Desktop nutzt ein selbst-signiertes
-Zertifikat, das der Client im LAN vertraut (trust-all — der Fingerprint wird noch
-nicht gepinnt). Eine optionale **PIN** am Empfänger schützt vor ungewolltem
-Senden; ohne gesetzte PIN kann bei „automatisch annehmen" jeder im selben Netz,
-der die Adresse kennt, senden. Nächste Härtung: Fingerprint-Pinning statt
-trust-all.
+Zertifikat. Wenn das Ziel über Discovery oder eine `filesync://`-Adresse gewählt
+wurde, **pinnt** der Client das Zertifikat gegen den Fingerprint (sha256) —
+MITM-Schutz. Nur bei manuell getippter IP ohne bekannten Fingerprint fällt er
+auf trust-all zurück. Eine optionale **PIN** am Empfänger schützt zusätzlich vor
+ungewolltem Senden; ohne PIN kann bei „automatisch annehmen" jeder im selben
+Netz, der die Adresse kennt, senden.

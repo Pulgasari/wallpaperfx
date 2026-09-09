@@ -88,6 +88,11 @@
         toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
     }
 
+    // fingerprint of the currently selected target (from a discovered device or a
+    // filesync:// uri). enables tls cert pinning. cleared when the host is edited
+    // by hand, since a typed ip has no known fingerprint to pin.
+    let targetFingerprint = '';
+
     // parse whatever the user typed: a filesync:// uri, an ip:port, or a bare host.
     function parseTarget() {
         let raw = $('host').value.trim();
@@ -101,14 +106,15 @@
                 if (u.port) port = parseInt(u.port, 10);
                 const pp = u.searchParams.get('protocol');
                 if (PROTOCOLS.includes(pp)) protocol = pp;
-                return { host, port, protocol };
+                const fp = u.searchParams.get('fingerprint') || targetFingerprint;
+                return { host, port, protocol, fingerprint: fp };
             } catch { return null; }
         }
         if (raw.includes(':') && !raw.includes(']')) {
             const [h, p] = raw.split(':');
             raw = h; if (p) port = parseInt(p, 10) || port;
         }
-        return { host: raw, port, protocol };
+        return { host: raw, port, protocol, fingerprint: targetFingerprint };
     }
 
     function rememberTarget(t) {
@@ -161,6 +167,7 @@
     function selectDevice(d) {
         $('host').value = d.ip;
         $('port').value = d.port || 53317;
+        targetFingerprint = d.fingerprint || ''; // enables cert pinning for this target
         if (PROTOCOLS.includes(d.protocol)) { state.protocol = d.protocol; save(); renderProtoSeg(); }
         updateSendable();
         toast('gewählt: ' + (d.alias || d.ip));
@@ -220,7 +227,8 @@
         try {
             await plugin.startAutoSync({
                 tree: autoState.tree, host: target.host, port: target.port,
-                protocol: target.protocol, pin: $('pin').value.trim(), ssid: $('ssid').value.trim(),
+                protocol: target.protocol, pin: $('pin').value.trim(),
+                fingerprint: target.fingerprint || '', ssid: $('ssid').value.trim(),
             });
             await refreshAutoState();
             toast('auto-sync aktiv');
@@ -280,7 +288,7 @@
         $('sendBtn').textContent = 'Sende…';
         $('progressFill').style.width = '0%';
         try {
-            await plugin.send({ host: target.host, port: target.port, protocol: target.protocol, pin, files: picked });
+            await plugin.send({ host: target.host, port: target.port, protocol: target.protocol, pin, fingerprint: target.fingerprint || '', files: picked });
             rememberTarget(target);
             toast(`${picked.length} datei(en) gesendet`);
             picked = []; renderFiles();
@@ -318,7 +326,12 @@
         $('folderBtn').addEventListener('click', pickFolder);
         $('autoToggle').addEventListener('click', toggleAutoSync);
         $('syncNowBtn').addEventListener('click', async () => { try { await plugin.syncNow(); toast('synchronisiere…'); } catch {} });
-        $('host').addEventListener('input', updateSendable);
+        $('host').addEventListener('input', () => {
+            // a hand-typed host has no known fingerprint to pin (unless it's a
+            // filesync:// uri, where parseTarget reads it from the uri itself).
+            if (!$('host').value.trim().startsWith('filesync://')) targetFingerprint = '';
+            updateSendable();
+        });
         try {
             const id = await plugin.getIdentity();
             if (id && id.alias) $('identity').textContent = 'dieses Gerät: ' + id.alias;

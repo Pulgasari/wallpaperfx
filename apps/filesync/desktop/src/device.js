@@ -4,8 +4,16 @@
 import { homedir, hostname } from 'node:os';
 import { join } from 'node:path';
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, X509Certificate, createHash } from 'node:crypto';
 import selfsigned from 'selfsigned';
+
+// sha256 of the cert's DER, lowercase hex. this is what a client pins against
+// (must match the android side: sha256 of cert.getEncoded()). derived from the
+// raw DER directly so the byte input is unambiguous.
+export function certFingerprint(certPem) {
+    const der = new X509Certificate(certPem).raw;
+    return createHash('sha256').update(der).digest('hex');
+}
 
 function configDir() {
     // honor XDG; fall back to ~/.config/filesync
