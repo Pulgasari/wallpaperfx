@@ -15,10 +15,14 @@ project under `apps/`:
   launcher UI is allowed to be a WebView, so unlike the wallpaper the whole
   home screen is the web layer; the native side is just the app-list/launch
   bridge. Its own notes live in `apps/launcher/CLAUDE.md`.
+- `apps/filesync/` — a lan file sender: an android app (Capacitor + native
+  `FileSync` plugin) sends files to a node **desktop** receiver
+  (`apps/filesync/desktop/`) over a LocalSend-v2 subset. This is a two-endpoint
+  pair, not a single app; the wire protocol is the invariant in
+  `apps/filesync/PROTOCOL.md`. Its own notes live in `apps/filesync/CLAUDE.md`.
 
-App names/ids are provisional (`com.wallpaperfx.app`, `com.launcher.app`);
-they get rebranded to `<brand> wallpapers` / `<brand> launcher` once a brand
-is chosen.
+App names/ids are provisional (`com.wallpaperfx.app`, `com.launcher.app`,
+`com.filesync.app`); they get rebranded to `<brand> …` once a brand is chosen.
 
 ## Layout invariant: apps are self-contained, not a workspace
 
@@ -28,6 +32,10 @@ root `package.json`/workspace: Capacitor's generated
 `android/capacitor.settings.gradle` references `../node_modules/@capacitor/...`
 relative to the app's `android/` dir, so npm hoisting would break the gradle
 build. Run `npm ci` / `npx cap sync android` / gradle from inside the app dir.
+
+`apps/filesync` additionally carries a `desktop/` node package (the receiver).
+It is its own self-contained package with its own `package.json`/lock and a
+separate CI job; it is not a capacitor/android build.
 
 ## Conventions
 
@@ -39,6 +47,8 @@ build. Run `npm ci` / `npx cap sync android` / gradle from inside the app dir.
 ## Build / verify
 
 No Android SDK is assumed locally — the source of truth for "does it build" is
-the `android build` GitHub Actions workflow, which matrix-builds every app in
-`apps/`. Locally, per app:
+the `android build` GitHub Actions workflow, which matrix-builds every android
+app in `apps/`. Locally, per app:
 `cd apps/<app> && npm install && npx cap sync android && (cd android && ./gradlew assembleDebug)`.
+The filesync desktop daemon is built/tested by the separate `desktop` workflow
+(node); locally `cd apps/filesync/desktop && npm install && npm test`.

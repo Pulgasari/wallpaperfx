@@ -1,0 +1,67 @@
+# FileSync
+
+Dateien vom Handy an den Desktop im Heimnetz schicken — LocalSend-kompatibel.
+Zwei Teile, gleicher JS-Stack wie der Rest:
+
+- **Handy (Sender)** — Android-App (Capacitor + natives `FileSync`-Plugin). Datei(en)
+  wählen, Ziel eingeben (oder QR/`filesync://`-Adresse der Desktop-App), senden.
+- **Desktop (Empfänger)** — Node-Daemon für Linux mit kleiner localhost-Web-UI.
+  Nimmt Dateien an und legt sie in einen Zielordner (Standard `~/FileSync`).
+
+Arbeitsname/-ID vorläufig (`com.filesync.app`, "FileSync"), wird später zu
+`<Brand> …`.
+
+## v0
+
+- Manuelles Pairing: Adresse (`ip:port`) am Handy eingeben; die Desktop-App zeigt
+  Adresse **und** QR. Zuletzt genutzte Ziele werden gemerkt.
+- Senden mit Fortschrittsanzeige, mehrere Dateien.
+- Empfänger: Zielordner + Gerätename einstellbar, automatisch annehmen (an/aus),
+  Empfangsverlauf, entdeckte Geräte.
+- Protokoll: LocalSend v2 (Details in `PROTOCOL.md`), d.h. interoperabel mit
+  bestehenden LocalSend-Apps.
+
+Später: mDNS-Auto-Discovery (Geräte finden sich selbst), Auto-Sync wenn beide im
+selben WLAN (Android-Foreground-Service), Gegenrichtung Desktop→Handy.
+
+## Desktop starten
+
+```bash
+cd apps/filesync/desktop
+npm install
+node src/index.js                 # https, speichert nach ~/FileSync
+# optionen:
+node src/index.js --dir ~/Inbox --alias "Wohnzimmer-PC"
+node src/index.js --http          # klartext-http (debugging im vertrauten lan)
+node src/index.js --help
+```
+
+Der Daemon druckt Adresse + QR und öffnet die Web-UI auf
+`http://127.0.0.1:53318`. Als systemd-user-service oder Autostart einrichtbar.
+
+Test: `npm test` (fährt echte prepare-upload/upload-Transfers gegen den Empfänger).
+
+## Handy-App bauen
+
+```bash
+cd apps/filesync
+npm install
+npx cap sync android
+cd android && ./gradlew assembleDebug
+# apk: android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+## Bedienung
+
+1. Desktop-Daemon starten, Adresse/QR ablesen.
+2. In der Handy-App die Adresse eintragen (oder `filesync://…` einfügen),
+   Protokoll (https/http) passend wählen.
+3. Dateien wählen → **Senden**. Sie landen im Zielordner des Desktops.
+
+## Sicherheit (v0)
+
+Für das vertraute Heimnetz gedacht. Der Desktop nutzt ein selbst-signiertes
+Zertifikat, das der Client im LAN vertraut (trust-all). Es gibt noch kein
+PIN/Pairing-Secret — jeder im selben Netz, der die Adresse kennt, kann senden
+(bei „automatisch annehmen" auch ohne Rückfrage). Ein Pairing-Token/PIN ist ein
+nächster Schritt.

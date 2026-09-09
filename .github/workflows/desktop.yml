@@ -1,0 +1,46 @@
+name: desktop
+
+# builds/tests the node desktop daemons (currently apps/filesync/desktop).
+# separate from the android matrix: these are plain node packages, no capacitor.
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "apps/*/desktop/**"
+      - ".github/workflows/desktop.yml"
+  pull_request:
+    paths:
+      - "apps/*/desktop/**"
+      - ".github/workflows/desktop.yml"
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        pkg: [filesync]
+    defaults:
+      run:
+        working-directory: apps/${{ matrix.pkg }}/desktop
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - name: setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: apps/${{ matrix.pkg }}/desktop/package-lock.json
+
+      - name: install deps
+        run: npm ci
+
+      - name: syntax check
+        run: npm run --silent check
+
+      - name: test
+        run: npm test

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- lan transfer talks to a desktop receiver by ip. localsend defaults to https
+     with a self-signed cert (trusted in code by fingerprint, not by a ca), but
+     the client also supports plain http on the trusted local network, so
+     cleartext must be permitted here. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

@@ -1,0 +1,27 @@
+{
+  "name": "filesync-desktop",
+  "version": "0.1.0",
+  "description": "localsend-compatible file receiver daemon for linux/desktop with a small local web ui",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "filesync-desktop": "src/index.js"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "check": "node --check src/index.js && node --check src/server.js && node --check src/discovery.js && node --check src/device.js && node --check src/webui.js",
+    "test": "node test/transfer.test.js"
+  },
+  "keywords": [
+    "localsend",
+    "file-transfer",
+    "lan",
+    "daemon"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "qrcode": "^1.5.4",
+    "selfsigned": "^2.4.1"
+  }
+}

@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        app: [wallpapers, launcher]
+        app: [wallpapers, launcher, filesync]
     defaults:
       run:
         working-directory: apps/${{ matrix.app }}
