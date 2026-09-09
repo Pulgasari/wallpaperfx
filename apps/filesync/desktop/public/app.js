@@ -31,6 +31,7 @@
             $('targetDir').value = s.config.targetDir;
             $('aliasInput').value = s.config.alias;
             $('autoAccept').checked = s.config.autoAccept;
+            $('pin').value = s.config.pin || '';
         }
 
         // pending requests (only meaningful when auto-accept is off)
@@ -60,7 +61,7 @@
     }
 
     function wire() {
-        ['targetDir', 'aliasInput'].forEach(id => {
+        ['targetDir', 'aliasInput', 'pin'].forEach(id => {
             $(id).addEventListener('focus', () => { editing = true; });
             $(id).addEventListener('blur', () => { editing = false; });
         });
@@ -70,6 +71,7 @@
                 targetDir: $('targetDir').value,
                 alias: $('aliasInput').value,
                 autoAccept: $('autoAccept').checked,
+                pin: $('pin').value,
             });
             $('saveMsg').textContent = 'gespeichert';
             setTimeout(() => { $('saveMsg').textContent = ''; }, 1500);

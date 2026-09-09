@@ -36,6 +36,7 @@ input[type=text], input[type=number] {
 }
 input:focus { outline: none; border-color: var(--accent); }
 .target-row2 { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.pin-input { flex: 0 0 auto; width: 140px; font-size: 14px; padding: 9px 11px; }
 
 .seg { display: inline-flex; gap: 4px; background: var(--bg); padding: 3px; border-radius: 10px; border: 1px solid var(--line); }
 .seg-btn { padding: 6px 14px; border: 0; border-radius: 8px; background: none; color: var(--muted); font-size: 13px; cursor: pointer; }

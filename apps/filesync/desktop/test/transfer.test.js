@@ -26,8 +26,9 @@ function start(config) {
     });
 }
 
-async function prepare(base, files, info = { alias: 'phone', fingerprint: 'p1' }) {
-    const r = await fetch(`${base}${API}/prepare-upload`, {
+async function prepare(base, files, info = { alias: 'phone', fingerprint: 'p1' }, pin) {
+    const q = pin != null ? `?pin=${encodeURIComponent(pin)}` : '';
+    const r = await fetch(`${base}${API}/prepare-upload${q}`, {
         method: 'POST', headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ info, files }),
     });
@@ -102,6 +103,27 @@ async function main() {
         assert.equal(up.status, 200, 'upload 200');
         assert.equal(readFileSync(join(dir, 'y.txt'), 'utf8'), 'yes', 'content matches');
         ok('auto-accept off + accept completes transfer');
+    }
+
+    // --- 5: pin gate ---
+    {
+        const dir = mkdtempSync(join(tmpdir(), 'fsx-'));
+        const { base } = await start({ targetDir: dir, autoAccept: true, pin: '2468' });
+        const data = Buffer.from('secret');
+        const files = { f1: { id: 'f1', fileName: 'p.txt', size: 6, fileType: 'text/plain' } };
+
+        const noPin = await prepare(base, files);
+        assert.equal(noPin.status, 401, 'missing pin 401');
+        const wrong = await prepare(base, files, undefined, '0000');
+        assert.equal(wrong.status, 401, 'wrong pin 401');
+        ok('pin gate rejects missing/wrong pin with 401');
+
+        const good = await prepare(base, files, undefined, '2468');
+        assert.equal(good.status, 200, 'correct pin 200');
+        const up = await upload(base, good.body.sessionId, 'f1', good.body.files.f1, data);
+        assert.equal(up.status, 200, 'upload 200');
+        assert.equal(readFileSync(join(dir, 'p.txt'), 'utf8'), 'secret', 'content matches');
+        ok('pin gate accepts correct pin and completes transfer');
     }
 
     console.log(`\n${passed} checks passed`);

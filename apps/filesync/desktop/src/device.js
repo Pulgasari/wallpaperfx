@@ -30,6 +30,7 @@ export function loadConfig() {
     cfg.fingerprint = cfg.fingerprint || randomBytes(20).toString('hex');
     cfg.targetDir = cfg.targetDir || defaultTargetDir();
     cfg.autoAccept = cfg.autoAccept !== undefined ? cfg.autoAccept : true;
+    cfg.pin = cfg.pin !== undefined ? String(cfg.pin) : ''; // empty = no pin required
     cfg._dir = dir;
     cfg._path = path;
     saveConfig(cfg);

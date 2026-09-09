@@ -138,6 +138,7 @@ public class FileSyncPlugin extends Plugin {
         final String host = call.getString("host");
         final int port = call.getInt("port", 53317);
         final String protocol = call.getString("protocol", "http");
+        final String pin = call.getString("pin", "");
         final JSArray files = call.getArray("files");
         if (host == null || host.isEmpty() || files == null || files.length() == 0) {
             call.reject("host and files are required");
@@ -146,14 +147,14 @@ public class FileSyncPlugin extends Plugin {
         // network must not run on the main thread
         new Thread(() -> {
             try {
-                doSend(call, protocol, host, port, files);
+                doSend(call, protocol, host, port, pin, files);
             } catch (Exception e) {
                 call.reject(e.getMessage() == null ? "send failed" : e.getMessage());
             }
         }, "filesync-send").start();
     }
 
-    private void doSend(PluginCall call, String protocol, String host, int port, JSArray files) throws Exception {
+    private void doSend(PluginCall call, String protocol, String host, int port, String pin, JSArray files) throws Exception {
         String base = protocol + "://" + host + ":" + port;
 
         // parse the file list the ui gave us; measure the total for progress
@@ -192,13 +193,18 @@ public class FileSyncPlugin extends Plugin {
         prepare.put("info", info);
         prepare.put("files", filesObj);
 
-        HttpURLConnection pc = open(base + API + "/prepare-upload", "POST", "application/json");
+        String prepareUrl = base + API + "/prepare-upload";
+        if (pin != null && !pin.isEmpty()) prepareUrl += "?pin=" + enc(pin);
+        HttpURLConnection pc = open(prepareUrl, "POST", "application/json");
         writeBytes(pc, prepare.toString().getBytes("UTF-8"));
         int pcode = pc.getResponseCode();
-        if (pcode == 403 || pcode == 204) { pc.disconnect(); call.reject("empfaenger hat abgelehnt"); return; }
-        if (pcode != 200) { pc.disconnect(); call.reject("prepare-upload fehlgeschlagen (" + pcode + ")"); return; }
-        JSONObject presp = new JSONObject(readBody(pc));
+        String prespBody = readBody(pc);
         pc.disconnect();
+        // 401 = the receiver wants a (correct) pin; surface it so the ui can prompt.
+        if (pcode == 401) { call.reject("pin", "PIN_REQUIRED"); return; }
+        if (pcode == 403 || pcode == 204) { call.reject("empfaenger hat abgelehnt"); return; }
+        if (pcode != 200) { call.reject("prepare-upload fehlgeschlagen (" + pcode + ")"); return; }
+        JSONObject presp = new JSONObject(prespBody);
         String sessionId = presp.getString("sessionId");
         JSONObject tokens = presp.getJSONObject("files");
 

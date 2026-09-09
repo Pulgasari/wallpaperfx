@@ -175,17 +175,23 @@
         const target = parseTarget();
         if (!target) { toast('ziel-adresse fehlt'); return; }
         if (!picked.length) return;
+        const pin = $('pin').value.trim();
         sending = true; updateSendable();
         $('sendBtn').textContent = 'Sende…';
         $('progressFill').style.width = '0%';
         try {
-            await plugin.send({ host: target.host, port: target.port, protocol: target.protocol, files: picked });
+            await plugin.send({ host: target.host, port: target.port, protocol: target.protocol, pin, files: picked });
             rememberTarget(target);
             toast(`${picked.length} datei(en) gesendet`);
             picked = []; renderFiles();
             $('progress').hidden = true;
         } catch (e) {
-            toast(e && e.message ? e.message : 'senden fehlgeschlagen');
+            if (e && (e.code === 'PIN_REQUIRED' || /(^|\b)pin\b/i.test(e.message || ''))) {
+                toast('PIN erforderlich oder falsch');
+                $('pin').focus();
+            } else {
+                toast(e && e.message ? e.message : 'senden fehlgeschlagen');
+            }
         } finally {
             sending = false; $('sendBtn').textContent = 'Senden'; updateSendable();
         }

@@ -53,7 +53,7 @@ export function startWebUi(ctx) {
             device: ctx.deviceInfo(),
             address: ctx.address(),
             fingerprint: ctx.config.fingerprint,
-            config: { alias: ctx.config.alias, targetDir: ctx.config.targetDir, autoAccept: ctx.config.autoAccept },
+            config: { alias: ctx.config.alias, targetDir: ctx.config.targetDir, autoAccept: ctx.config.autoAccept, pin: ctx.config.pin },
             pairingUri: pairingUri(ctx),
             qr: await QRCode.toDataURL(pairingUri(ctx), { margin: 1, width: 240 }),
             peers: [...ctx.receiver.peers.values()],
@@ -83,6 +83,7 @@ export function startWebUi(ctx) {
                 if (typeof body.alias === 'string' && body.alias.trim()) ctx.config.alias = body.alias.trim();
                 if (typeof body.targetDir === 'string' && body.targetDir.trim()) ctx.config.targetDir = body.targetDir.trim();
                 if (typeof body.autoAccept === 'boolean') ctx.config.autoAccept = body.autoAccept;
+                if (typeof body.pin === 'string') ctx.config.pin = body.pin.trim(); // empty clears the pin
                 saveConfig(ctx.config);
                 return json(res, 200, await state());
             }
