@@ -9,7 +9,8 @@
         const cap = window.Capacitor;
         if (cap && cap.Plugins && cap.Plugins.FileSync) return cap.Plugins.FileSync;
         // browser fallback: fake identity/pick, simulate a transfer with progress.
-        let cb = null;
+        const listeners = {};
+        const emit = (ev, data) => (listeners[ev] || []).forEach(fn => fn(data));
         return {
             async getIdentity() { return { alias: 'Browser', fingerprint: 'dev' }; },
             async pickFiles() {
@@ -18,7 +19,17 @@
                     { uri: 'mock://b', name: 'notiz.txt', size: 1200, mime: 'text/plain' },
                 ] };
             },
-            addListener(_ev, fn) { cb = fn; return { remove() { cb = null; } }; },
+            addListener(ev, fn) {
+                (listeners[ev] = listeners[ev] || []).push(fn);
+                return { remove() { listeners[ev] = (listeners[ev] || []).filter(f => f !== fn); } };
+            },
+            async startDiscovery() {
+                setTimeout(() => {
+                    emit('device', { alias: 'Wohnzimmer-PC', ip: '192.168.1.50', port: 53317, protocol: 'https', fingerprint: 'desk-1', deviceType: 'desktop' });
+                    emit('device', { alias: 'Laptop', ip: '192.168.1.77', port: 53317, protocol: 'https', fingerprint: 'desk-2', deviceType: 'desktop' });
+                }, 300);
+            },
+            async stopDiscovery() {},
             async send({ files }) {
                 const total = files.reduce((s, f) => s + Math.max(0, f.size), 0);
                 let sent = 0;
@@ -26,7 +37,7 @@
                     const t = Math.max(0, files[i].size);
                     for (let s = 0; s <= t; s += Math.max(1, Math.floor(t / 4))) {
                         sent = Math.min(total, sent + Math.max(1, Math.floor(t / 4)));
-                        cb && cb({ index: i, count: files.length, name: files[i].name, fileSent: Math.min(s, t), fileTotal: t, sent, total });
+                        emit('progress', { index: i, count: files.length, name: files[i].name, fileSent: Math.min(s, t), fileTotal: t, sent, total });
                         await new Promise(r => setTimeout(r, 120));
                     }
                 }
@@ -132,6 +143,39 @@
         }
     }
 
+    // discovered devices (multicast). keyed by fingerprint, newest info wins.
+    const devices = new Map();
+
+    function onDevice(d) {
+        if (!d || !d.ip) return;
+        devices.set(d.fingerprint || d.ip, d);
+        renderDevices();
+    }
+
+    function selectDevice(d) {
+        $('host').value = d.ip;
+        $('port').value = d.port || 53317;
+        if (PROTOCOLS.includes(d.protocol)) { state.protocol = d.protocol; save(); renderProtoSeg(); }
+        updateSendable();
+        toast('gewählt: ' + (d.alias || d.ip));
+    }
+
+    function renderDevices() {
+        const ul = $('deviceList');
+        const list = [...devices.values()];
+        $('devicesEmpty').hidden = list.length > 0;
+        ul.innerHTML = '';
+        for (const d of list) {
+            const li = document.createElement('li');
+            li.className = 'device-row';
+            li.innerHTML = `<div class="file-info"><b>${esc(d.alias || 'Gerät')}</b>` +
+                `<span class="muted small">${esc(d.ip)}:${d.port || 53317} · ${esc(d.protocol || 'http')}</span></div>` +
+                `<span class="pick-hint">wählen ›</span>`;
+            li.addEventListener('click', () => selectDevice(d));
+            ul.appendChild(li);
+        }
+    }
+
     function renderFiles() {
         const ul = $('fileList');
         ul.innerHTML = '';
@@ -199,18 +243,27 @@
 
     // ---- init ----
 
+    async function rescan() {
+        try { await plugin.startDiscovery(); toast('suche im netzwerk…'); }
+        catch (e) { toast('discovery nicht verfügbar'); }
+    }
+
     async function init() {
         renderProtoSeg();
         renderRecents();
+        renderDevices();
         renderFiles();
         plugin.addListener('progress', showProgress);
+        plugin.addListener('device', onDevice);
         $('pickBtn').addEventListener('click', pick);
         $('sendBtn').addEventListener('click', send);
+        $('rescanBtn').addEventListener('click', rescan);
         $('host').addEventListener('input', updateSendable);
         try {
             const id = await plugin.getIdentity();
             if (id && id.alias) $('identity').textContent = 'dieses Gerät: ' + id.alias;
         } catch {}
+        try { await plugin.startDiscovery(); } catch {}
         updateSendable();
     }
 

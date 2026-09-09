@@ -49,6 +49,8 @@ public class FileSyncPlugin extends Plugin {
     private static final String API = "/api/localsend/v2";
     private static final int BUF = 64 * 1024;
 
+    private Discovery discovery;
+
     // ---- identity (stable per install) ----
 
     @PluginMethod
@@ -72,6 +74,61 @@ public class FileSyncPlugin extends Plugin {
             sp.edit().putString("fingerprint", fp).apply();
         }
         return fp;
+    }
+
+    // our announce/info dto for discovery (the phone has no server, so port/
+    // protocol are placeholders that let a desktop reach back if it wants to).
+    private JSONObject announceInfo() {
+        try {
+            JSONObject o = new JSONObject();
+            o.put("alias", deviceAlias());
+            o.put("version", "2.1");
+            o.put("deviceModel", Build.MODEL);
+            o.put("deviceType", "mobile");
+            o.put("fingerprint", fingerprint());
+            o.put("port", 53317);
+            o.put("protocol", "http");
+            return o;
+        } catch (Exception e) {
+            return new JSONObject();
+        }
+    }
+
+    // ---- discovery ----
+
+    @PluginMethod
+    public void startDiscovery(PluginCall call) {
+        try {
+            if (discovery == null) {
+                discovery = new Discovery(getContext(), announceInfo(), fingerprint(), (info, ip) -> {
+                    JSObject o = new JSObject();
+                    o.put("alias", info.optString("alias", "unknown"));
+                    o.put("ip", ip);
+                    o.put("port", info.optInt("port", 53317));
+                    o.put("protocol", info.optString("protocol", "http"));
+                    o.put("fingerprint", info.optString("fingerprint", ""));
+                    o.put("deviceType", info.optString("deviceType", ""));
+                    notifyListeners("device", o);
+                });
+            }
+            discovery.start();
+            discovery.announce(); // re-announce so a "rescan" from the ui refreshes the list
+            call.resolve();
+        } catch (Exception e) {
+            call.reject(e.getMessage() == null ? "discovery failed" : e.getMessage());
+        }
+    }
+
+    @PluginMethod
+    public void stopDiscovery(PluginCall call) {
+        if (discovery != null) discovery.stop();
+        call.resolve();
+    }
+
+    @Override
+    protected void handleOnDestroy() {
+        if (discovery != null) discovery.stop();
+        super.handleOnDestroy();
     }
 
     // ---- file picking ----

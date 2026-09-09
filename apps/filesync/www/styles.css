@@ -53,6 +53,12 @@ input:focus { outline: none; border-color: var(--accent); }
     border: 1px solid var(--line); background: var(--bg); color: var(--fg); font-size: 13px; font-weight: 600; cursor: pointer;
 }
 
+.device-list { list-style: none; margin: 0; padding: 0; }
+.device-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 2px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.device-row:last-child { border-bottom: 0; }
+.device-row:active { background: rgba(255,255,255,0.05); }
+.pick-hint { color: var(--accent); font-size: 12px; font-weight: 600; }
+
 .file-list { list-style: none; margin: 0; padding: 0; }
 .file-list li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 2px; border-bottom: 1px solid var(--line); }
 .file-list li:last-child { border-bottom: 0; }
