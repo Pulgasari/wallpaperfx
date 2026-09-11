@@ -39,10 +39,20 @@
         pc.hidden = !s.pending.length;
         pl.innerHTML = s.pending.map(p => {
             const files = p.files.map(f => esc(f.name)).join(', ');
-            return `<li><div><b>${esc(p.sender)}</b><span class="muted"> ${esc(files)}</span></div>` +
+            const trust = p.senderFingerprint
+                ? `<label class="trust-check"><input type="checkbox" data-trust="${p.id}" /> künftig ohne Nachfrage annehmen</label>` : '';
+            return `<li><div><b>${esc(p.sender)}</b><span class="muted"> ${esc(files)}</span>${trust}</div>` +
                 `<div class="btns"><button data-accept="${p.id}">Annehmen</button>` +
                 `<button class="ghost" data-decline="${p.id}">Ablehnen</button></div></li>`;
         }).join('');
+
+        // trusted devices (persistent pairing)
+        const tl = $('trusted'), trusted = s.config.trustedDevices || [];
+        $('trustedEmpty').hidden = trusted.length > 0;
+        tl.innerHTML = trusted.map(d =>
+            `<li><div><b>${esc(d.alias || 'unknown')}</b>` +
+            `<span class="muted small mono"> ${esc((d.fingerprint || '').slice(0, 16))}…</span></div>` +
+            `<button class="ghost" data-untrust="${esc(d.fingerprint)}">Entfernen</button></li>`).join('');
 
         const hl = $('history');
         $('historyEmpty').hidden = s.history.length > 0;
@@ -80,8 +90,14 @@
         document.body.addEventListener('click', async e => {
             const acc = e.target.getAttribute('data-accept');
             const dec = e.target.getAttribute('data-decline');
-            if (acc) { await api('/ui/respond', { sessionId: acc, accept: true }); tick(); }
+            const unt = e.target.getAttribute('data-untrust');
+            if (acc) {
+                const cb = document.querySelector(`[data-trust="${acc}"]`);
+                await api('/ui/respond', { sessionId: acc, accept: true, trust: !!(cb && cb.checked) });
+                tick();
+            }
             if (dec) { await api('/ui/respond', { sessionId: dec, accept: false }); tick(); }
+            if (unt) { await api('/ui/untrust', { fingerprint: unt }); tick(); }
         });
     }
 

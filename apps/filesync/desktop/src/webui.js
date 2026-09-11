@@ -55,13 +55,23 @@ export function startWebUi(ctx) {
             device: ctx.deviceInfo(),
             address: ctx.address(),
             fingerprint: ctx.fingerprint || ctx.config.fingerprint,
-            config: { alias: ctx.config.alias, targetDir: ctx.config.targetDir, autoAccept: ctx.config.autoAccept, pin: ctx.config.pin },
+            config: { alias: ctx.config.alias, targetDir: ctx.config.targetDir, autoAccept: ctx.config.autoAccept, pin: ctx.config.pin, trustedDevices: ctx.config.trustedDevices || [] },
             pairingUri: pairingUri(ctx),
             qr: await QRCode.toDataURL(pairingUri(ctx), { margin: 1, width: 240 }),
             peers: [...ctx.receiver.peers.values()],
             pending,
             history,
         };
+    }
+
+    // persistent pairing: remember a sender's fingerprint so future transfers from
+    // it are auto-accepted (see server.js decide()).
+    function addTrusted(fingerprint, alias) {
+        const list = ctx.config.trustedDevices || (ctx.config.trustedDevices = []);
+        if (!list.some(d => d && d.fingerprint === fingerprint)) {
+            list.push({ fingerprint, alias: alias || 'unknown', at: Date.now() });
+            saveConfig(ctx.config);
+        }
     }
 
     async function serveStatic(res, pathname) {
@@ -91,10 +101,22 @@ export function startWebUi(ctx) {
             }
             if (req.method === 'POST' && url.pathname === '/ui/respond') {
                 const body = await readBody(req);
+                // capture the pending entry before responding (the 'session' event
+                // removes it once the receiver proceeds).
+                const entry = pending.find(p => p.id === body.sessionId);
+                if (body.accept && body.trust && entry && entry.senderFingerprint) {
+                    addTrusted(entry.senderFingerprint, entry.sender);
+                }
                 const ok = ctx.receiver.respond(body.sessionId, body.accept);
                 const i = pending.findIndex(p => p.id === body.sessionId);
                 if (i >= 0) pending.splice(i, 1);
                 return json(res, 200, { ok });
+            }
+            if (req.method === 'POST' && url.pathname === '/ui/untrust') {
+                const body = await readBody(req);
+                ctx.config.trustedDevices = (ctx.config.trustedDevices || []).filter(d => d && d.fingerprint !== body.fingerprint);
+                saveConfig(ctx.config);
+                return json(res, 200, await state());
             }
             return serveStatic(res, url.pathname);
         } catch (e) {

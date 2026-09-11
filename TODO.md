@@ -22,16 +22,16 @@ settings-options:
 
 Ich habe FileSync soeben getestet und konnte erfolgreich Dateien vom Smartphone an Desktop-PC schicken. Ich musste jedoch immer neu "bestätigen", als das scheint noch kein "dauerhaftes Pairing" (ich weiss den genauen/korrektenBegriff nicht).
 
-- [ ] "dauerhaftes Pairing" ermöglichen
-- [ ] fix: wenn der dateiname recht lang ist sprengt er das komplette layout -> muss umgebrochen werden (nicht gekürzt!!)
-- [ ] generell fände ich ne Art History nice, wo ich sehen kann, was gesendet wurde und obs erfolgreich war usw.
-  - [ ] Einträge einzeln löschbar
-  - [ ] alles löschbar
-  - [ ] History selbst aktivierbar/deaktivierbar
-- [ ] und ich glaube wir müssen auch noch machen, dass die app im hintergrund nich gekillt wird, wenn iwas läuft?
-- [ ] ich würde mal anfangen dass noch in abschnitte zu unterteilen (später vielleicht tabs aber das brauchs erstmal noch garnich). und die bisherigen panel bilden quasi den abschnitt "LocalSend".
-- [ ] neuer abschnitt: WebDAV
-- [ ] neuer abschnitt: Cloud (Haben die bekannten Cloud-Provider evtl. schon fertige APIs parat? Ich denke z.b. an nextcloud, mega, dropbox, google drive usw. ). also mir gehts dabeivorallem drum dass ich zb meinen ebook-folder auf smartphone mit folder bei cloud-provider automatisch syncen kann, im beide richtungen oder 2-wege/dings)
+- [x] "dauerhaftes Pairing" ermöglichen (desktop: vertraute geräte -> ohne nachfrage annehmen)
+- [x] fix: wenn der dateiname recht lang ist sprengt er das komplette layout -> muss umgebrochen werden (nicht gekürzt!!)
+- [x] generell fände ich ne Art History nice, wo ich sehen kann, was gesendet wurde und obs erfolgreich war usw.
+  - [x] Einträge einzeln löschbar
+  - [x] alles löschbar
+  - [x] History selbst aktivierbar/deaktivierbar
+- [x] und ich glaube wir müssen auch noch machen, dass die app im hintergrund nich gekillt wird, wenn iwas läuft? (foreground-service während dem senden)
+- [x] ich würde mal anfangen dass noch in abschnitte zu unterteilen (später vielleicht tabs aber das brauchs erstmal noch garnich). und die bisherigen panel bilden quasi den abschnitt "LocalSend".
+- [ ] neuer abschnitt: WebDAV (platzhalter-abschnitt angelegt; umsetzung offen -> siehe vorschlag im chat)
+- [ ] neuer abschnitt: Cloud (platzhalter-abschnitt angelegt; braucht anbieter-auswahl + oauth -> siehe vorschlag im chat) (Haben die bekannten Cloud-Provider evtl. schon fertige APIs parat? Ich denke z.b. an nextcloud, mega, dropbox, google drive usw. ). also mir gehts dabeivorallem drum dass ich zb meinen ebook-folder auf smartphone mit folder bei cloud-provider automatisch syncen kann, im beide richtungen oder 2-wege/dings)
 
 da ich mich hier thematisch nicht so megagut auskenne, kannst du mir auch gerne mal noch features und teiö-aspekte vorschlagen, die sinnvoll/nützlich/üblich sind, ich aber noch gar nich aufm schirm habe. ich bilde mir auch ein im verlauf erwähntest du auch mal irgendwie QR-Codes und fingerprint.
 

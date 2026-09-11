@@ -28,6 +28,12 @@
             android:name=".bridge.SyncService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
+
+        <!-- keep-alive: foreground service running for the duration of a manual send -->
+        <service
+            android:name=".bridge.TransferService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
     </application>
 
     <!-- lan file transfer: talk to the desktop receiver over the local network -->

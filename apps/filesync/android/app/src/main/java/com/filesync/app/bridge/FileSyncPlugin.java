@@ -300,12 +300,18 @@ public class FileSyncPlugin extends Plugin {
             call.reject("host and files are required");
             return;
         }
+        // keep the process alive for the duration: a foreground service raises the
+        // priority so android does not kill the app (and this upload) if the user
+        // backgrounds it mid-transfer. the upload still runs on the worker thread.
+        TransferService.start(getContext(), "Dateien werden gesendet…");
         // network must not run on the main thread
         new Thread(() -> {
             try {
                 doSend(call, protocol, host, port, pin, fingerprint, files);
             } catch (Exception e) {
                 call.reject(e.getMessage() == null ? "send failed" : e.getMessage());
+            } finally {
+                TransferService.stop(getContext());
             }
         }, "filesync-send").start();
     }
