@@ -20,6 +20,14 @@ settings-options:
 
 ## Filesync
 
+Ich habe FileSync soeben getestet und konnte erfolgreich Dateien vom Smartphone an Desktop-PC schicken. Ich musste jedoch immer neu "bestätigen", als das scheint noch kein "dauerhaftes Pairing" (ich weiss den genauen/korrektenBegriff nicht).
+
+- [ ] "dauerhaftes Pairing" ermöglichen
+- [ ] fix: wenn der dateiname recht lang ist sprengt er das komplette layout -> muss umgebrochen werden (nicht gekürzt!!)
+- [ ] ich würde mal anfangen dass noch in abschnitte zu unterteilen (später vielleicht tabs aber das brauchs erstmal noch garnich).undda bisherigw ist quasi der abschnitt "LocalSend".
+- [ ] neuer abschnitt: WebDAV
+- [ ] neuer abschnitt: cloud
+
 ## Launcher
 
 - [x] fix: das is alles zu sensibel. selbst wenn man nur scrollt und irgendwas berührt, wirddas sofort gestartet/getriggert
@@ -37,3 +45,7 @@ settings-options:
 - [x] gesamthintergrund einstellbar: farbe, transparenz (sodass zb der wallpapers-bg durchscheinen könnte oder whatever) oder kann man nich sogar den bg live abgreifen direkt?
 
 ## Wallpapers
+
+---
+
+# Sonstiges
