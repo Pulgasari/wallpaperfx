@@ -14,5 +14,7 @@
 - [ ] add toggle: show appname
 - [ ] add toggle: uppercase appname
 - [ ] add toggle: cut appname (or multiline)
+- [ ] feld für custom-css
+- [ ] gesamthintergrund einstellbar: farbe, transparenz (sodass zb der wallpapers-bg durchscheinen könnte oder whatever) oder kann man nich sogar den bg live abgreifen direkt?
 
 ## Wallpapers
