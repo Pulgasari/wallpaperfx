@@ -33,6 +33,8 @@ Ich habe FileSync soeben getestet und konnte erfolgreich Dateien vom Smartphone 
 - [ ] neuer abschnitt: WebDAV
 - [ ] neuer abschnitt: Cloud (Haben die bekannten Cloud-Provider evtl. schon fertige APIs parat? Ich denke z.b. an nextcloud, mega, dropbox, google drive usw. ). also mir gehts dabeivorallem drum dass ich zb meinen ebook-folder auf smartphone mit folder bei cloud-provider automatisch syncen kann, im beide richtungen oder 2-wege/dings)
 
+da ich mich hier thematisch nicht so megagut auskenne, kannst du mir auch gerne mal noch features und teiö-aspekte vorschlagen, die sinnvoll/nützlich/üblich sind, ich aber noch gar nich aufm schirm habe. ich bilde mir auch ein im verlauf erwähntest du auch mal irgendwie QR-Codes und fingerprint.
+
 
 ## Launcher
 
