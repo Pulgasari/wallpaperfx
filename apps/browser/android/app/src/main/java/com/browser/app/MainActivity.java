@@ -20,6 +20,7 @@ public class MainActivity extends BridgeActivity {
     private FrameLayout contentContainer;
     private WebView chrome;
     private int collapsedPx;
+    private int dockGravity = Gravity.BOTTOM; // dock strip anchor (top or bottom)
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -39,19 +40,32 @@ public class MainActivity extends BridgeActivity {
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
         root.addView(chrome, new FrameLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, collapsedPx, Gravity.BOTTOM));
+            ViewGroup.LayoutParams.MATCH_PARENT, collapsedPx, dockGravity));
 
         setContentView(root);
     }
 
     public FrameLayout getContentContainer() { return contentContainer; }
 
-    // fullscreen (modal panels) vs bottom strip (just the pill + triggers).
+    private boolean chromeExpanded = false;
+
+    // fullscreen (modal panels) vs a strip (just the dock) anchored top or bottom.
     public void setChromeExpanded(boolean expanded) {
+        chromeExpanded = expanded;
         runOnUiThread(() -> {
             FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) chrome.getLayoutParams();
             lp.height = expanded ? ViewGroup.LayoutParams.MATCH_PARENT : collapsedPx;
-            lp.gravity = Gravity.BOTTOM;
+            lp.gravity = dockGravity;
+            chrome.setLayoutParams(lp);
+        });
+    }
+
+    // move the collapsed dock strip to the top or bottom of the screen.
+    public void setDockPosition(boolean top) {
+        dockGravity = top ? Gravity.TOP : Gravity.BOTTOM;
+        runOnUiThread(() -> {
+            FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) chrome.getLayoutParams();
+            lp.gravity = dockGravity;
             chrome.setLayoutParams(lp);
         });
     }
