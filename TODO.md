@@ -62,3 +62,4 @@ Nur ein paar konzeptuelle Fragen: also nicht bauen, sondern mir benatworten bzw 
 
 - [ ] Wie läuft das eigtl. aktuell und generell mit der Mehrsprachigkeit? Ist das alles hartkodiert Deutsch oder gibts schon irgendwelche Sprachvariablen? Oder/und wie läuft das generell bei Android-Apps?
 - [ ] Selbiges Frag ich mich zb auch bzgl. Themes, Icons, Fonts usw.
+- [ ] und insbesondere für gesten
