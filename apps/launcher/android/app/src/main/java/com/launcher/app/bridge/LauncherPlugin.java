@@ -72,4 +72,18 @@ public class LauncherPlugin extends Plugin {
         getContext().startActivity(launch);
         call.resolve();
     }
+
+    // toggle FLAG_SHOW_WALLPAPER so a translucent page background lets the system
+    // wallpaper show behind the launcher (the window + webview are transparent, set
+    // in MainActivity). used when the ui's background opacity is < 1.
+    @PluginMethod
+    public void setShowWallpaper(PluginCall call) {
+        final boolean show = call.getBoolean("show", false);
+        getActivity().runOnUiThread(() -> {
+            android.view.Window w = getActivity().getWindow();
+            if (show) w.addFlags(android.view.WindowManager.LayoutParams.FLAG_SHOW_WALLPAPER);
+            else w.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SHOW_WALLPAPER);
+        });
+        call.resolve();
+    }
 }
