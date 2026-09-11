@@ -26,7 +26,7 @@ Ich habe FileSync soeben getestet und konnte erfolgreich Dateien vom Smartphone 
 - [ ] fix: wenn der dateiname recht lang ist sprengt er das komplette layout -> muss umgebrochen werden (nicht gekürzt!!)
 - [ ] ich würde mal anfangen dass noch in abschnitte zu unterteilen (später vielleicht tabs aber das brauchs erstmal noch garnich).undda bisherigw ist quasi der abschnitt "LocalSend".
 - [ ] neuer abschnitt: WebDAV
-- [ ] neuer abschnitt: cloud
+- [ ] neuer abschnitt: Cloud (Haben die bekannten Cloud-Provider evtl. schon fertige APIs parat? Ich denke z.b. an nextcloud, mega, dropbox, google drive usw. ). also mir gehts dabeivorallem drum dass ich zb meinen ebook-folder auf smartphone mit folder bei cloud-provider automatisch syncen kann, im beide richtungen oder 2-wege/dings)
 
 ## Launcher
 
