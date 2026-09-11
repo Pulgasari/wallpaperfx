@@ -3,6 +3,10 @@
 ## Browser
 - [ ] add to dock: settings
 - [ ] add to dock: userscripts (violentmonkey oder sowas)
+- settings-options:
+  - [ ] colors: bg / fg / accent
+  - [ ] position dock: top : bottom
+  - [ ] position lade-anzeiger: top | bottom
 
 ## Filesync
 
