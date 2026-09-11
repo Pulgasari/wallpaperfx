@@ -2,17 +2,22 @@
 
 ## Browser
 
-- [ ] add to dock: settings
-- [ ] add to dock: userscripts (violentmonkey oder sowas)
+- [ ] add button to dock: dev-tools
+- [ ] add button to dock: userscripts (violentmonkey o.ä.)
+- [ ] add button to dock: search in page
+- [ ] add button to dock: settings
 
 settings-options:
   - [ ] colors: bg / fg / accent
   - [ ] position dock: top : bottom
   - [ ] position lade-anzeiger: top | bottom
+  - [ ] reihenfolge der dock-elemente
+  - [ ] toggle on/off der einzelnen dock-elemente
 
 ## Filesync
 
 ## Launcher
+
 - [ ] fix: das is alles zu sensibel. selbst wenn man nur scrollt und irgendwas berührt, wirddas sofort gestartet/getriggert
 - [ ] fix: wenn das settings-panel angezeigt wird, sollt kein blur-effekt das app-grid überlagern, weil man so ja nix chillig einstellen kann
 - [ ] raster-größe sollte bis 10 gehen
