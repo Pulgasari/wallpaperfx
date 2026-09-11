@@ -1,5 +1,7 @@
 # TODO
 
+- [ ] die apps haben/zeigen aktuell nur das default capacitor icon. die sollten alle n eigenes icon bekommen. für den anfang würde jeweils einfach n dicker anfangsbuchstabe reichen also: B, FS, L, WP
+
 ## Browser
 
 - [ ] add button to dock: dev-tools
@@ -13,6 +15,8 @@ settings-options:
   - [ ] position lade-anzeiger: top | bottom
   - [ ] reihenfolge der dock-elemente
   - [ ] toggle on/off der einzelnen dock-elemente
+  - [ ] size der dock-elemeente
+  - [ ] gap zwischenden dock-elementen
 
 ## Filesync
 
