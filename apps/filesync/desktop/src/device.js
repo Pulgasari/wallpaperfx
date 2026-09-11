@@ -39,6 +39,9 @@ export function loadConfig() {
     cfg.targetDir = cfg.targetDir || defaultTargetDir();
     cfg.autoAccept = cfg.autoAccept !== undefined ? cfg.autoAccept : true;
     cfg.pin = cfg.pin !== undefined ? String(cfg.pin) : ''; // empty = no pin required
+    // persistent pairing: senders whose fingerprint is listed here are accepted
+    // without a prompt even when autoAccept is off. entries: {fingerprint, alias, at}.
+    cfg.trustedDevices = Array.isArray(cfg.trustedDevices) ? cfg.trustedDevices : [];
     cfg._dir = dir;
     cfg._path = path;
     saveConfig(cfg);

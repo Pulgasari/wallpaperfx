@@ -17,69 +17,140 @@
 </header>
 
 <main class="wrap">
-    <!-- ===== target (manual pairing) ===== -->
-    <section class="card">
-        <h2>Ziel (Desktop)</h2>
-        <div class="target-row">
-            <input id="host" type="text" inputmode="url" autocapitalize="off" autocomplete="off"
-                   spellcheck="false" placeholder="192.168.x.x  oder  filesync://…" />
-            <input id="port" type="number" inputmode="numeric" value="53317" aria-label="Port" />
+    <!-- ===================== section: LocalSend ===================== -->
+    <section id="secLocalsend" class="section" data-sec="localsend">
+        <button class="section-head" type="button" data-toggle="localsend">
+            LocalSend <span class="chev">▾</span>
+        </button>
+        <div class="section-body">
+            <!-- ===== target (manual pairing) ===== -->
+            <section class="card">
+                <h2>Ziel (Desktop)</h2>
+                <div class="target-row">
+                    <input id="host" type="text" inputmode="url" autocapitalize="off" autocomplete="off"
+                           spellcheck="false" placeholder="192.168.x.x  oder  filesync://…" />
+                    <input id="port" type="number" inputmode="numeric" value="53317" aria-label="Port" />
+                </div>
+                <div class="target-row2">
+                    <div id="protoSeg" class="seg" role="group" aria-label="Protokoll"></div>
+                    <input id="pin" type="text" inputmode="numeric" autocomplete="off" spellcheck="false"
+                           class="pin-input" placeholder="PIN (optional)" aria-label="PIN" />
+                </div>
+                <div id="recents" class="recents"></div>
+            </section>
+
+            <!-- ===== discovered devices ===== -->
+            <section class="card">
+                <div class="card-head">
+                    <h2>Geräte im Netz</h2>
+                    <button id="rescanBtn" class="chip">Suchen</button>
+                </div>
+                <ul id="deviceList" class="device-list"></ul>
+                <p id="devicesEmpty" class="muted small">keine Geräte gefunden — Adresse oben manuell eingeben</p>
+            </section>
+
+            <!-- ===== files ===== -->
+            <section class="card">
+                <div class="card-head">
+                    <h2>Dateien</h2>
+                    <button id="pickBtn" class="chip">+ Dateien wählen</button>
+                </div>
+                <ul id="fileList" class="file-list"></ul>
+                <p id="filesEmpty" class="muted">keine dateien gewählt</p>
+            </section>
+
+            <!-- ===== auto-sync ===== -->
+            <section class="card">
+                <div class="card-head">
+                    <h2>Auto-Sync (WLAN)</h2>
+                    <span id="autoStatus" class="muted small">aus</span>
+                </div>
+                <button id="folderBtn" class="chip">Ordner wählen</button>
+                <label class="ssid-row">
+                    <span class="muted small">Nur in diesem WLAN (optional)</span>
+                    <input id="ssid" type="text" autocapitalize="off" autocomplete="off" spellcheck="false" placeholder="SSID (leer = jedes WLAN)" />
+                </label>
+                <p class="muted small">Neue Dateien im Ordner werden im WLAN automatisch an das oben gewählte Ziel gesendet.</p>
+                <div class="auto-actions">
+                    <button id="autoToggle" class="chip">Aktivieren</button>
+                    <button id="syncNowBtn" class="chip" hidden>Jetzt synchronisieren</button>
+                </div>
+            </section>
         </div>
-        <div class="target-row2">
-            <div id="protoSeg" class="seg" role="group" aria-label="Protokoll"></div>
-            <input id="pin" type="text" inputmode="numeric" autocomplete="off" spellcheck="false"
-                   class="pin-input" placeholder="PIN (optional)" aria-label="PIN" />
-        </div>
-        <div id="recents" class="recents"></div>
     </section>
 
-    <!-- ===== discovered devices ===== -->
-    <section class="card">
-        <div class="card-head">
-            <h2>Geräte im Netz</h2>
-            <button id="rescanBtn" class="chip">Suchen</button>
-        </div>
-        <ul id="deviceList" class="device-list"></ul>
-        <p id="devicesEmpty" class="muted small">keine Geräte gefunden — Adresse oben manuell eingeben</p>
-    </section>
-
-    <!-- ===== files ===== -->
-    <section class="card">
-        <div class="card-head">
-            <h2>Dateien</h2>
-            <button id="pickBtn" class="chip">+ Dateien wählen</button>
-        </div>
-        <ul id="fileList" class="file-list"></ul>
-        <p id="filesEmpty" class="muted">keine dateien gewählt</p>
-    </section>
-
-    <!-- ===== auto-sync ===== -->
-    <section class="card">
-        <div class="card-head">
-            <h2>Auto-Sync (WLAN)</h2>
-            <span id="autoStatus" class="muted small">aus</span>
-        </div>
-        <button id="folderBtn" class="chip">Ordner wählen</button>
-        <label class="ssid-row">
-            <span class="muted small">Nur in diesem WLAN (optional)</span>
-            <input id="ssid" type="text" autocapitalize="off" autocomplete="off" spellcheck="false" placeholder="SSID (leer = jedes WLAN)" />
-        </label>
-        <p class="muted small">Neue Dateien im Ordner werden im WLAN automatisch an das oben gewählte Ziel gesendet.</p>
-        <div class="auto-actions">
-            <button id="autoToggle" class="chip">Aktivieren</button>
-            <button id="syncNowBtn" class="chip" hidden>Jetzt synchronisieren</button>
+    <!-- ===================== section: Verlauf (history) ===================== -->
+    <section id="secHistory" class="section" data-sec="history">
+        <button class="section-head" type="button" data-toggle="history">
+            Verlauf <span class="chev">▾</span>
+        </button>
+        <div class="section-body">
+            <section class="card">
+                <div class="card-head">
+                    <h2>Gesendet</h2>
+                    <button id="historyClear" class="chip">Alles löschen</button>
+                </div>
+                <label class="switch-row">
+                    <span class="muted small">Verlauf aufzeichnen</span>
+                    <input id="historyEnabled" type="checkbox" />
+                </label>
+                <ul id="historyList" class="history-list"></ul>
+                <p id="historyEmpty" class="muted">noch nichts gesendet</p>
+            </section>
         </div>
     </section>
 
-    <!-- ===== send ===== -->
-    <section class="send-area">
-        <div id="progress" class="progress" hidden>
-            <div class="progress-bar"><div id="progressFill" class="progress-fill"></div></div>
-            <p id="progressText" class="muted small"></p>
+    <!-- ===================== section: WebDAV (planned) ===================== -->
+    <section id="secWebdav" class="section collapsed" data-sec="webdav">
+        <button class="section-head" type="button" data-toggle="webdav">
+            WebDAV <span class="section-badge">geplant</span> <span class="chev">▾</span>
+        </button>
+        <div class="section-body">
+            <section class="card">
+                <div class="placeholder">
+                    <p class="muted small">Direkt auf einen WebDAV-Server hoch-/runterladen und Ordner
+                        zweiseitig abgleichen (auch Nextcloud, das intern WebDAV spricht).</p>
+                </div>
+                <div class="field-list" aria-hidden="true">
+                    <label><span class="muted small">Server-URL</span>
+                        <input id="wdUrl" type="text" inputmode="url" autocapitalize="off" autocomplete="off"
+                               spellcheck="false" placeholder="https://cloud.example.com/remote.php/dav" disabled /></label>
+                    <label><span class="muted small">Benutzer</span>
+                        <input id="wdUser" type="text" autocapitalize="off" autocomplete="off" spellcheck="false" placeholder="benutzername" disabled /></label>
+                    <label><span class="muted small">Ordner (remote)</span>
+                        <input id="wdPath" type="text" autocapitalize="off" autocomplete="off" spellcheck="false" placeholder="/Ebooks" disabled /></label>
+                </div>
+                <p class="muted small">Noch nicht aktiv — Umsetzung folgt.</p>
+            </section>
         </div>
-        <button id="sendBtn" class="send-btn" disabled>Senden</button>
+    </section>
+
+    <!-- ===================== section: Cloud (planned) ===================== -->
+    <section id="secCloud" class="section collapsed" data-sec="cloud">
+        <button class="section-head" type="button" data-toggle="cloud">
+            Cloud <span class="section-badge">geplant</span> <span class="chev">▾</span>
+        </button>
+        <div class="section-body">
+            <section class="card">
+                <div class="placeholder">
+                    <p class="muted small">Ordner mit Cloud-Anbietern zweiseitig synchronisieren
+                        (z.B. Ebook-Ordner). Nextcloud/ownCloud laufen über den WebDAV-Abschnitt;
+                        Dropbox, Google&nbsp;Drive und MEGA brauchen je eine App-Registrierung (OAuth).</p>
+                </div>
+                <p class="muted small">Noch nicht aktiv — Auswahl der Anbieter folgt.</p>
+            </section>
+        </div>
     </section>
 </main>
+
+<!-- ===== send (LocalSend) ===== -->
+<section class="send-area">
+    <div id="progress" class="progress" hidden>
+        <div class="progress-bar"><div id="progressFill" class="progress-fill"></div></div>
+        <p id="progressText" class="muted small"></p>
+    </div>
+    <button id="sendBtn" class="send-btn" disabled>Senden</button>
+</section>
 
 <script src="app.js"></script>
 </body>

@@ -126,6 +126,29 @@ async function main() {
         ok('pin gate accepts correct pin and completes transfer');
     }
 
+    // --- 6: persistent pairing -> a trusted device skips the prompt (autoAccept off) ---
+    {
+        const dir = mkdtempSync(join(tmpdir(), 'fsx-'));
+        const { base, events } = await start({ targetDir: dir, autoAccept: false, trustedDevices: [{ fingerprint: 'trusted-1' }] });
+        // no 'pending' handler on purpose: a trusted sender must not be held for approval
+        events.on('pending', () => { throw new Error('trusted device should not require approval'); });
+        const data = Buffer.from('trusted');
+        const files = { f1: { id: 'f1', fileName: 't.txt', size: 7, fileType: 'text/plain' } };
+        const prep = await prepare(base, files, { alias: 'phone', fingerprint: 'trusted-1' });
+        assert.equal(prep.status, 200, 'trusted device prepare-upload 200');
+        const up = await upload(base, prep.body.sessionId, 'f1', prep.body.files.f1, data);
+        assert.equal(up.status, 200, 'upload 200');
+        assert.equal(readFileSync(join(dir, 't.txt'), 'utf8'), 'trusted', 'content matches');
+        ok('trusted device auto-accepts with autoAccept off');
+
+        // an unknown device with the same config is still held (and here declined)
+        const { base: base2, receiver: rec2, events: ev2 } = await start({ targetDir: dir, autoAccept: false, trustedDevices: [{ fingerprint: 'trusted-1' }] });
+        ev2.on('pending', s => setTimeout(() => rec2.respond(s.id, false), 10));
+        const prep2 = await prepare(base2, files, { alias: 'stranger', fingerprint: 'other-9' });
+        assert.equal(prep2.status, 403, 'untrusted device still prompts (declined -> 403)');
+        ok('untrusted device is still gated');
+    }
+
     console.log(`\n${passed} checks passed`);
     process.exit(0);
 }

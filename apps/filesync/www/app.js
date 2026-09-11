@@ -55,6 +55,7 @@
     const plugin = getPlugin();
     const PROTOCOLS = ['https', 'http'];
     const STORE_KEY = 'filesync';
+    const HISTORY_MAX = 200;
 
     const $ = id => document.getElementById(id);
     let picked = [];
@@ -64,8 +65,14 @@
     function load() {
         try {
             const s = JSON.parse(localStorage.getItem(STORE_KEY) || '{}');
-            return { targets: Array.isArray(s.targets) ? s.targets : [], protocol: PROTOCOLS.includes(s.protocol) ? s.protocol : 'https' };
-        } catch { return { targets: [], protocol: 'https' }; }
+            return {
+                targets: Array.isArray(s.targets) ? s.targets : [],
+                protocol: PROTOCOLS.includes(s.protocol) ? s.protocol : 'https',
+                history: Array.isArray(s.history) ? s.history : [],
+                historyEnabled: s.historyEnabled !== false, // default on
+                sections: (s.sections && typeof s.sections === 'object') ? s.sections : {},
+            };
+        } catch { return { targets: [], protocol: 'https', history: [], historyEnabled: true, sections: {} }; }
     }
     function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch {} }
 
@@ -259,6 +266,65 @@
         $('sendBtn').disabled = sending || picked.length === 0 || !$('host').value.trim();
     }
 
+    // ---- history (sent files, chrome-side; the native send has no record) ----
+
+    function recordHistory(entry) {
+        if (!state.historyEnabled) return;
+        state.history.unshift(entry);
+        if (state.history.length > HISTORY_MAX) state.history.length = HISTORY_MAX;
+        save();
+        renderHistory();
+    }
+
+    function renderHistory() {
+        $('historyEnabled').checked = state.historyEnabled;
+        const ul = $('historyList');
+        $('historyEmpty').hidden = state.history.length > 0;
+        ul.innerHTML = '';
+        state.history.forEach((h, i) => {
+            const li = document.createElement('li');
+            const names = Array.isArray(h.names) ? h.names.join(', ') : (h.name || '');
+            const when = h.at ? new Date(h.at).toLocaleString() : '';
+            const status = h.ok ? '<span class="hist-status ok">ok</span>' : '<span class="hist-status fail">fehler</span>';
+            li.innerHTML = `<div class="hist-info"><b>${esc(names)}</b>` +
+                `<span class="hist-meta muted small">${status}` +
+                `<span>→ ${esc(h.target || '')}</span>` +
+                (h.size ? `<span>· ${fmtSize(h.size)}</span>` : '') +
+                `<span>· ${esc(when)}</span></span>` +
+                (h.ok ? '' : `<span class="muted small">${esc(h.error || '')}</span>`) +
+                `</div>`;
+            const rm = document.createElement('button');
+            rm.className = 'icon-btn'; rm.setAttribute('aria-label', 'Eintrag löschen'); rm.textContent = '×';
+            rm.addEventListener('click', () => { state.history.splice(i, 1); save(); renderHistory(); });
+            li.appendChild(rm);
+            ul.appendChild(li);
+        });
+    }
+
+    // ---- collapsible sections (persisted open/closed) ----
+
+    function applySections() {
+        document.querySelectorAll('.section').forEach(sec => {
+            const key = sec.getAttribute('data-sec');
+            const v = state.sections[key];
+            if (v === true) sec.classList.add('collapsed');
+            else if (v === false) sec.classList.remove('collapsed');
+            // undefined -> keep the html default
+        });
+    }
+
+    function wireSections() {
+        document.querySelectorAll('.section-head[data-toggle]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const sec = btn.closest('.section');
+                const key = btn.getAttribute('data-toggle');
+                const collapsed = sec.classList.toggle('collapsed');
+                state.sections[key] = collapsed;
+                save();
+            });
+        });
+    }
+
     // ---- actions ----
 
     async function pick() {
@@ -279,26 +345,36 @@
         $('progressText').textContent = `${p.name} (${p.index + 1}/${p.count}) · ${pct}%`;
     }
 
+    const histId = () => Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+
     async function send() {
         const target = parseTarget();
         if (!target) { toast('ziel-adresse fehlt'); return; }
         if (!picked.length) return;
         const pin = $('pin').value.trim();
+        // snapshot for the history entry (picked is cleared on success)
+        const names = picked.map(f => f.name);
+        const size = picked.reduce((s, f) => s + Math.max(0, f.size), 0);
+        const targetLabel = target.host + ':' + target.port;
         sending = true; updateSendable();
         $('sendBtn').textContent = 'Sende…';
         $('progressFill').style.width = '0%';
         try {
             await plugin.send({ host: target.host, port: target.port, protocol: target.protocol, pin, fingerprint: target.fingerprint || '', files: picked });
             rememberTarget(target);
-            toast(`${picked.length} datei(en) gesendet`);
+            recordHistory({ id: histId(), at: Date.now(), names, count: names.length, size, target: targetLabel, ok: true });
+            toast(`${names.length} datei(en) gesendet`);
             picked = []; renderFiles();
             $('progress').hidden = true;
         } catch (e) {
             if (e && (e.code === 'PIN_REQUIRED' || /(^|\b)pin\b/i.test(e.message || ''))) {
+                // mid-flow prompt, not a final outcome -> do not record it
                 toast('PIN erforderlich oder falsch');
                 $('pin').focus();
             } else {
-                toast(e && e.message ? e.message : 'senden fehlgeschlagen');
+                const msg = e && e.message ? e.message : 'senden fehlgeschlagen';
+                recordHistory({ id: histId(), at: Date.now(), names, count: names.length, size, target: targetLabel, ok: false, error: msg });
+                toast(msg);
             }
         } finally {
             sending = false; $('sendBtn').textContent = 'Senden'; updateSendable();
@@ -313,10 +389,13 @@
     }
 
     async function init() {
+        applySections();
+        wireSections();
         renderProtoSeg();
         renderRecents();
         renderDevices();
         renderFiles();
+        renderHistory();
         renderAutoSync();
         plugin.addListener('progress', showProgress);
         plugin.addListener('device', onDevice);
@@ -326,6 +405,8 @@
         $('folderBtn').addEventListener('click', pickFolder);
         $('autoToggle').addEventListener('click', toggleAutoSync);
         $('syncNowBtn').addEventListener('click', async () => { try { await plugin.syncNow(); toast('synchronisiere…'); } catch {} });
+        $('historyEnabled').addEventListener('change', () => { state.historyEnabled = $('historyEnabled').checked; save(); });
+        $('historyClear').addEventListener('click', () => { state.history = []; save(); renderHistory(); toast('verlauf geleert'); });
         $('host').addEventListener('input', () => {
             // a hand-typed host has no known fingerprint to pin (unless it's a
             // filesync:// uri, where parseTarget reads it from the uri itself).

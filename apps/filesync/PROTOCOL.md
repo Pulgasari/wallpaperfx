@@ -96,6 +96,11 @@ aborts the session; the receiver removes any partial files.
 - auto-accept on (default) → `prepare-upload` returns tokens immediately.
   auto-accept off → the request is held until the local web ui accepts/declines
   (60s timeout → decline).
+- persistent pairing: a sender whose `info.fingerprint` is in the receiver's
+  `trustedDevices` list is accepted without a prompt even when auto-accept is off.
+  the web ui adds a device to that list ("künftig ohne Nachfrage annehmen" on a
+  request) and can remove it again. this is a receiver-local trust list, not part
+  of the wire shape — the sender sends the same `prepare-upload` either way.
 
 ## Fingerprint
 
