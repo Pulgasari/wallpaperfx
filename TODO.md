@@ -1,6 +1,8 @@
 # TODO
 
 ## Browser
+- [ ] add to dock: settings
+- [ ] add to dock: userscripts (violentmonkey oder sowas)
 
 ## Filesync
 
