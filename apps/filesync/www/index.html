@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="de">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark" />
+    <title>FileSync</title>
+    <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<div id="status" class="status-toast" role="status"></div>
+
+<header class="topbar">
+    <span class="app-name">FileSync</span>
+    <span id="identity" class="muted small"></span>
+</header>
+
+<main class="wrap">
+    <!-- ===== target (manual pairing) ===== -->
+    <section class="card">
+        <h2>Ziel (Desktop)</h2>
+        <div class="target-row">
+            <input id="host" type="text" inputmode="url" autocapitalize="off" autocomplete="off"
+                   spellcheck="false" placeholder="192.168.x.x  oder  filesync://…" />
+            <input id="port" type="number" inputmode="numeric" value="53317" aria-label="Port" />
+        </div>
+        <div class="target-row2">
+            <div id="protoSeg" class="seg" role="group" aria-label="Protokoll"></div>
+            <input id="pin" type="text" inputmode="numeric" autocomplete="off" spellcheck="false"
+                   class="pin-input" placeholder="PIN (optional)" aria-label="PIN" />
+        </div>
+        <div id="recents" class="recents"></div>
+    </section>
+
+    <!-- ===== discovered devices ===== -->
+    <section class="card">
+        <div class="card-head">
+            <h2>Geräte im Netz</h2>
+            <button id="rescanBtn" class="chip">Suchen</button>
+        </div>
+        <ul id="deviceList" class="device-list"></ul>
+        <p id="devicesEmpty" class="muted small">keine Geräte gefunden — Adresse oben manuell eingeben</p>
+    </section>
+
+    <!-- ===== files ===== -->
+    <section class="card">
+        <div class="card-head">
+            <h2>Dateien</h2>
+            <button id="pickBtn" class="chip">+ Dateien wählen</button>
+        </div>
+        <ul id="fileList" class="file-list"></ul>
+        <p id="filesEmpty" class="muted">keine dateien gewählt</p>
+    </section>
+
+    <!-- ===== auto-sync ===== -->
+    <section class="card">
+        <div class="card-head">
+            <h2>Auto-Sync (WLAN)</h2>
+            <span id="autoStatus" class="muted small">aus</span>
+        </div>
+        <button id="folderBtn" class="chip">Ordner wählen</button>
+        <label class="ssid-row">
+            <span class="muted small">Nur in diesem WLAN (optional)</span>
+            <input id="ssid" type="text" autocapitalize="off" autocomplete="off" spellcheck="false" placeholder="SSID (leer = jedes WLAN)" />
+        </label>
+        <p class="muted small">Neue Dateien im Ordner werden im WLAN automatisch an das oben gewählte Ziel gesendet.</p>
+        <div class="auto-actions">
+            <button id="autoToggle" class="chip">Aktivieren</button>
+            <button id="syncNowBtn" class="chip" hidden>Jetzt synchronisieren</button>
+        </div>
+    </section>
+
+    <!-- ===== send ===== -->
+    <section class="send-area">
+        <div id="progress" class="progress" hidden>
+            <div class="progress-bar"><div id="progressFill" class="progress-fill"></div></div>
+            <p id="progressText" class="muted small"></p>
+        </div>
+        <button id="sendBtn" class="send-btn" disabled>Senden</button>
+    </section>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>

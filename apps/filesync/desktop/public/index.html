@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="de">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FileSync Desktop</title>
+    <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<header class="top">
+    <div>
+        <h1 id="alias">FileSync</h1>
+        <p id="addr" class="muted"></p>
+    </div>
+    <span id="proto" class="pill"></span>
+</header>
+
+<main>
+    <section class="card pair">
+        <div>
+            <h2>Pairing</h2>
+            <p class="muted">Am Handy diese Adresse eingeben oder den QR scannen:</p>
+            <p id="pairAddr" class="mono big"></p>
+            <p id="fingerprint" class="muted mono small"></p>
+        </div>
+        <img id="qr" alt="pairing qr" width="180" height="180" />
+    </section>
+
+    <section class="card">
+        <h2>Einstellungen</h2>
+        <label class="row">
+            <span>Zielordner</span>
+            <input id="targetDir" type="text" spellcheck="false" />
+        </label>
+        <label class="row">
+            <span>Gerätename</span>
+            <input id="aliasInput" type="text" spellcheck="false" />
+        </label>
+        <label class="row switch">
+            <span>Automatisch annehmen</span>
+            <input id="autoAccept" type="checkbox" />
+        </label>
+        <label class="row">
+            <span>PIN <span class="muted small">(leer = aus)</span></span>
+            <input id="pin" type="text" inputmode="numeric" spellcheck="false" placeholder="z.B. 1234" />
+        </label>
+        <div class="row end"><button id="saveBtn">Speichern</button><span id="saveMsg" class="muted small"></span></div>
+    </section>
+
+    <section id="pendingCard" class="card" hidden>
+        <h2>Anfragen</h2>
+        <ul id="pending" class="list"></ul>
+    </section>
+
+    <section class="card">
+        <h2>Empfangen</h2>
+        <ul id="history" class="list"></ul>
+        <p id="historyEmpty" class="muted">noch nichts empfangen</p>
+    </section>
+
+    <section class="card">
+        <h2>Geräte im Netz</h2>
+        <ul id="peers" class="list"></ul>
+        <p id="peersEmpty" class="muted">keine geräte entdeckt</p>
+    </section>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>

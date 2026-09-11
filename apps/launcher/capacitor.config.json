@@ -1,0 +1,8 @@
+{
+  "appId": "com.launcher.app",
+  "appName": "Launcher",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": true
+  }
+}

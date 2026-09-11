@@ -1,0 +1,8 @@
+{
+  "appId": "com.filesync.app",
+  "appName": "FileSync",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": true
+  }
+}

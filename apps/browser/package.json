@@ -1,0 +1,28 @@
+{
+  "name": "browser",
+  "version": "0.1.0",
+  "description": "minimalist android browser: transparent capacitor chrome over native content webviews",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "sync": "cap sync android",
+    "copy": "cap copy android",
+    "open": "cap open android",
+    "build:apk": "cap sync android && cd android && ./gradlew assembleDebug"
+  },
+  "keywords": [
+    "android",
+    "capacitor",
+    "browser",
+    "webview"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@capacitor/android": "^7.0.0",
+    "@capacitor/core": "^7.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^7.0.0"
+  }
+}

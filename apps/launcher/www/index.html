@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="de">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark" />
+    <title>Launcher</title>
+    <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<!-- toast for transient status / errors -->
+<div id="status" class="status-toast" role="status"></div>
+
+<!-- ===== home: the app grid ===== -->
+<main id="home" class="home">
+    <div id="grid" class="grid" aria-label="Apps"></div>
+</main>
+
+<!-- fixed settings affordance -->
+<button id="settingsToggle" class="fab" data-icon="settings" aria-label="Einstellungen"></button>
+
+<!-- dims the home while an overlay is open -->
+<div id="backdrop" class="backdrop" hidden></div>
+
+<!-- ===== folder overlay (opened by tapping a folder tile) ===== -->
+<section id="folderView" class="overlay-sheet" hidden aria-label="Ordner">
+    <div class="overlay-head">
+        <span id="folderTitle" class="overlay-title">Ordner</span>
+        <button class="icon-btn overlay-close" data-icon="close" data-close="folderView" aria-label="Schließen"></button>
+    </div>
+    <div id="folderGrid" class="grid grid-in-folder"></div>
+</section>
+
+<!-- ===== settings overlay ===== -->
+<section id="settingsPanel" class="overlay-sheet" hidden aria-label="Einstellungen">
+    <div class="overlay-head">
+        <span class="overlay-title">Einstellungen</span>
+        <button class="icon-btn overlay-close" data-icon="close" data-close="settingsPanel" aria-label="Schließen"></button>
+    </div>
+
+    <div class="field">
+        <label>Rastergröße</label>
+        <div id="colsChoice" class="seg" role="group" aria-label="Spalten"></div>
+    </div>
+
+    <div class="field">
+        <label for="iconColor">Icon-Farbe</label>
+        <div class="color-row">
+            <input id="iconColor" type="color" value="#e6e6e6" />
+            <div id="colorPresets" class="color-presets"></div>
+        </div>
+    </div>
+
+    <div class="field">
+        <div class="field-head">
+            <label>Ordner</label>
+            <button id="addFolderBtn" class="chip" data-icon="add">Ordner erstellen</button>
+        </div>
+        <ul id="folderList" class="folder-list"></ul>
+    </div>
+</section>
+
+<!-- ===== bottom action sheet (per-app actions) ===== -->
+<section id="actionSheet" class="action-sheet" hidden aria-label="App-Aktionen">
+    <div class="sheet-title" id="sheetTitle"></div>
+    <div id="sheetActions" class="sheet-actions"></div>
+    <button class="sheet-cancel" data-close="actionSheet">Abbrechen</button>
+</section>
+
+<script src="app.js"></script>
+</body>
+</html>

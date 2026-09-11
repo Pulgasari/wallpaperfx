@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="de">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Browser</title>
+    <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<!-- thin per-tab load progress, sits just above the bar -->
+<div id="prog" class="prog" hidden><span id="progFill"></span></div>
+
+<!-- ===== collapsed bottom bar: [trigger] ( pill ) [trigger] ===== -->
+<div id="bar" class="bar">
+    <button id="tLeft" class="trig" aria-label="Tabs"></button>
+    <button id="pill" class="pill">
+        <span id="pillText">Suchen oder URL</span>
+    </button>
+    <button id="tRight" class="trig" aria-label="Lesezeichen"></button>
+</div>
+
+<!-- ===== url / search panel ===== -->
+<section id="panelUrl" class="panel" hidden aria-label="Adresse">
+    <button class="backdrop" data-close aria-label="Schließen"></button>
+    <div class="panel-scroll">
+        <ul id="suggest" class="suggest"></ul>
+    </div>
+    <form id="urlForm" class="urlbar">
+        <input id="urlInput" type="text" inputmode="url" autocapitalize="off"
+               autocomplete="off" spellcheck="false" placeholder="Suchen oder URL eingeben" />
+        <button type="submit" id="urlGo" class="go" aria-label="Los"></button>
+    </form>
+</section>
+
+<!-- ===== tabs overview ===== -->
+<section id="panelTabs" class="panel sheet" hidden aria-label="Tabs">
+    <button class="backdrop" data-close aria-label="Schließen"></button>
+    <div class="sheet-body">
+        <div class="sheet-head">
+            <span class="sheet-title">Tabs</span>
+            <span class="sheet-actions">
+                <button id="newGroupBtn" class="txt-btn">Gruppe</button>
+                <button id="newTabBtn" class="txt-btn">Neuer Tab</button>
+            </span>
+        </div>
+        <div id="tabGroups"></div>
+    </div>
+</section>
+
+<!-- ===== bookmarks ===== -->
+<section id="panelMarks" class="panel sheet" hidden aria-label="Lesezeichen">
+    <button class="backdrop" data-close aria-label="Schließen"></button>
+    <div class="sheet-body">
+        <div class="sheet-head">
+            <span class="sheet-title">Lesezeichen</span>
+            <span class="sheet-actions">
+                <button id="addMarkBtn" class="txt-btn">Aktuelle Seite</button>
+            </span>
+        </div>
+        <ul id="markList" class="rows"></ul>
+        <p id="marksEmpty" class="empty">noch keine Lesezeichen</p>
+    </div>
+</section>
+
+<script src="app.js"></script>
+</body>
+</html>
