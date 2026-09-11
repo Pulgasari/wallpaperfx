@@ -1,18 +1,15 @@
 // minimalist browser chrome. plain js. drives the native Browser plugin (tabs =
-// native content webviews) and re-renders on "state" events. grouping + bookmarks
-// are chrome-side (localStorage). in a plain browser (no capacitor) a mock keeps
-// the ui usable for layout/screenshots. see ../ARCHITECTURE.md.
+// native content webviews) and re-renders on "state" events. bookmarks, groups,
+// userscripts and appearance are chrome-side (localStorage). a mock keeps the ui
+// usable in a plain browser for layout/screenshots. see ../ARCHITECTURE.md.
 (function () {
     'use strict';
 
-    const domainOf = url => {
-        try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return url || ''; }
-    };
+    const domainOf = url => { try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return url || ''; } };
 
     function getPlugin() {
         const cap = window.Capacitor;
         if (cap && cap.Plugins && cap.Plugins.Browser) return cap.Plugins.Browser;
-        // ---- browser dev mock ----
         const listeners = {};
         const emit = (ev, d) => (listeners[ev] || []).forEach(fn => fn(d));
         let tabs = [
@@ -31,53 +28,112 @@
                 t.url = /^[a-z]+:\/\//i.test(url) ? url : (url.includes('.') && !url.includes(' ') ? 'https://' + url : 'https://duckduckgo.com/?q=' + encodeURIComponent(url));
                 t.title = domainOf(t.url); expanded = false; push(); return state();
             },
-            async newTab({ url }) { const id = 't' + (++n + 0); tabs.push({ id, url: url || 'https://duckduckgo.com/', title: 'Neuer Tab', loading: false, progress: 100, canGoBack: false }); activeId = id; push(); return state(); },
+            async newTab({ url }) { const id = 't' + (++n); tabs.push({ id, url: url || 'https://duckduckgo.com/', title: 'Neuer Tab', loading: false, progress: 100, canGoBack: false }); activeId = id; push(); return state(); },
             async closeTab({ id }) { tabs = tabs.filter(t => t.id !== id); if (activeId === id) activeId = tabs.length ? tabs[tabs.length - 1].id : ''; push(); return state(); },
             async activateTab({ id }) { activeId = id; push(); return state(); },
-            async goBack() { return state(); },
-            async goForward() { return state(); },
-            async reload() { return state(); },
+            async goBack() { return state(); }, async goForward() { return state(); }, async reload() { return state(); },
             async setChromeExpanded({ expanded: e }) { expanded = e; push(); return state(); },
+            async setDockPosition() {}, async findInPage() {}, async findNext() {}, async clearFind() {},
+            async toggleDevtools() {}, async setUserscripts() {},
             addListener(ev, fn) { (listeners[ev] = listeners[ev] || []).push(fn); return { remove() { listeners[ev] = (listeners[ev] || []).filter(f => f !== fn); } }; },
         };
     }
-
     const plugin = getPlugin();
 
-    // ---- icons (inline, currentColor) ----
+    // ---- icons ----
     const ICONS = {
         tabs: '<rect x="4" y="4" width="16" height="16" rx="3"/><line x1="4" y1="9" x2="20" y2="9"/>',
         book: '<path d="M7 4h10a1 1 0 0 1 1 1v15l-6-4-6 4V5a1 1 0 0 1 1-1z"/>',
         go: '<line x1="5" y1="12" x2="18" y2="12"/><path d="M13 7l5 5-5 5"/>',
+        search: '<circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/>',
+        console: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9l3 3-3 3"/><line x1="13" y1="15" x2="17" y2="15"/>',
+        code: '<path d="M8 8l-4 4 4 4"/><path d="M16 8l4 4-4 4"/><line x1="13.5" y1="6" x2="10.5" y2="18"/>',
+        gear: '<circle cx="12" cy="12" r="3.2"/><path d="M12 3.5v2.4M12 18.1v2.4M20.5 12h-2.4M5.9 12H3.5M18 6l-1.7 1.7M7.7 16.3L6 18M18 18l-1.7-1.7M7.7 7.7L6 6"/>',
     };
-    const svg = (name) => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" ' +
-        'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (ICONS[name] || '') + '</svg>';
+    const svg = name => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (ICONS[name] || '') + '</svg>';
 
-    // ---- state ----
     const $ = id => document.getElementById(id);
     const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const uid = p => p + Math.random().toString(36).slice(2, 8);
     const STORE = 'browser';
 
-    let ns = { tabs: [], activeId: '', expanded: false };  // native state
-    let local = loadLocal();                                // bookmarks + groups
-    let panel = null;                                       // 'url' | 'tabs' | 'marks' | null
+    // ---- dock element catalog ----
+    const DOCK = {
+        tabs: { icon: 'tabs', label: 'Tabs', run: () => openPanel('tabs') },
+        marks: { icon: 'book', label: 'Lesezeichen', run: () => openPanel('marks') },
+        find: { icon: 'search', label: 'Auf Seite suchen', run: () => openPanel('find') },
+        devtools: { icon: 'console', label: 'Dev-Tools', run: () => { plugin.toggleDevtools(); closePanel(); } },
+        userscripts: { icon: 'code', label: 'Userscripts', run: () => openPanel('scripts') },
+        settings: { icon: 'gear', label: 'Einstellungen', run: () => openPanel('settings') },
+    };
+    const DOCK_DEFAULT = [
+        { id: 'tabs', on: true }, { id: 'marks', on: true }, { id: 'find', on: true },
+        { id: 'userscripts', on: true }, { id: 'devtools', on: false }, { id: 'settings', on: true },
+    ];
+    const SETTINGS_DEFAULT = () => ({
+        bg: '#0c0d10', fg: '#edeef0', accent: '#4f8cff',
+        dockPos: 'bottom', loaderPos: 'bottom', dockSize: 46, dockGap: 12,
+        dock: DOCK_DEFAULT.map(d => ({ ...d })),
+    });
+
+    // ---- state ----
+    let ns = { tabs: [], activeId: '', expanded: false };
+    let local = loadLocal();
+    let panel = null;
+    const PANELS = ['panelUrl', 'panelFind', 'panelTabs', 'panelMarks', 'panelScripts', 'panelSettings'];
 
     function loadLocal() {
-        try {
-            const s = JSON.parse(localStorage.getItem(STORE) || '{}');
-            return {
-                bookmarks: Array.isArray(s.bookmarks) ? s.bookmarks : [],
-                groups: Array.isArray(s.groups) ? s.groups : [],
-                tabGroups: s.tabGroups && typeof s.tabGroups === 'object' ? s.tabGroups : {},
-            };
-        } catch { return { bookmarks: [], groups: [], tabGroups: {} }; }
+        let s = {};
+        try { s = JSON.parse(localStorage.getItem(STORE) || '{}'); } catch {}
+        const settings = Object.assign(SETTINGS_DEFAULT(), s.settings || {});
+        // reconcile dock list with the known catalog (keep order, add missing, drop unknown)
+        const known = Object.keys(DOCK);
+        const seen = new Set();
+        settings.dock = (Array.isArray(settings.dock) ? settings.dock : [])
+            .filter(d => d && known.includes(d.id) && !seen.has(d.id) && seen.add(d.id));
+        for (const id of known) if (!seen.has(id)) settings.dock.push({ id, on: id !== 'devtools' });
+        return {
+            bookmarks: Array.isArray(s.bookmarks) ? s.bookmarks : [],
+            groups: Array.isArray(s.groups) ? s.groups : [],
+            tabGroups: s.tabGroups && typeof s.tabGroups === 'object' ? s.tabGroups : {},
+            userscripts: Array.isArray(s.userscripts) ? s.userscripts : [],
+            settings,
+        };
     }
     function saveLocal() { try { localStorage.setItem(STORE, JSON.stringify(local)); } catch {} }
-
-    const uid = p => p + Math.random().toString(36).slice(2, 8);
     const activeTab = () => ns.tabs.find(t => t.id === ns.activeId) || null;
 
-    // ---- bar ----
+    // ---- appearance ----
+    function applyAll() { applyTheme(); applyDock(); applyLoader(); renderBar(); }
+    function applyTheme() {
+        const st = document.documentElement.style, s = local.settings;
+        st.setProperty('--bg', s.bg); st.setProperty('--fg', s.fg); st.setProperty('--accent', s.accent);
+        st.setProperty('--dock-size', s.dockSize + 'px'); st.setProperty('--dock-gap', s.dockGap + 'px');
+    }
+    function applyLoader() {
+        document.body.classList.toggle('loader-top', local.settings.loaderPos === 'top');
+    }
+    function applyDock() {
+        document.body.classList.toggle('dock-top', local.settings.dockPos === 'top');
+        try { plugin.setDockPosition({ position: local.settings.dockPos }); } catch {}
+        const enabled = local.settings.dock.filter(d => d.on).map(d => d.id);
+        const leftN = Math.ceil(enabled.length / 2);
+        buildDockGroup($('dockLeft'), enabled.slice(0, leftN));
+        buildDockGroup($('dockRight'), enabled.slice(leftN));
+    }
+    function buildDockGroup(box, ids) {
+        box.innerHTML = '';
+        for (const id of ids) {
+            const def = DOCK[id]; if (!def) continue;
+            const b = document.createElement('button');
+            b.className = 'trig'; b.setAttribute('aria-label', def.label); b.title = def.label;
+            b.innerHTML = svg(def.icon);
+            b.addEventListener('click', def.run);
+            box.appendChild(b);
+        }
+    }
+
+    // ---- bar / progress ----
     function renderBar() {
         const t = activeTab();
         $('pillText').textContent = t && t.url ? domainOf(t.url) : 'Suchen oder URL';
@@ -90,29 +146,32 @@
     // ---- panels ----
     async function openPanel(name) {
         panel = name;
-        ['panelUrl', 'panelTabs', 'panelMarks'].forEach(id => { $(id).hidden = true; });
+        PANELS.forEach(id => { $(id).hidden = true; });
         try { await plugin.setChromeExpanded({ expanded: true }); } catch {}
-        $({ url: 'panelUrl', tabs: 'panelTabs', marks: 'panelMarks' }[name]).hidden = false;
+        const map = { url: 'panelUrl', find: 'panelFind', tabs: 'panelTabs', marks: 'panelMarks', scripts: 'panelScripts', settings: 'panelSettings' };
+        $(map[name]).hidden = false;
         if (name === 'url') primeUrl();
+        if (name === 'find') primeFind();
         if (name === 'tabs') renderTabs();
         if (name === 'marks') renderMarks();
+        if (name === 'scripts') renderScripts();
+        if (name === 'settings') renderSettings();
     }
     async function closePanel() {
+        const wasFind = panel === 'find';
         panel = null;
-        ['panelUrl', 'panelTabs', 'panelMarks'].forEach(id => { $(id).hidden = true; });
+        PANELS.forEach(id => { $(id).hidden = true; });
+        if (wasFind) { try { plugin.clearFind(); } catch {} }
         try { await plugin.setChromeExpanded({ expanded: false }); } catch {}
     }
 
     // ---- url / search ----
     function primeUrl() {
-        const t = activeTab();
-        const v = t && t.url ? t.url : '';
-        const input = $('urlInput');
-        input.value = v;
-        renderSuggest(v);
+        const t = activeTab(); const input = $('urlInput');
+        input.value = t && t.url ? t.url : '';
+        renderSuggest(input.value);
         setTimeout(() => { input.focus(); input.select(); }, 30);
     }
-
     function renderSuggest(q) {
         const query = (q || '').trim().toLowerCase();
         const items = [];
@@ -124,143 +183,199 @@
             ...local.bookmarks.map(b => ({ title: b.title || domainOf(b.url), sub: domainOf(b.url), url: b.url })),
             ...ns.tabs.filter(t => t.id !== ns.activeId).map(t => ({ title: t.title || domainOf(t.url), sub: domainOf(t.url) + ' · Tab', url: t.url })),
         ];
-        for (const it of pool) {
-            if (!query || (it.title + ' ' + it.url).toLowerCase().includes(query)) items.push(it);
-            if (items.length >= 12) break;
-        }
+        for (const it of pool) { if (!query || (it.title + ' ' + it.url).toLowerCase().includes(query)) items.push(it); if (items.length >= 12) break; }
         const ul = $('suggest');
-        ul.innerHTML = items.map((it, i) =>
-            `<li data-i="${i}"><b>${esc(it.title)}</b><span>${esc(it.sub)}</span></li>`).join('');
+        ul.innerHTML = items.map((it, i) => `<li data-i="${i}"><b>${esc(it.title)}</b><span>${esc(it.sub)}</span></li>`).join('');
         ul._items = items;
     }
+    function go(url) { const v = (url || '').trim(); if (!v) return; plugin.navigate({ url: v }); closePanel(); }
 
-    function go(url) {
-        const v = (url || '').trim();
-        if (!v) return;
-        plugin.navigate({ url: v });
-        closePanel();
+    // ---- find in page ----
+    function primeFind() {
+        const input = $('findInput'); input.value = ''; $('findCount').textContent = '';
+        setTimeout(() => input.focus(), 30);
     }
 
-    // ---- tabs overview ----
+    // ---- tabs ----
     function groupName(id) { const g = local.groups.find(x => x.id === id); return g ? g.name : ''; }
-
     function renderTabs() {
-        const box = $('tabGroups');
-        box.innerHTML = '';
-        // bucket tabs by group (localStorage), ungrouped last
-        const buckets = new Map(); // groupId('' = none) -> tabs[]
-        for (const t of ns.tabs) {
-            const gid = local.tabGroups[t.id] || '';
-            if (!buckets.has(gid)) buckets.set(gid, []);
-            buckets.get(gid).push(t);
-        }
+        const box = $('tabGroups'); box.innerHTML = '';
+        const buckets = new Map();
+        for (const t of ns.tabs) { const gid = local.tabGroups[t.id] || ''; if (!buckets.has(gid)) buckets.set(gid, []); buckets.get(gid).push(t); }
         const order = [...local.groups.map(g => g.id).filter(id => buckets.has(id)), ...(buckets.has('') ? [''] : [])];
         for (const gid of order) {
-            const section = document.createElement('div');
-            section.className = 'group';
+            const section = document.createElement('div'); section.className = 'group';
             if (gid) section.innerHTML = `<div class="group-head"><span>${esc(groupName(gid))}</span><span class="line"></span></div>`;
-            const ul = document.createElement('ul');
-            ul.className = 'rows';
+            const ul = document.createElement('ul'); ul.className = 'rows';
             for (const t of buckets.get(gid)) ul.appendChild(tabRow(t));
-            section.appendChild(ul);
-            box.appendChild(section);
+            section.appendChild(ul); box.appendChild(section);
         }
     }
-
     function tabRow(t) {
         const li = document.createElement('li');
         li.className = 'row' + (t.id === ns.activeId ? ' active' : '');
         const dom = domainOf(t.url);
-        li.innerHTML =
-            `<span class="ricon">${esc((dom[0] || '?').toUpperCase())}</span>` +
+        li.innerHTML = `<span class="ricon">${esc((dom[0] || '?').toUpperCase())}</span>` +
             `<span class="rtext"><b>${esc(t.title || dom || 'Neuer Tab')}</b><span>${esc(dom)}</span></span>`;
-        // group picker
-        const sel = document.createElement('select');
-        sel.className = 'mini-select';
-        sel.innerHTML = `<option value="">—</option>` +
-            local.groups.map(g => `<option value="${g.id}">${esc(g.name)}</option>`).join('');
+        const sel = document.createElement('select'); sel.className = 'mini-select';
+        sel.innerHTML = `<option value="">—</option>` + local.groups.map(g => `<option value="${g.id}">${esc(g.name)}</option>`).join('');
         sel.value = local.tabGroups[t.id] || '';
         sel.addEventListener('click', e => e.stopPropagation());
-        sel.addEventListener('change', () => {
-            if (sel.value) local.tabGroups[t.id] = sel.value; else delete local.tabGroups[t.id];
-            saveLocal(); renderTabs();
-        });
-        const close = document.createElement('button');
-        close.className = 'icon-btn'; close.textContent = '×'; close.setAttribute('aria-label', 'Tab schließen');
+        sel.addEventListener('change', () => { if (sel.value) local.tabGroups[t.id] = sel.value; else delete local.tabGroups[t.id]; saveLocal(); renderTabs(); });
+        const close = document.createElement('button'); close.className = 'icon-btn'; close.textContent = '×'; close.setAttribute('aria-label', 'Tab schließen');
         close.addEventListener('click', e => { e.stopPropagation(); plugin.closeTab({ id: t.id }); });
-        li.appendChild(sel);
-        li.appendChild(close);
+        li.appendChild(sel); li.appendChild(close);
         li.addEventListener('click', () => { plugin.activateTab({ id: t.id }); closePanel(); });
         return li;
     }
 
     // ---- bookmarks ----
     function renderMarks() {
-        const ul = $('markList');
-        ul.innerHTML = '';
+        const ul = $('markList'); ul.innerHTML = '';
         $('marksEmpty').hidden = local.bookmarks.length > 0;
         for (const b of local.bookmarks) {
-            const li = document.createElement('li');
-            li.className = 'row';
+            const li = document.createElement('li'); li.className = 'row';
             const dom = domainOf(b.url);
-            li.innerHTML = `<span class="ricon">${esc((dom[0] || '?').toUpperCase())}</span>` +
-                `<span class="rtext"><b>${esc(b.title || dom)}</b><span>${esc(dom)}</span></span>`;
-            const del = document.createElement('button');
-            del.className = 'icon-btn'; del.textContent = '×'; del.setAttribute('aria-label', 'Löschen');
+            li.innerHTML = `<span class="ricon">${esc((dom[0] || '?').toUpperCase())}</span><span class="rtext"><b>${esc(b.title || dom)}</b><span>${esc(dom)}</span></span>`;
+            const del = document.createElement('button'); del.className = 'icon-btn'; del.textContent = '×'; del.setAttribute('aria-label', 'Löschen');
             del.addEventListener('click', e => { e.stopPropagation(); local.bookmarks = local.bookmarks.filter(x => x.id !== b.id); saveLocal(); renderMarks(); });
-            li.appendChild(del);
-            li.addEventListener('click', () => go(b.url));
+            li.appendChild(del); li.addEventListener('click', () => go(b.url));
             ul.appendChild(li);
         }
     }
-
     function addCurrentBookmark() {
-        const t = activeTab();
-        if (!t || !t.url) return;
+        const t = activeTab(); if (!t || !t.url) return;
         if (local.bookmarks.some(b => b.url === t.url)) return;
         local.bookmarks.unshift({ id: uid('b'), url: t.url, title: t.title || domainOf(t.url) });
         saveLocal(); renderMarks();
     }
 
+    // ---- userscripts ----
+    function pushUserscripts() {
+        try { plugin.setUserscripts({ scripts: local.userscripts.map(s => ({ name: s.name, code: s.code, matches: s.matches, enabled: s.enabled })) }); } catch {}
+    }
+    let editingScript = null;
+    function renderScripts() {
+        $('scriptEditor').hidden = true;
+        const ul = $('scriptList'); ul.innerHTML = '';
+        $('scriptsEmpty').hidden = local.userscripts.length > 0;
+        for (const s of local.userscripts) {
+            const li = document.createElement('li'); li.className = 'row';
+            li.innerHTML = `<span class="rtext"><b>${esc(s.name || 'Script')}</b><span>${esc((s.matches || []).join(' ') || 'alle Seiten')}</span></span>`;
+            const tog = document.createElement('input'); tog.type = 'checkbox'; tog.checked = s.enabled !== false;
+            tog.addEventListener('click', e => e.stopPropagation());
+            tog.addEventListener('change', () => { s.enabled = tog.checked; saveLocal(); pushUserscripts(); });
+            const del = document.createElement('button'); del.className = 'icon-btn'; del.textContent = '×'; del.setAttribute('aria-label', 'Löschen');
+            del.addEventListener('click', e => { e.stopPropagation(); local.userscripts = local.userscripts.filter(x => x.id !== s.id); saveLocal(); pushUserscripts(); renderScripts(); });
+            li.appendChild(tog); li.appendChild(del);
+            li.addEventListener('click', () => openScriptEditor(s));
+            ul.appendChild(li);
+        }
+    }
+    function openScriptEditor(s) {
+        editingScript = s || { id: uid('u'), name: '', matches: [], code: '', enabled: true };
+        $('scriptName').value = editingScript.name || '';
+        $('scriptMatches').value = (editingScript.matches || []).join(' ');
+        $('scriptCode').value = editingScript.code || '';
+        $('scriptEnabled').checked = editingScript.enabled !== false;
+        $('scriptEditor').hidden = false;
+        $('scriptList').hidden = true; $('scriptsEmpty').hidden = true;
+    }
+    function saveScript() {
+        editingScript.name = $('scriptName').value.trim() || 'Script';
+        editingScript.matches = $('scriptMatches').value.split(/\s+/).filter(Boolean);
+        editingScript.code = $('scriptCode').value;
+        editingScript.enabled = $('scriptEnabled').checked;
+        if (!local.userscripts.includes(editingScript)) local.userscripts.push(editingScript);
+        saveLocal(); pushUserscripts();
+        $('scriptList').hidden = false; renderScripts();
+    }
+
+    // ---- settings ----
+    function renderSettings() {
+        const s = local.settings;
+        $('colBg').value = s.bg; $('colFg').value = s.fg; $('colAccent').value = s.accent;
+        renderSeg('dockPosSeg', [['bottom', 'Unten'], ['top', 'Oben']], s.dockPos, v => { s.dockPos = v; saveLocal(); applyDock(); renderSettings(); });
+        renderSeg('loaderPosSeg', [['bottom', 'Unten'], ['top', 'Oben']], s.loaderPos, v => { s.loaderPos = v; saveLocal(); applyLoader(); renderSettings(); });
+        $('rangeDockSize').value = s.dockSize; $('valDockSize').textContent = s.dockSize + 'px';
+        $('rangeDockGap').value = s.dockGap; $('valDockGap').textContent = s.dockGap + 'px';
+        renderDockList();
+    }
+    function renderSeg(id, opts, cur, onPick) {
+        const box = $(id); box.innerHTML = '';
+        for (const [val, label] of opts) {
+            const b = document.createElement('button');
+            b.className = 'seg-btn' + (val === cur ? ' active' : '');
+            b.textContent = label; b.addEventListener('click', () => onPick(val));
+            box.appendChild(b);
+        }
+    }
+    function renderDockList() {
+        const ul = $('dockList'); ul.innerHTML = '';
+        local.settings.dock.forEach((d, i) => {
+            const li = document.createElement('li'); li.className = 'row';
+            li.innerHTML = `<span class="ricon">${svg(DOCK[d.id].icon)}</span><span class="rtext"><b>${esc(DOCK[d.id].label)}</b></span>`;
+            const up = document.createElement('button'); up.className = 'icon-btn'; up.textContent = '↑'; up.disabled = i === 0;
+            up.addEventListener('click', () => moveDock(i, -1));
+            const dn = document.createElement('button'); dn.className = 'icon-btn'; dn.textContent = '↓'; dn.disabled = i === local.settings.dock.length - 1;
+            dn.addEventListener('click', () => moveDock(i, 1));
+            const tog = document.createElement('input'); tog.type = 'checkbox'; tog.checked = !!d.on;
+            tog.addEventListener('change', () => { d.on = tog.checked; saveLocal(); applyDock(); });
+            li.appendChild(up); li.appendChild(dn); li.appendChild(tog);
+            ul.appendChild(li);
+        });
+    }
+    function moveDock(i, dir) {
+        const arr = local.settings.dock; const j = i + dir;
+        if (j < 0 || j >= arr.length) return;
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+        saveLocal(); applyDock(); renderDockList();
+    }
+
     // ---- wiring ----
     function wire() {
-        $('tLeft').innerHTML = svg('tabs');
-        $('tRight').innerHTML = svg('book');
         $('urlGo').innerHTML = svg('go');
-
         $('pill').addEventListener('click', () => openPanel('url'));
-        $('tLeft').addEventListener('click', () => openPanel('tabs'));
-        $('tRight').addEventListener('click', () => openPanel('marks'));
-
         document.querySelectorAll('[data-close]').forEach(el => el.addEventListener('click', closePanel));
 
         $('urlForm').addEventListener('submit', e => { e.preventDefault(); go($('urlInput').value); });
         $('urlInput').addEventListener('input', () => renderSuggest($('urlInput').value));
-        $('suggest').addEventListener('click', e => {
-            const li = e.target.closest('li'); if (!li) return;
-            const it = ($('suggest')._items || [])[+li.dataset.i]; if (it) go(it.url);
-        });
+        $('suggest').addEventListener('click', e => { const li = e.target.closest('li'); if (!li) return; const it = ($('suggest')._items || [])[+li.dataset.i]; if (it) go(it.url); });
+
+        $('findForm').addEventListener('submit', e => { e.preventDefault(); plugin.findNext({ forward: true }); });
+        $('findInput').addEventListener('input', () => plugin.findInPage({ query: $('findInput').value }));
+        $('findPrev').addEventListener('click', () => plugin.findNext({ forward: false }));
 
         $('newTabBtn').addEventListener('click', async () => { await plugin.newTab({}); openPanel('url'); });
-        $('newGroupBtn').addEventListener('click', () => {
-            const name = prompt('Gruppenname:', 'Gruppe'); if (name == null) return;
-            local.groups.push({ id: uid('g'), name: name.trim() || 'Gruppe' }); saveLocal(); renderTabs();
-        });
+        $('newGroupBtn').addEventListener('click', () => { const name = prompt('Gruppenname:', 'Gruppe'); if (name == null) return; local.groups.push({ id: uid('g'), name: name.trim() || 'Gruppe' }); saveLocal(); renderTabs(); });
         $('addMarkBtn').addEventListener('click', addCurrentBookmark);
 
-        // native back / any external collapse: reconcile panels with expanded state
+        $('newScriptBtn').addEventListener('click', () => openScriptEditor(null));
+        $('scriptSave').addEventListener('click', saveScript);
+        $('scriptCancel').addEventListener('click', () => { $('scriptList').hidden = false; renderScripts(); });
+
+        $('colBg').addEventListener('input', () => { local.settings.bg = $('colBg').value; saveLocal(); applyTheme(); });
+        $('colFg').addEventListener('input', () => { local.settings.fg = $('colFg').value; saveLocal(); applyTheme(); });
+        $('colAccent').addEventListener('input', () => { local.settings.accent = $('colAccent').value; saveLocal(); applyTheme(); });
+        $('rangeDockSize').addEventListener('input', () => { local.settings.dockSize = Number($('rangeDockSize').value); $('valDockSize').textContent = local.settings.dockSize + 'px'; saveLocal(); applyTheme(); });
+        $('rangeDockGap').addEventListener('input', () => { local.settings.dockGap = Number($('rangeDockGap').value); $('valDockGap').textContent = local.settings.dockGap + 'px'; saveLocal(); applyTheme(); });
+
         plugin.addListener('state', s => {
             const wasExpanded = ns.expanded;
-            ns = s;
-            renderBar();
-            if (!s.expanded && panel) { panel = null; ['panelUrl', 'panelTabs', 'panelMarks'].forEach(id => { $(id).hidden = true; }); }
+            ns = s; renderBar();
+            if (!s.expanded && panel) { panel = null; PANELS.forEach(id => { $(id).hidden = true; }); }
             if (panel === 'tabs') renderTabs();
             if (panel === 'url' && wasExpanded) renderSuggest($('urlInput').value);
+        });
+        plugin.addListener('find', e => {
+            $('findCount').textContent = e && e.count ? ((e.index + 1) + '/' + e.count) : (e && e.done ? '0/0' : '');
         });
     }
 
     async function init() {
         wire();
+        applyAll();
+        pushUserscripts();
         try { ns = await plugin.ready(); } catch {}
         renderBar();
     }

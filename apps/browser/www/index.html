@@ -8,28 +8,34 @@
 </head>
 <body>
 
-<!-- thin per-tab load progress, sits just above the bar -->
+<!-- thin per-tab load progress (position configurable: top/bottom) -->
 <div id="prog" class="prog" hidden><span id="progFill"></span></div>
 
-<!-- ===== collapsed bottom bar: [trigger] ( pill ) [trigger] ===== -->
+<!-- ===== dock: [buttons] ( pill ) [buttons] ; contents built from settings ===== -->
 <div id="bar" class="bar">
-    <button id="tLeft" class="trig" aria-label="Tabs"></button>
-    <button id="pill" class="pill">
-        <span id="pillText">Suchen oder URL</span>
-    </button>
-    <button id="tRight" class="trig" aria-label="Lesezeichen"></button>
+    <div id="dockLeft" class="dock-group"></div>
+    <button id="pill" class="pill"><span id="pillText">Suchen oder URL</span></button>
+    <div id="dockRight" class="dock-group"></div>
 </div>
 
-<!-- ===== url / search panel ===== -->
+<!-- ===== url / search ===== -->
 <section id="panelUrl" class="panel" hidden aria-label="Adresse">
     <button class="backdrop" data-close aria-label="Schließen"></button>
-    <div class="panel-scroll">
-        <ul id="suggest" class="suggest"></ul>
-    </div>
+    <div class="panel-scroll"><ul id="suggest" class="suggest"></ul></div>
     <form id="urlForm" class="urlbar">
-        <input id="urlInput" type="text" inputmode="url" autocapitalize="off"
-               autocomplete="off" spellcheck="false" placeholder="Suchen oder URL eingeben" />
+        <input id="urlInput" type="text" inputmode="url" autocapitalize="off" autocomplete="off" spellcheck="false" placeholder="Suchen oder URL eingeben" />
         <button type="submit" id="urlGo" class="go" aria-label="Los"></button>
+    </form>
+</section>
+
+<!-- ===== find in page (bar, page stays visible behind) ===== -->
+<section id="panelFind" class="panel find" hidden aria-label="Auf Seite suchen">
+    <form id="findForm" class="findbar">
+        <input id="findInput" type="text" autocapitalize="off" autocomplete="off" spellcheck="false" placeholder="Auf Seite suchen" />
+        <span id="findCount" class="find-count"></span>
+        <button type="button" id="findPrev" class="ic" aria-label="Zurück">‹</button>
+        <button type="submit" id="findNext" class="ic" aria-label="Weiter">›</button>
+        <button type="button" id="findClose" class="ic" data-close aria-label="Schließen">×</button>
     </form>
 </section>
 
@@ -54,12 +60,56 @@
     <div class="sheet-body">
         <div class="sheet-head">
             <span class="sheet-title">Lesezeichen</span>
-            <span class="sheet-actions">
-                <button id="addMarkBtn" class="txt-btn">Aktuelle Seite</button>
-            </span>
+            <span class="sheet-actions"><button id="addMarkBtn" class="txt-btn">Aktuelle Seite</button></span>
         </div>
         <ul id="markList" class="rows"></ul>
         <p id="marksEmpty" class="empty">noch keine Lesezeichen</p>
+    </div>
+</section>
+
+<!-- ===== userscripts ===== -->
+<section id="panelScripts" class="panel sheet" hidden aria-label="Userscripts">
+    <button class="backdrop" data-close aria-label="Schließen"></button>
+    <div class="sheet-body">
+        <div class="sheet-head">
+            <span class="sheet-title">Userscripts</span>
+            <span class="sheet-actions"><button id="newScriptBtn" class="txt-btn">Neu</button></span>
+        </div>
+        <ul id="scriptList" class="rows"></ul>
+        <p id="scriptsEmpty" class="empty">noch keine Userscripts</p>
+        <!-- editor (shown while adding/editing) -->
+        <div id="scriptEditor" class="editor" hidden>
+            <input id="scriptName" class="in" placeholder="Name" />
+            <input id="scriptMatches" class="in" placeholder="Match-Muster, z.B. https://*.example.com/*  (Leerzeichen-getrennt)" />
+            <textarea id="scriptCode" class="css-area" spellcheck="false" placeholder="// javascript, laeuft nach dem laden der seite"></textarea>
+            <label class="switch-row"><span>Aktiv</span><input id="scriptEnabled" type="checkbox" checked /></label>
+            <div class="editor-actions">
+                <button id="scriptCancel" class="txt-btn">Abbrechen</button>
+                <button id="scriptSave" class="txt-btn primary">Speichern</button>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ===== settings ===== -->
+<section id="panelSettings" class="panel sheet" hidden aria-label="Einstellungen">
+    <button class="backdrop" data-close aria-label="Schließen"></button>
+    <div class="sheet-body">
+        <div class="sheet-head"><span class="sheet-title">Einstellungen</span></div>
+
+        <h3 class="grp">Farben</h3>
+        <div class="row-field"><label for="colBg">Hintergrund</label><input id="colBg" type="color" /></div>
+        <div class="row-field"><label for="colFg">Vordergrund</label><input id="colFg" type="color" /></div>
+        <div class="row-field"><label for="colAccent">Akzent</label><input id="colAccent" type="color" /></div>
+
+        <h3 class="grp">Dock</h3>
+        <div class="field"><label>Position</label><div id="dockPosSeg" class="seg"></div></div>
+        <div class="field"><label>Ladeanzeige</label><div id="loaderPosSeg" class="seg"></div></div>
+        <div class="range-field"><label>Größe <b id="valDockSize"></b></label><input id="rangeDockSize" type="range" min="36" max="60" step="1" /></div>
+        <div class="range-field"><label>Abstand <b id="valDockGap"></b></label><input id="rangeDockGap" type="range" min="4" max="28" step="1" /></div>
+
+        <h3 class="grp">Dock-Elemente</h3>
+        <ul id="dockList" class="rows"></ul>
     </div>
 </section>
 

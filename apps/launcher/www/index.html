@@ -6,24 +6,22 @@
     <meta name="color-scheme" content="dark" />
     <title>Launcher</title>
     <link rel="stylesheet" href="styles.css" />
+    <!-- user custom css, filled live from settings -->
+    <style id="customCssStyle"></style>
 </head>
 <body>
 
-<!-- toast for transient status / errors -->
 <div id="status" class="status-toast" role="status"></div>
 
-<!-- ===== home: the app grid ===== -->
 <main id="home" class="home">
     <div id="grid" class="grid" aria-label="Apps"></div>
 </main>
 
-<!-- fixed settings affordance -->
 <button id="settingsToggle" class="fab" data-icon="settings" aria-label="Einstellungen"></button>
 
-<!-- dims the home while an overlay is open -->
 <div id="backdrop" class="backdrop" hidden></div>
 
-<!-- ===== folder overlay (opened by tapping a folder tile) ===== -->
+<!-- ===== folder overlay ===== -->
 <section id="folderView" class="overlay-sheet" hidden aria-label="Ordner">
     <div class="overlay-head">
         <span id="folderTitle" class="overlay-title">Ordner</span>
@@ -32,26 +30,76 @@
     <div id="folderGrid" class="grid grid-in-folder"></div>
 </section>
 
-<!-- ===== settings overlay ===== -->
+<!-- ===== settings overlay (no backdrop: grid stays visible for live preview) ===== -->
 <section id="settingsPanel" class="overlay-sheet" hidden aria-label="Einstellungen">
     <div class="overlay-head">
         <span class="overlay-title">Einstellungen</span>
         <button class="icon-btn overlay-close" data-icon="close" data-close="settingsPanel" aria-label="Schließen"></button>
     </div>
 
-    <div class="field">
-        <label>Rastergröße</label>
-        <div id="colsChoice" class="seg" role="group" aria-label="Spalten"></div>
+    <h3 class="group-title">Raster</h3>
+    <div class="field range-field">
+        <label>Spalten <b id="valCols"></b></label>
+        <input id="rangeCols" type="range" min="3" max="10" step="1" />
+    </div>
+    <div class="field range-field">
+        <label>Abstand <b id="valGap"></b></label>
+        <input id="rangeGap" type="range" min="0" max="28" step="1" />
     </div>
 
+    <h3 class="group-title">Zelle</h3>
+    <div class="field range-field">
+        <label>Innenabstand <b id="valPad"></b></label>
+        <input id="rangePad" type="range" min="0" max="28" step="1" />
+    </div>
+    <div class="field">
+        <label>Form</label>
+        <div id="shapeSeg" class="seg" role="group" aria-label="Zellform"></div>
+    </div>
     <div class="field">
         <label for="iconColor">Icon-Farbe</label>
         <div class="color-row">
-            <input id="iconColor" type="color" value="#e6e6e6" />
+            <input id="iconColor" type="color" />
             <div id="colorPresets" class="color-presets"></div>
         </div>
     </div>
+    <div class="field range-field">
+        <label>Rahmenstärke <b id="valBorder"></b></label>
+        <input id="rangeBorder" type="range" min="0" max="4" step="1" />
+    </div>
+    <div class="field row-field">
+        <label for="borderColor">Rahmenfarbe</label>
+        <input id="borderColor" type="color" />
+    </div>
+    <div class="field row-field">
+        <label for="cellBg">Zell-Hintergrund</label>
+        <input id="cellBg" type="color" />
+    </div>
+    <div class="field range-field">
+        <label>Zell-Transparenz <b id="valCellAlpha"></b></label>
+        <input id="rangeCellAlpha" type="range" min="0" max="1" step="0.05" />
+    </div>
 
+    <h3 class="group-title">Beschriftung</h3>
+    <label class="switch-row"><span>App-Name zeigen</span><input id="toggleLabel" type="checkbox" /></label>
+    <label class="switch-row"><span>Großbuchstaben</span><input id="toggleUppercase" type="checkbox" /></label>
+    <label class="switch-row"><span>Einzeilig kürzen (aus = mehrzeilig)</span><input id="toggleMultiline" type="checkbox" /></label>
+
+    <h3 class="group-title">Hintergrund</h3>
+    <div class="field row-field">
+        <label for="pageBg">Farbe</label>
+        <input id="pageBg" type="color" />
+    </div>
+    <div class="field range-field">
+        <label>Deckkraft <b id="valPageAlpha"></b></label>
+        <input id="rangePageAlpha" type="range" min="0" max="1" step="0.05" />
+    </div>
+    <p class="hint">Deckkraft &lt; 1 lässt das System-Wallpaper durchscheinen.</p>
+
+    <h3 class="group-title">Eigenes CSS</h3>
+    <textarea id="customCss" class="css-area" spellcheck="false" placeholder=".tile-label { letter-spacing: .04em }"></textarea>
+
+    <h3 class="group-title">Ordner</h3>
     <div class="field">
         <div class="field-head">
             <label>Ordner</label>

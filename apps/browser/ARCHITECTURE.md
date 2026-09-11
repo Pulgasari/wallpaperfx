@@ -76,9 +76,27 @@ the hardware back button and tapping the backdrop stay in sync.
 Exactly **two css tokens** (`--bg`, `--fg`); every other shade is `color-mix` of
 them. Retheming = change two values. Keep it that way.
 
-## Not yet (v0)
+## Dock + settings
 
-userscripts (violentmonkey-style injection), auto-grouping, configurable pill
-gestures (long-press / hold-drag) and custom triggers, per-tab back/forward ui,
-downloads, `window.open`/new-window handling, external-scheme (mailto/intent)
-handling.
+The dock is configurable (chrome-side, `localStorage` `browser.settings`): which
+buttons show, their order (they split evenly around the pill), size, gap, and the
+dock/loader position (top or bottom — dock position also calls
+`BrowserPlugin.setDockPosition`, which re-anchors the native strip). Colors are
+three tokens `--bg/--fg/--accent`. Buttons: tabs, bookmarks, find-in-page,
+dev-tools, userscripts, settings.
+
+- **find**: `findInPage/findNext/clearFind` drive the native `WebView.findAllAsync`;
+  a `find` event reports the match count. its panel is a transparent bar so the
+  page stays visible.
+- **dev-tools**: `toggleDevtools` injects/removes eruda in the active page
+  (best-effort; needs network + a permissive page CSP). `setWebContentsDebuggingEnabled`
+  is on for chrome://inspect over USB.
+- **userscripts**: managed chrome-side; the list is pushed to native
+  (`setUserscripts`) and injected at document-end into pages whose url matches a
+  script's `matches` glob. No GM_* API yet.
+
+## Not yet
+
+full GM_* userscript api, auto tab-grouping, configurable pill gestures
+(long-press / hold-drag), per-tab back/forward ui, downloads, `window.open`/
+new-window handling, external-scheme (mailto/intent) handling.

@@ -19,6 +19,8 @@ import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
+import org.json.JSONArray;
+
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -43,7 +45,16 @@ public class BrowserPlugin extends Plugin {
         boolean canGoBack = false;
     }
 
+    // toggles eruda (a mobile devtools console) in the active page; best-effort,
+    // needs network + a page csp that allows the cdn script.
+    private static final String ERUDA_TOGGLE =
+        "(function(){try{if(window.__eruda&&window.eruda){eruda.destroy();window.__eruda=false;return;}" +
+        "var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/eruda';" +
+        "s.onload=function(){try{eruda.init();window.__eruda=true;}catch(e){}};" +
+        "document.head.appendChild(s);}catch(e){}})();";
+
     private final Map<String, Tab> tabs = new LinkedHashMap<>();
+    private final List<JSObject> userscripts = new ArrayList<>(); // {name, code, matches[], enabled}
     private String activeId = null;
     private int counter = 0;
     private boolean expanded = false;
@@ -141,6 +152,85 @@ public class BrowserPlugin extends Plugin {
         ui(() -> { setExpanded(ex); call.resolve(state()); });
     }
 
+    // ---- dock / find / devtools / userscripts ----
+
+    @PluginMethod
+    public void setDockPosition(PluginCall call) {
+        final boolean top = "top".equals(call.getString("position", "bottom"));
+        ui(() -> { activity().setDockPosition(top); call.resolve(); });
+    }
+
+    @PluginMethod
+    public void findInPage(PluginCall call) {
+        final String q = call.getString("query", "");
+        ui(() -> {
+            Tab t = active();
+            if (t != null) { if (q.isEmpty()) t.view.clearMatches(); else t.view.findAllAsync(q); }
+            call.resolve();
+        });
+    }
+
+    @PluginMethod
+    public void findNext(PluginCall call) {
+        final boolean fwd = call.getBoolean("forward", true);
+        ui(() -> { Tab t = active(); if (t != null) t.view.findNext(fwd); call.resolve(); });
+    }
+
+    @PluginMethod
+    public void clearFind(PluginCall call) {
+        ui(() -> { Tab t = active(); if (t != null) t.view.clearMatches(); call.resolve(); });
+    }
+
+    @PluginMethod
+    public void toggleDevtools(PluginCall call) {
+        ui(() -> { Tab t = active(); if (t != null) t.view.evaluateJavascript(ERUDA_TOGGLE, null); call.resolve(); });
+    }
+
+    // the chrome pushes the full script list; we inject matching enabled ones on
+    // each page load (document-end). glob '*' in matches is the only wildcard.
+    @PluginMethod
+    public void setUserscripts(PluginCall call) {
+        JSArray arr = call.getArray("scripts");
+        userscripts.clear();
+        if (arr != null) {
+            try { for (int i = 0; i < arr.length(); i++) userscripts.add(JSObject.fromJSONObject(arr.getJSONObject(i))); }
+            catch (Exception ignored) {}
+        }
+        call.resolve();
+    }
+
+    private void injectUserscripts(WebView v, String url) {
+        if (url == null || userscripts.isEmpty()) return;
+        for (JSObject sc : userscripts) {
+            if (!sc.optBoolean("enabled", true)) continue;
+            if (!matchesUrl(sc.optJSONArray("matches"), url)) continue;
+            String code = sc.optString("code", "");
+            if (code.isEmpty()) continue;
+            v.evaluateJavascript("(function(){try{" + code + "\n}catch(e){console.error('userscript',e);}})();", null);
+        }
+    }
+
+    private boolean matchesUrl(JSONArray matches, String url) {
+        if (matches == null || matches.length() == 0) return true; // no @match = every page
+        for (int i = 0; i < matches.length(); i++) {
+            String glob = matches.optString(i, "");
+            if (!glob.isEmpty() && globMatch(glob, url)) return true;
+        }
+        return false;
+    }
+
+    private boolean globMatch(String glob, String url) {
+        StringBuilder re = new StringBuilder("^");
+        for (int i = 0; i < glob.length(); i++) {
+            char c = glob.charAt(i);
+            if (c == '*') re.append(".*");
+            else if ("\\.[]{}()+-^$|?".indexOf(c) >= 0) re.append('\\').append(c);
+            else re.append(c);
+        }
+        re.append("$");
+        try { return url.matches(re.toString()); } catch (Exception e) { return false; }
+    }
+
     // called from MainActivity.onBackPressed (ui thread). returns true if consumed.
     public boolean handleBack() {
         if (expanded) { setExpanded(false); return true; }
@@ -163,6 +253,7 @@ public class BrowserPlugin extends Plugin {
     private Tab openTab(String url) {
         Tab t = new Tab();
         t.id = "t" + (++counter);
+        WebView.setWebContentsDebuggingEnabled(true); // allow chrome://inspect over usb
         WebView wv = new WebView(getContext());
         WebSettings s = wv.getSettings();
         s.setJavaScriptEnabled(true);
@@ -181,7 +272,9 @@ public class BrowserPlugin extends Plugin {
             }
             @Override public void onPageFinished(WebView v, String u) {
                 t.loading = false; t.url = v.getUrl(); t.title = v.getTitle();
-                t.canGoBack = v.canGoBack(); emit();
+                t.canGoBack = v.canGoBack();
+                injectUserscripts(v, u);
+                emit();
             }
             @Override public void doUpdateVisitedHistory(WebView v, String u, boolean reload) {
                 t.url = v.getUrl(); t.canGoBack = v.canGoBack(); emit();
@@ -190,6 +283,12 @@ public class BrowserPlugin extends Plugin {
         wv.setWebChromeClient(new WebChromeClient() {
             @Override public void onReceivedTitle(WebView v, String title) { t.title = title; emit(); }
             @Override public void onProgressChanged(WebView v, int p) { t.progress = p; emit(); }
+        });
+        // find-in-page match count -> chrome
+        wv.setFindListener((activeMatch, count, done) -> {
+            JSObject o = new JSObject();
+            o.put("index", activeMatch); o.put("count", count); o.put("done", done);
+            notifyListeners("find", o);
         });
 
         t.view = wv;

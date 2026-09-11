@@ -1,6 +1,8 @@
 // launcher home ui. plain js, bundler-free. talks to the native Launcher
 // capacitor plugin (getApps/launchApp). in a plain browser (no capacitor) a
-// mock keeps the ui usable for layout work.
+// mock keeps the ui usable for layout work. most appearance settings are driven
+// by css custom properties + body classes so changes preview live without
+// rebuilding the grid.
 (function () {
     'use strict';
 
@@ -11,7 +13,7 @@
         if (cap && cap.Plugins && cap.Plugins.Launcher) {
             return cap.Plugins.Launcher;
         }
-        // browser fallback: a fixed demo set, launch is a no-op alert.
+        // browser fallback: a fixed demo set, launch is a no-op toast.
         return {
             async getApps() {
                 return {
@@ -35,18 +37,14 @@
                     ]
                 };
             },
-            async launchApp({ packageName }) {
-                toast('nur im nativen build: startet ' + packageName);
-            }
+            async launchApp({ packageName }) { toast('nur im nativen build: startet ' + packageName); },
+            async setShowWallpaper() {}
         };
     }
 
     const plugin = getPlugin();
 
-    // ---- icon set ----
-    // monochrome line icons, viewbox 0 0 24 24, drawn from basic shapes so they
-    // stay valid and recolor via `currentColor`. inner markup only; svg() wraps.
-
+    // ---- icon set (monochrome line icons, recolored via currentColor) ----
     const ICONS = {
         app: '<rect x="4" y="4" width="16" height="16" rx="4"/>',
         phone: '<rect x="6" y="2.5" width="12" height="19" rx="2.5"/><line x1="10" y1="18.5" x2="14" y2="18.5"/>',
@@ -76,18 +74,12 @@
         edit: '<path d="M4 20h4L18 10l-4-4L4 16z"/><line x1="13" y1="7" x2="17" y2="11"/>',
         open: '<path d="M14 4h6v6"/><line x1="20" y1="4" x2="11" y2="13"/><path d="M18 14v4a2 2 0 01-2 2H6a2 2 0 01-2-2V8a2 2 0 012-2h4"/>'
     };
-
-    // returns an <svg> string for the named icon (falls back to the app glyph).
     function svg(name, cls) {
         const inner = ICONS[name] || ICONS.app;
         return '<svg class="' + (cls || 'icon') + '" viewBox="0 0 24 24" fill="none" ' +
             'stroke="currentColor" stroke-width="1.7" stroke-linecap="round" ' +
             'stroke-linejoin="round" aria-hidden="true">' + inner + '</svg>';
     }
-
-    // keyword -> icon guess. order matters (first match wins). tested against the
-    // lowercased "label packagename" so both the visible name and the package id
-    // can trigger a match. unknown apps get the generic app glyph.
     const ICON_RULES = [
         [/dial|phone|call|contact|telefon|anruf/, 'phone'],
         [/messag|sms|chat|whatsapp|telegram|signal|nachricht/, 'message'],
@@ -108,147 +100,117 @@
         [/weather|wetter|climate/, 'weather'],
         [/setting|config|einstell/, 'settings']
     ];
-
     function guessIcon(app) {
         const hay = ((app.label || '') + ' ' + (app.packageName || '')).toLowerCase();
-        for (const [re, name] of ICON_RULES) {
-            if (re.test(hay)) return name;
-        }
+        for (const [re, name] of ICON_RULES) if (re.test(hay)) return name;
         return 'app';
     }
 
     // ---- state ----
-    // persisted in localStorage. apps themselves are queried live from the device;
-    // only preferences and folder membership (by package name) are stored.
 
     const STORE_KEY = 'launcher';
-    const COLS_MIN = 3, COLS_MAX = 6;
+    const COLS_MIN = 3, COLS_MAX = 10;
     const COLOR_PRESETS = ['#e6e6e6', '#111111', '#4f8cff', '#22c55e', '#f97316', '#ec4899'];
 
     const defaults = () => ({
         cols: 4,
         iconColor: '#e6e6e6',
-        folders: [] // [{ id, name, apps: [packageName, ...] }]
+        gap: 8,            // px between cells
+        cellPad: 12,       // px inside each cell (around the glyph)
+        shape: 'squircle', // circle | square | squircle
+        borderSize: 0,     // px cell border
+        borderColor: '#ffffff',
+        cellBg: '#ffffff',
+        cellBgAlpha: 0.05,
+        showLabel: true,
+        uppercase: false,
+        cutLabel: true,    // false = wrap to multiple lines
+        customCss: '',
+        pageBg: '#0d0d10',
+        pageBgAlpha: 1,    // < 1 lets the system wallpaper show through
+        folders: []        // [{ id, name, apps: [packageName] }]
     });
 
     let state = load();
-    let apps = [];               // live [{ packageName, label }]
-    let appByPkg = new Map();    // packageName -> app
+    let apps = [];
+    let appByPkg = new Map();
 
     function load() {
         try {
-            const raw = JSON.parse(localStorage.getItem(STORE_KEY) || '{}');
-            const s = Object.assign(defaults(), raw);
+            const s = Object.assign(defaults(), JSON.parse(localStorage.getItem(STORE_KEY) || '{}'));
             s.cols = clamp(s.cols | 0 || 4, COLS_MIN, COLS_MAX);
             if (!Array.isArray(s.folders)) s.folders = [];
             return s;
-        } catch (e) {
-            return defaults();
-        }
+        } catch (e) { return defaults(); }
     }
-
-    function save() {
-        try {
-            localStorage.setItem(STORE_KEY, JSON.stringify(state));
-        } catch (e) { /* private mode etc. */ }
-    }
+    function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {} }
 
     // ---- folder helpers ----
 
     const uid = () => 'f' + Math.random().toString(36).slice(2, 9);
-
-    function folderOf(pkg) {
-        return state.folders.find(f => f.apps.includes(pkg)) || null;
-    }
-
-    function createFolder(name) {
-        const f = { id: uid(), name: name || 'Ordner', apps: [] };
-        state.folders.push(f);
-        save();
-        return f;
-    }
-
-    function deleteFolder(id) {
-        // apps in a deleted folder fall back to the top-level grid automatically.
-        state.folders = state.folders.filter(f => f.id !== id);
-        save();
-    }
-
-    function renameFolder(id, name) {
-        const f = state.folders.find(x => x.id === id);
-        if (f) { f.name = name || f.name; save(); }
-    }
-
-    function moveToFolder(pkg, folderId) {
-        removeFromFolder(pkg);
-        const f = state.folders.find(x => x.id === folderId);
-        if (f && !f.apps.includes(pkg)) f.apps.push(pkg);
-        save();
-    }
-
-    function removeFromFolder(pkg) {
-        for (const f of state.folders) {
-            const i = f.apps.indexOf(pkg);
-            if (i >= 0) f.apps.splice(i, 1);
-        }
-        save();
-    }
-
-    // apps that live in a folder are hidden from the top-level grid.
-    function topLevelApps() {
-        const inFolder = new Set(state.folders.flatMap(f => f.apps));
-        return apps.filter(a => !inFolder.has(a.packageName));
-    }
-
-    // known packages only, in stored order (drops uninstalled apps silently).
-    function folderApps(folder) {
-        return folder.apps.map(p => appByPkg.get(p)).filter(Boolean);
-    }
+    const folderOf = pkg => state.folders.find(f => f.apps.includes(pkg)) || null;
+    function createFolder(name) { const f = { id: uid(), name: name || 'Ordner', apps: [] }; state.folders.push(f); save(); return f; }
+    function deleteFolder(id) { state.folders = state.folders.filter(f => f.id !== id); save(); }
+    function renameFolder(id, name) { const f = state.folders.find(x => x.id === id); if (f) { f.name = name || f.name; save(); } }
+    function moveToFolder(pkg, folderId) { removeFromFolder(pkg); const f = state.folders.find(x => x.id === folderId); if (f && !f.apps.includes(pkg)) f.apps.push(pkg); save(); }
+    function removeFromFolder(pkg) { for (const f of state.folders) { const i = f.apps.indexOf(pkg); if (i >= 0) f.apps.splice(i, 1); } save(); }
+    function topLevelApps() { const inFolder = new Set(state.folders.flatMap(f => f.apps)); return apps.filter(a => !inFolder.has(a.packageName)); }
+    function folderApps(folder) { return folder.apps.map(p => appByPkg.get(p)).filter(Boolean); }
 
     // ---- dom helpers ----
 
     const $ = id => document.getElementById(id);
-    // function declaration (hoisted): load() calls this before this line runs.
     function clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
+    function hexToRgba(hex, alpha) {
+        const m = /^#?([0-9a-f]{6})$/i.exec((hex || '').trim());
+        if (!m) return hex;
+        const n = parseInt(m[1], 16);
+        return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+    }
 
     let toastTimer = 0;
     function toast(msg) {
         const el = $('status');
-        el.textContent = msg;
-        el.classList.add('show');
+        el.textContent = msg; el.classList.add('show');
         clearTimeout(toastTimer);
         toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
     }
 
-    // tap vs long-press on a tile without firing a launch after a hold.
+    // tap vs scroll vs long-press. the earlier version launched on any touchend
+    // that was not a long-press, so a scroll that started on a tile fired a
+    // launch. now a move past the threshold marks the gesture as a scroll and
+    // suppresses both the tap and the hold.
     function bindTile(el, onTap, onHold) {
-        let timer = 0, held = false, sx = 0, sy = 0;
+        let timer = 0, held = false, moved = false, sx = 0, sy = 0;
+        const THRESH = 12;
+        const clearTimer = () => { clearTimeout(timer); timer = 0; };
         const start = e => {
-            held = false;
+            held = false; moved = false;
             const p = e.touches ? e.touches[0] : e;
             sx = p.clientX; sy = p.clientY;
-            timer = setTimeout(() => { held = true; navigatorVibrate(); onHold && onHold(); }, 480);
+            clearTimer();
+            timer = setTimeout(() => { if (!moved) { held = true; vibrate(); onHold && onHold(); } }, 480);
         };
         const move = e => {
             const p = e.touches ? e.touches[0] : e;
-            if (Math.abs(p.clientX - sx) > 10 || Math.abs(p.clientY - sy) > 10) cancel();
+            if (Math.abs(p.clientX - sx) > THRESH || Math.abs(p.clientY - sy) > THRESH) { moved = true; clearTimer(); }
         };
-        const cancel = () => { clearTimeout(timer); };
-        const end = () => { clearTimeout(timer); if (!held) onTap && onTap(); };
+        const end = () => { clearTimer(); if (!held && !moved) onTap && onTap(); };
         el.addEventListener('touchstart', start, { passive: true });
         el.addEventListener('touchmove', move, { passive: true });
         el.addEventListener('touchend', end);
-        el.addEventListener('touchcancel', cancel);
-        // mouse (browser dev): plain click launches, contextmenu holds.
-        el.addEventListener('click', e => { if (!('ontouchstart' in window)) onTap && onTap(); });
+        el.addEventListener('touchcancel', () => { clearTimer(); moved = true; });
+        // mouse (browser dev): plain click launches, right-click holds.
+        el.addEventListener('click', () => { if (!('ontouchstart' in window)) onTap && onTap(); });
         el.addEventListener('contextmenu', e => { e.preventDefault(); onHold && onHold(); });
     }
+    function vibrate() { try { if (navigator.vibrate) navigator.vibrate(12); } catch (e) {} }
 
-    function navigatorVibrate() {
-        try { if (navigator.vibrate) navigator.vibrate(12); } catch (e) {}
+    function escapeHtml(s) {
+        return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     }
 
-    // ---- tile builders ----
+    // ---- tiles ----
 
     function appTile(app) {
         const el = document.createElement('button');
@@ -258,67 +220,64 @@
         bindTile(el, () => launch(app.packageName), () => openAppActions(app));
         return el;
     }
-
     function folderTile(folder) {
         const el = document.createElement('button');
         el.className = 'tile';
         const preview = folderApps(folder).slice(0, 4)
             .map(a => '<span class="mini">' + svg(guessIcon(a), 'icon-mini') + '</span>').join('');
-        el.innerHTML = '<span class="tile-icon folder-icon">' +
-            (preview || svg('folder')) + '</span>' +
+        el.innerHTML = '<span class="tile-icon folder-icon">' + (preview || svg('folder')) + '</span>' +
             '<span class="tile-label">' + escapeHtml(folder.name) + '</span>';
         bindTile(el, () => openFolder(folder), () => openFolderActions(folder));
         return el;
     }
 
-    function escapeHtml(s) {
-        return String(s).replace(/[&<>"']/g, c => (
-            { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
-        ));
-    }
+    // ---- appearance (css vars + body classes, applied live) ----
 
-    // ---- render ----
-
-    function applyGridVars() {
-        document.body.style.setProperty('--cols', state.cols);
-        document.body.style.setProperty('--icon-color', state.iconColor);
+    function applyStyleVars() {
+        const b = document.body.style;
+        b.setProperty('--cols', state.cols);
+        b.setProperty('--icon-color', state.iconColor);
+        b.setProperty('--gap', state.gap + 'px');
+        b.setProperty('--cell-pad', state.cellPad + 'px');
+        b.setProperty('--cell-radius', state.shape === 'circle' ? '50%' : state.shape === 'square' ? '14px' : '32%');
+        b.setProperty('--cell-border', state.borderSize + 'px');
+        b.setProperty('--cell-border-color', state.borderColor);
+        b.setProperty('--cell-bg', hexToRgba(state.cellBg, state.cellBgAlpha));
+        b.setProperty('--page-bg', hexToRgba(state.pageBg, state.pageBgAlpha));
+        document.body.classList.toggle('no-label', !state.showLabel);
+        document.body.classList.toggle('uppercase', state.uppercase);
+        document.body.classList.toggle('multiline', !state.cutLabel);
+        $('customCssStyle').textContent = state.customCss || '';
+        // when the page bg is not fully opaque, ask native to show the wallpaper behind
+        try { plugin.setShowWallpaper({ show: state.pageBgAlpha < 1 }); } catch (e) {}
     }
 
     function renderHome() {
-        applyGridVars();
         const grid = $('grid');
         grid.innerHTML = '';
         for (const f of state.folders) grid.appendChild(folderTile(f));
         for (const a of topLevelApps()) grid.appendChild(appTile(a));
-        if (!state.folders.length && !apps.length) {
-            grid.innerHTML = '<p class="empty">keine apps gefunden</p>';
-        }
+        if (!state.folders.length && !apps.length) grid.innerHTML = '<p class="empty">keine apps gefunden</p>';
     }
 
-    // ---- actions: launch ----
+    // ---- launch ----
 
     async function launch(pkg) {
-        try {
-            await plugin.launchApp({ packageName: pkg });
-        } catch (e) {
-            toast('konnte app nicht starten');
-        }
+        try { await plugin.launchApp({ packageName: pkg }); }
+        catch (e) { toast('konnte app nicht starten'); }
     }
 
     // ---- overlays ----
 
-    function openOverlay(id) {
-        $('backdrop').hidden = false;
+    function openOverlay(id, withBackdrop) {
+        if (withBackdrop !== false) $('backdrop').hidden = false;
         $(id).hidden = false;
     }
-
     function closeOverlay(id) {
         $(id).hidden = true;
-        // hide the backdrop only when nothing else is open.
-        const anyOpen = ['folderView', 'settingsPanel'].some(x => !$(x).hidden);
+        const anyOpen = ['folderView'].some(x => !$(x).hidden);
         if (!anyOpen) $('backdrop').hidden = true;
     }
-
     function closeAll() {
         ['folderView', 'settingsPanel', 'actionSheet'].forEach(x => { $(x).hidden = true; });
         $('backdrop').hidden = true;
@@ -327,22 +286,18 @@
     // ---- folder overlay ----
 
     let openFolderId = null;
-
     function openFolder(folder) {
         openFolderId = folder.id;
         $('folderTitle').textContent = folder.name;
         const grid = $('folderGrid');
         grid.innerHTML = '';
         const items = folderApps(folder);
-        if (!items.length) {
-            grid.innerHTML = '<p class="empty">ordner ist leer</p>';
-        } else {
-            for (const a of items) grid.appendChild(appTile(a));
-        }
+        if (!items.length) grid.innerHTML = '<p class="empty">ordner ist leer</p>';
+        else for (const a of items) grid.appendChild(appTile(a));
         openOverlay('folderView');
     }
 
-    // ---- action sheet (per-app) ----
+    // ---- action sheet ----
 
     function sheetButton(iconName, label, onClick, danger) {
         const b = document.createElement('button');
@@ -351,79 +306,46 @@
         b.addEventListener('click', () => { closeAll(); onClick(); });
         return b;
     }
-
     function openAppActions(app) {
         $('sheetTitle').textContent = app.label;
         const box = $('sheetActions');
         box.innerHTML = '';
         box.appendChild(sheetButton('open', 'Öffnen', () => launch(app.packageName)));
-
         const current = folderOf(app.packageName);
-        // move-to-folder entries: existing folders (minus the current one).
         for (const f of state.folders) {
             if (current && f.id === current.id) continue;
             box.appendChild(sheetButton('folder', 'In "' + f.name + '" verschieben', () => {
-                moveToFolder(app.packageName, f.id);
-                renderHome();
-                toast('in ' + f.name + ' verschoben');
+                moveToFolder(app.packageName, f.id); renderHome(); toast('in ' + f.name + ' verschoben');
             }));
         }
         box.appendChild(sheetButton('add', 'Neuer Ordner mit App', () => {
-            const name = prompt('Ordnername:', 'Ordner');
-            if (name == null) return;
-            const f = createFolder(name.trim() || 'Ordner');
-            moveToFolder(app.packageName, f.id);
-            renderHome();
+            const name = prompt('Ordnername:', 'Ordner'); if (name == null) return;
+            const f = createFolder(name.trim() || 'Ordner'); moveToFolder(app.packageName, f.id); renderHome();
         }));
         if (current) {
             box.appendChild(sheetButton('back', 'Aus "' + current.name + '" entfernen', () => {
-                removeFromFolder(app.packageName);
-                renderHome();
-                if (!$('folderView').hidden) {
-                    const f = state.folders.find(x => x.id === openFolderId);
-                    if (f) openFolder(f);
-                }
+                removeFromFolder(app.packageName); renderHome();
+                if (!$('folderView').hidden) { const f = state.folders.find(x => x.id === openFolderId); if (f) openFolder(f); }
             }));
         }
         $('actionSheet').hidden = false;
         $('backdrop').hidden = false;
     }
-
     function openFolderActions(folder) {
         $('sheetTitle').textContent = folder.name;
         const box = $('sheetActions');
         box.innerHTML = '';
         box.appendChild(sheetButton('open', 'Öffnen', () => openFolder(folder)));
         box.appendChild(sheetButton('edit', 'Umbenennen', () => {
-            const name = prompt('Ordnername:', folder.name);
-            if (name == null) return;
-            renameFolder(folder.id, name.trim());
-            renderHome();
+            const name = prompt('Ordnername:', folder.name); if (name == null) return;
+            renameFolder(folder.id, name.trim()); renderHome();
         }));
-        box.appendChild(sheetButton('trash', 'Ordner löschen', () => {
-            deleteFolder(folder.id);
-            renderHome();
-        }, true));
+        box.appendChild(sheetButton('trash', 'Ordner löschen', () => { deleteFolder(folder.id); renderHome(); }, true));
         $('actionSheet').hidden = false;
         $('backdrop').hidden = false;
     }
 
     // ---- settings ----
-
-    function renderColsChoice() {
-        const box = $('colsChoice');
-        box.innerHTML = '';
-        for (let c = COLS_MIN; c <= COLS_MAX; c++) {
-            const b = document.createElement('button');
-            b.className = 'seg-btn' + (c === state.cols ? ' active' : '');
-            b.textContent = c;
-            b.addEventListener('click', () => {
-                state.cols = c; save();
-                renderColsChoice(); renderHome();
-            });
-            box.appendChild(b);
-        }
-    }
 
     function renderColorPresets() {
         const box = $('colorPresets');
@@ -433,62 +355,73 @@
             b.className = 'swatch' + (c.toLowerCase() === state.iconColor.toLowerCase() ? ' active' : '');
             b.style.background = c;
             b.setAttribute('aria-label', c);
-            b.addEventListener('click', () => setIconColor(c));
+            b.addEventListener('click', () => { state.iconColor = c; save(); $('iconColor').value = c; renderColorPresets(); applyStyleVars(); });
             box.appendChild(b);
         }
     }
 
-    function setIconColor(c) {
-        state.iconColor = c; save();
-        $('iconColor').value = c;
-        renderColorPresets();
-        applyGridVars();
-        renderHome();
+    function renderShapeSeg() {
+        const box = $('shapeSeg');
+        box.innerHTML = '';
+        for (const s of [['circle', 'Kreis'], ['squircle', 'Squircle'], ['square', 'Eckig']]) {
+            const b = document.createElement('button');
+            b.className = 'seg-btn' + (state.shape === s[0] ? ' active' : '');
+            b.textContent = s[1];
+            b.addEventListener('click', () => { state.shape = s[0]; save(); renderShapeSeg(); applyStyleVars(); });
+            box.appendChild(b);
+        }
+    }
+
+    // wire a range input to a numeric state key, live-applying + showing its value
+    function wireRange(id, key, valId, suffix) {
+        const el = $(id);
+        el.value = state[key];
+        if (valId) $(valId).textContent = state[key] + (suffix || '');
+        el.addEventListener('input', () => {
+            state[key] = Number(el.value); save();
+            if (valId) $(valId).textContent = state[key] + (suffix || '');
+            applyStyleVars();
+        });
+    }
+    function wireColor(id, key) {
+        const el = $(id); el.value = state[key];
+        el.addEventListener('input', () => { state[key] = el.value; save(); applyStyleVars(); if (id === 'iconColor') renderColorPresets(); });
+    }
+    function wireToggle(id, key) {
+        const el = $(id); el.checked = !!state[key];
+        el.addEventListener('change', () => { state[key] = el.checked; save(); applyStyleVars(); });
     }
 
     function renderFolderList() {
         const ul = $('folderList');
         ul.innerHTML = '';
-        if (!state.folders.length) {
-            ul.innerHTML = '<li class="muted">noch keine ordner</li>';
-            return;
-        }
+        if (!state.folders.length) { ul.innerHTML = '<li class="muted">noch keine ordner</li>'; return; }
         for (const f of state.folders) {
             const li = document.createElement('li');
             li.className = 'folder-row';
             li.innerHTML = '<span class="folder-row-name">' + svg('folder', 'icon-sm') +
-                '<span>' + escapeHtml(f.name) + '</span>' +
-                '<em>' + folderApps(f).length + '</em></span>';
+                '<span>' + escapeHtml(f.name) + '</span><em>' + folderApps(f).length + '</em></span>';
             const actions = document.createElement('span');
             actions.className = 'folder-row-actions';
             const rn = document.createElement('button');
-            rn.className = 'icon-btn'; rn.innerHTML = svg('edit', 'icon-sm');
-            rn.setAttribute('aria-label', 'Umbenennen');
-            rn.addEventListener('click', () => {
-                const name = prompt('Ordnername:', f.name);
-                if (name == null) return;
-                renameFolder(f.id, name.trim());
-                renderFolderList(); renderHome();
-            });
+            rn.className = 'icon-btn'; rn.innerHTML = svg('edit', 'icon-sm'); rn.setAttribute('aria-label', 'Umbenennen');
+            rn.addEventListener('click', () => { const name = prompt('Ordnername:', f.name); if (name == null) return; renameFolder(f.id, name.trim()); renderFolderList(); renderHome(); });
             const del = document.createElement('button');
-            del.className = 'icon-btn danger'; del.innerHTML = svg('trash', 'icon-sm');
-            del.setAttribute('aria-label', 'Löschen');
-            del.addEventListener('click', () => {
-                deleteFolder(f.id);
-                renderFolderList(); renderHome();
-            });
+            del.className = 'icon-btn danger'; del.innerHTML = svg('trash', 'icon-sm'); del.setAttribute('aria-label', 'Löschen');
+            del.addEventListener('click', () => { deleteFolder(f.id); renderFolderList(); renderHome(); });
             actions.appendChild(rn); actions.appendChild(del);
             li.appendChild(actions);
             ul.appendChild(li);
         }
     }
 
+    // settings shows WITHOUT the dimming/blur backdrop so the grid stays readable
+    // and previews changes live while you adjust.
     function openSettings() {
-        renderColsChoice();
         renderColorPresets();
+        renderShapeSeg();
         renderFolderList();
-        $('iconColor').value = state.iconColor;
-        openOverlay('settingsPanel');
+        openOverlay('settingsPanel', false);
     }
 
     // ---- wiring ----
@@ -496,53 +429,48 @@
     function wire() {
         $('settingsToggle').addEventListener('click', openSettings);
         $('backdrop').addEventListener('click', closeAll);
-
-        // any [data-close] closes its named overlay.
-        document.querySelectorAll('[data-close]').forEach(el => {
-            el.addEventListener('click', () => closeOverlay(el.getAttribute('data-close')));
-        });
-        // the action sheet cancel closes everything (backdrop included).
+        document.querySelectorAll('[data-close]').forEach(el => el.addEventListener('click', () => closeOverlay(el.getAttribute('data-close'))));
         document.querySelector('.sheet-cancel').addEventListener('click', closeAll);
 
-        $('iconColor').addEventListener('input', e => setIconColor(e.target.value));
-        $('addFolderBtn').addEventListener('click', () => {
-            const name = prompt('Ordnername:', 'Ordner');
-            if (name == null) return;
-            createFolder(name.trim() || 'Ordner');
-            renderFolderList(); renderHome();
-        });
+        wireRange('rangeCols', 'cols', 'valCols');
+        wireRange('rangeGap', 'gap', 'valGap', 'px');
+        wireRange('rangePad', 'cellPad', 'valPad', 'px');
+        wireRange('rangeBorder', 'borderSize', 'valBorder', 'px');
+        wireRange('rangeCellAlpha', 'cellBgAlpha', 'valCellAlpha');
+        wireRange('rangePageAlpha', 'pageBgAlpha', 'valPageAlpha');
+        wireColor('iconColor', 'iconColor');
+        wireColor('borderColor', 'borderColor');
+        wireColor('cellBg', 'cellBg');
+        wireColor('pageBg', 'pageBg');
+        wireToggle('toggleLabel', 'showLabel');
+        wireToggle('toggleUppercase', 'uppercase');
+        wireToggle('toggleMultiline', 'cutLabel'); // note: checked = cut (single line)
 
-        // esc closes overlays (browser dev convenience).
+        const css = $('customCss');
+        css.value = state.customCss || '';
+        css.addEventListener('input', () => { state.customCss = css.value; save(); applyStyleVars(); });
+
+        $('addFolderBtn').addEventListener('click', () => {
+            const name = prompt('Ordnername:', 'Ordner'); if (name == null) return;
+            createFolder(name.trim() || 'Ordner'); renderFolderList(); renderHome();
+        });
         document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAll(); });
     }
 
-    // ---- init ----
-
-    // fill static chrome buttons (fab, overlay-close, chips) with their glyph.
     function renderStaticIcons() {
-        document.querySelectorAll('[data-icon]').forEach(el => {
-            el.insertAdjacentHTML('afterbegin', svg(el.getAttribute('data-icon'), 'icon-sm'));
-        });
+        document.querySelectorAll('[data-icon]').forEach(el => el.insertAdjacentHTML('afterbegin', svg(el.getAttribute('data-icon'), 'icon-sm')));
     }
 
     async function init() {
         renderStaticIcons();
         wire();
-        applyGridVars();
-        try {
-            const res = await plugin.getApps();
-            apps = (res && res.apps) || [];
-        } catch (e) {
-            apps = [];
-            toast('konnte apps nicht laden');
-        }
+        applyStyleVars();
+        try { const res = await plugin.getApps(); apps = (res && res.apps) || []; }
+        catch (e) { apps = []; toast('konnte apps nicht laden'); }
         appByPkg = new Map(apps.map(a => [a.packageName, a]));
         renderHome();
     }
 
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', init);
-    } else {
-        init();
-    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+    else init();
 })();
