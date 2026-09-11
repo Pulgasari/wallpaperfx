@@ -11,6 +11,8 @@
 - [ ] add option for grid: gap-size
 - [ ] add option for grid-cell: padding-size 
 - [ ] add option for grid-cell: shape (circle, square, squircle)
+- [ ] add option for grid-cell: border-size, border-color
+- [ ] add option for grid-cell: background color + transparenz
 - [ ] add toggle: show appname
 - [ ] add toggle: uppercase appname
 - [ ] add toggle: cut appname (or multiline)
