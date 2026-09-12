@@ -9,6 +9,9 @@
 - [x] add button to dock: search in page
 - [x] add button to dock: settings
 
+dock:
+- [ ] der dock darf doch nicht aus freischwebenden buttons bestehen, der den webview überlagert, weil das für ux-probleme sorgt. daher sollte er eine geschlossene leisten werden. default unter dem webview positioniert, in den settings aber als oben drüber einstellbar
+
 settings-options:
   - [x] colors: bg / fg / accent
   - [x] position dock: top : bottom
