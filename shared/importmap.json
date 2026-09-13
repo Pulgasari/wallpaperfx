@@ -1,5 +1,7 @@
 {
   "imports": {
+    "@aufbau/ass"       : "./vendor/@aufbau/ass/index.js",
+    "@aufbau/ass/"      : "./vendor/@aufbau/ass/",
     "@aufbau/filters"   : "./vendor/@aufbau/filters/index.js",
     "@aufbau/filters/"  : "./vendor/@aufbau/filters/",
     "@aufbau/gestures"  : "./vendor/@aufbau/gestures/index.js",
