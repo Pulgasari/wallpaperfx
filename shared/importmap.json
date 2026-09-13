@@ -1,16 +1,16 @@
 {
   "imports": {
-    "@aufbau/filters": "./vendor/@aufbau/filters/index.js",
-    "@aufbau/filters/": "./vendor/@aufbau/filters/",
-    "@aufbau/gestures": "./vendor/@aufbau/gestures/index.js",
-    "@aufbau/gestures/": "./vendor/@aufbau/gestures/",
-    "@aufbau/patterns": "./vendor/@aufbau/patterns/index.js",
-    "@aufbau/patterns/": "./vendor/@aufbau/patterns/",
-    "@domina/methods": "./vendor/@domina/methods/index.js",
-    "@domina/methods/": "./vendor/@domina/methods/",
-    "@pulgasari/is": "./vendor/@pulgasari/is/index.js",
-    "@pulgasari/is/": "./vendor/@pulgasari/is/",
-    "@pulgasari/str": "./vendor/@pulgasari/str/index.js",
-    "@pulgasari/str/": "./vendor/@pulgasari/str/"
+    "@aufbau/filters"   : "./vendor/@aufbau/filters/index.js",
+    "@aufbau/filters/"  : "./vendor/@aufbau/filters/",
+    "@aufbau/gestures"  : "./vendor/@aufbau/gestures/index.js",
+    "@aufbau/gestures/" : "./vendor/@aufbau/gestures/",
+    "@aufbau/patterns"  : "./vendor/@aufbau/patterns/index.js",
+    "@aufbau/patterns/" : "./vendor/@aufbau/patterns/",
+    "@domina/methods"   : "./vendor/@domina/methods/index.js",
+    "@domina/methods/"  : "./vendor/@domina/methods/",
+    "@pulgasari/is"     : "./vendor/@pulgasari/is/index.js",
+    "@pulgasari/is/"    : "./vendor/@pulgasari/is/",
+    "@pulgasari/str"    : "./vendor/@pulgasari/str/index.js",
+    "@pulgasari/str/"   : "./vendor/@pulgasari/str/"
   }
 }
