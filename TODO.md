@@ -9,10 +9,26 @@
 - [x] add button to dock: search in page
 - [x] add button to dock: settings
 
-dock:
+### context-menu
+- [ ] grundsätzlich den mechanismus bauen
+- [ ] bei der url-leise testweise einbauen
+  - [ ] add to bookmarks
+  - [ ] reload / hard reload
+  - [ ] close
+
+### dashboard
+quasi die startseite oder bei leerer tab.
+
+- [ ] rendert zunächst erstmal die bookmarks als grid
+
+### dock:
 - [ ] der dock darf doch nicht aus freischwebenden buttons bestehen, der den webview überlagert, weil das für ux-probleme sorgt. daher sollte er eine geschlossene leisten werden. default unter dem webview positioniert, in den settings aber als oben drüber einstellbar
 
-settings-options:
+### gestures
+- [ ] reload = webview nach unten ziehen
+- [ ] hard reload = webview nach unten ziehen und halten
+
+### settings-options:
   - [x] colors: bg / fg / accent
   - [x] position dock: top : bottom
   - [x] position lade-anzeiger: top | bottom
@@ -56,6 +72,14 @@ da ich mich hier thematisch nicht so megagut auskenne, kannst du mir auch gerne 
 - [x] gesamthintergrund einstellbar: farbe, transparenz (sodass zb der wallpapers-bg durchscheinen könnte oder whatever) oder kann man nich sogar den bg live abgreifen direkt?
 
 ## Wallpapers
+
+---
+
+# tooling
+
+- [x] `@pulgasari/is` published: https://jsr.io/@pulgasari/is
+- [x] `@pulgasari/logger` published: https://jsr.io/@pulgasari/logger
+- [X] `@pulgasari/str` published: https://jsr.io/@pulgasari/str
 
 ---
 
