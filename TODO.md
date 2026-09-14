@@ -9,6 +9,12 @@
 - [x] add button to dock: search in page
 - [x] add button to dock: settings
 
+### bookmarks
+- [ ] folders
+- [ ] tags
+- [ ] export/import as/from html (zumindest bild ich mir ein dass das typischer mechanismus ist?)
+- [ ] export/import as/from json
+
 ### context-menu
 - [ ] grundsätzlich den mechanismus bauen
 - [ ] bei der url-leise testweise einbauen
@@ -25,6 +31,8 @@ quasi die startseite oder bei leerer tab.
 - [ ] der dock darf doch nicht aus freischwebenden buttons bestehen, der den webview überlagert, weil das für ux-probleme sorgt. daher sollte er eine geschlossene leisten werden. default unter dem webview positioniert, in den settings aber als oben drüber einstellbar
 
 ### gestures
+(auf basis von `@aufbau/gestures` ?)
+
 - [ ] reload = webview nach unten ziehen
 - [ ] hard reload = webview nach unten ziehen und halten
 
