@@ -7,6 +7,7 @@
     --accent: #4f8cff;
     --dock-size: 46px;
     --dock-gap: 12px;
+    --strip: 104px; /* dock bar height; MUST match MainActivity.collapsedPx (104dp) */
 }
 @media (prefers-color-scheme: light) {
     :root { --bg: #f6f6f4; --fg: #17181b; }
@@ -26,35 +27,43 @@ html, body {
     -webkit-user-select: none; user-select: none;
 }
 
-/* ===== dock (collapsed strip) ===== */
+/* ===== dock: a closed bar, not floating chips. the bar is the opaque surface
+   filling the reserved strip (content is inset by --strip natively, so the bar
+   owns its space instead of overlapping the page). buttons sit flat on it. ===== */
 .bar {
-    position: fixed; left: 0; right: 0; bottom: 0; height: 100%;
+    position: fixed; left: 0; right: 0; bottom: 0; height: var(--strip);
     display: flex; align-items: center; justify-content: center; gap: var(--dock-gap);
     padding: 0 14px calc(env(safe-area-inset-bottom) + 14px);
+    background: var(--bg); border-top: 1px solid var(--line);
     overflow: hidden;
 }
-body.dock-top .bar { top: 0; bottom: auto; padding: calc(env(safe-area-inset-top) + 14px) 14px 0; }
+body.dock-top .bar { top: 0; bottom: auto; padding: calc(env(safe-area-inset-top) + 14px) 14px 0; border-top: 0; border-bottom: 1px solid var(--line); }
 .dock-group { display: flex; align-items: center; gap: var(--dock-gap); flex: 0 0 auto; }
 .pill {
     flex: 1 1 0; min-width: 40px; max-width: 62vw; height: var(--dock-size); padding: 0 20px;
     display: inline-flex; align-items: center; justify-content: center;
-    border: 1px solid var(--line); border-radius: 999px; background: var(--bg); color: var(--fg);
+    border: 1px solid var(--line); border-radius: 999px; background: var(--faint); color: var(--fg);
     font-size: 14px; cursor: pointer;
 }
 .pill #pillText { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .trig {
-    flex: 0 0 auto; width: var(--dock-size); height: var(--dock-size); border-radius: 50%;
-    border: 1px solid var(--line); background: var(--bg); color: var(--fg);
+    flex: 0 0 auto; width: var(--dock-size); height: var(--dock-size); border-radius: 12px;
+    border: 0; background: transparent; color: var(--fg);
     display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
 }
+.trig:active { background: var(--faint); }
 .trig svg, .pill svg { width: 20px; height: 20px; }
 
-/* ===== load progress (position configurable) ===== */
+/* ===== load progress: sits on the content/bar seam. content is inset by --strip
+   on the dock side, so the loader rides the top or bottom edge of that region,
+   independent of which side the dock is on (four combos below). ===== */
 .prog {
     position: fixed; left: 0; right: 0; z-index: 5; height: 2px; background: var(--faint);
-    bottom: calc(env(safe-area-inset-bottom) + var(--dock-size) + 26px); top: auto;
+    bottom: var(--strip); top: auto;
 }
-body.loader-top .prog { top: 0; bottom: auto; }
+body.dock-top .prog { bottom: 0; top: auto; }                         /* dock top -> content reaches screen bottom */
+body.loader-top .prog { top: 0; bottom: auto; }                       /* loader top, dock bottom */
+body.dock-top.loader-top .prog { top: var(--strip); bottom: auto; }   /* both at top */
 .prog span { display: block; height: 100%; width: 0; background: var(--accent); transition: width .15s; }
 
 /* ===== panels ===== */

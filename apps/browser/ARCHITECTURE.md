@@ -32,11 +32,16 @@ A transparent full-screen WebView on top would still eat every touch, so the
 content below would be dead. Rather than punching touch-through holes, we size the
 chrome WebView to exactly the region it needs:
 
-- **collapsed**: chrome WebView = a bottom **strip** (~104dp) holding the pill +
-  the two trigger buttons. Everything above the strip is the content WebView and
-  is fully interactive.
+- **collapsed**: chrome WebView = a **strip** (~104dp = `collapsedPx`) holding the
+  dock bar (pill + buttons), anchored top or bottom. The `contentContainer` carries
+  a `collapsedPx` margin on that same side, so the content WebView sits *beside* the
+  strip, not behind it — the dock is a closed bar that reserves its own space and
+  the rest of the screen is fully interactive content. (Without the inset a
+  transparent strip on top eats touches over the bottom of every page.)
 - **expanded**: chrome WebView = **fullscreen** (modal) while a panel (url / tabs
-  / bookmarks) is open; it legitimately owns all touches then.
+  / bookmarks) is open; it legitimately owns all touches then. The content inset
+  does not change on expand/collapse (only on a dock-position change), so pages do
+  not reflow when a panel opens.
 
 `MainActivity.setChromeExpanded(boolean)` swaps the chrome WebView's layout height
 between `collapsedPx` and `MATCH_PARENT`. The chrome js calls
@@ -78,10 +83,13 @@ them. Retheming = change two values. Keep it that way.
 
 ## Dock + settings
 
-The dock is configurable (chrome-side, `localStorage` `browser.settings`): which
-buttons show, their order (they split evenly around the pill), size, gap, and the
-dock/loader position (top or bottom — dock position also calls
-`BrowserPlugin.setDockPosition`, which re-anchors the native strip). Colors are
+The dock is a **closed bar** (opaque `--bg` surface, bottom-anchored by default),
+not floating chips — buttons sit flat on it and it reserves its own space via the
+content inset above. It is configurable (chrome-side, `localStorage`
+`browser.settings`): which buttons show, their order (they split evenly around the
+pill), size, gap, and the dock/loader position (top or bottom — dock position also
+calls `BrowserPlugin.setDockPosition`, which re-anchors the native strip and moves
+the content inset with it). Colors are
 three tokens `--bg/--fg/--accent`. Buttons: tabs, bookmarks, find-in-page,
 dev-tools, userscripts, settings.
 
