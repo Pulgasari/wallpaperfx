@@ -60,10 +60,48 @@
     <div class="sheet-body">
         <div class="sheet-head">
             <span class="sheet-title">Lesezeichen</span>
-            <span class="sheet-actions"><button id="addMarkBtn" class="txt-btn">Aktuelle Seite</button></span>
+            <span class="sheet-actions">
+                <button id="markIoBtn" class="txt-btn">Import/Export</button>
+                <button id="newFolderBtn" class="txt-btn">Ordner</button>
+                <button id="addMarkBtn" class="txt-btn">Aktuelle Seite</button>
+            </span>
         </div>
-        <ul id="markList" class="rows"></ul>
+        <div id="markGroups"></div>
         <p id="marksEmpty" class="empty">noch keine Lesezeichen</p>
+
+        <!-- edit a bookmark (title / url / folder / tags) -->
+        <div id="markEditor" class="editor" hidden>
+            <input id="markTitle" class="in" placeholder="Titel" />
+            <input id="markUrl" class="in" placeholder="URL" inputmode="url" autocapitalize="off" spellcheck="false" />
+            <label class="field-label">Ordner</label>
+            <select id="markFolder" class="in"></select>
+            <input id="markTags" class="in" placeholder="Tags (Leerzeichen-getrennt)" autocapitalize="off" spellcheck="false" />
+            <div class="editor-actions">
+                <button id="markDelete" class="txt-btn danger">Löschen</button>
+                <button id="markCancel" class="txt-btn">Abbrechen</button>
+                <button id="markSave" class="txt-btn primary">Speichern</button>
+            </div>
+        </div>
+
+        <!-- import / export via copy-paste (json or netscape html) -->
+        <div id="markIO" class="editor" hidden>
+            <div id="markIoFmt" class="seg"></div>
+            <textarea id="markIoText" class="css-area" spellcheck="false" placeholder="Export: der Inhalt erscheint hier zum Kopieren. Import: hier einfügen und Import drücken."></textarea>
+            <div class="editor-actions">
+                <button id="markIoClose" class="txt-btn">Schließen</button>
+                <button id="markIoExport" class="txt-btn">Export</button>
+                <button id="markIoImport" class="txt-btn primary">Import</button>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ===== dashboard: start page for a new tab (bookmarks grid) ===== -->
+<section id="panelDash" class="panel dash" hidden aria-label="Start">
+    <div class="dash-body">
+        <button id="dashSearch" class="dash-search">Suchen oder URL</button>
+        <div id="dashGrid" class="dash-grid"></div>
+        <p id="dashEmpty" class="empty">noch keine Lesezeichen</p>
     </div>
 </section>
 

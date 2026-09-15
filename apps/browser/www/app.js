@@ -52,6 +52,7 @@
         reload: '<path d="M20 11a8 8 0 1 0-2.34 5.66"/><path d="M20 4v5h-5"/>',
         bolt: '<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>',
         x: '<line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/>',
+        pencil: '<path d="M4 20h4L18.5 9.5a2 2 0 0 0-2.83-2.83L5 17.5V20z"/><path d="M13.5 6.5l4 4"/>',
     };
     const svg = name => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (ICONS[name] || '') + '</svg>';
 
@@ -83,7 +84,7 @@
     let ns = { tabs: [], activeId: '', expanded: false };
     let local = loadLocal();
     let panel = null;
-    const PANELS = ['panelUrl', 'panelFind', 'panelTabs', 'panelMarks', 'panelScripts', 'panelSettings', 'panelMenu'];
+    const PANELS = ['panelUrl', 'panelFind', 'panelTabs', 'panelMarks', 'panelScripts', 'panelSettings', 'panelMenu', 'panelDash'];
 
     function loadLocal() {
         let s = {};
@@ -97,6 +98,7 @@
         for (const id of known) if (!seen.has(id)) settings.dock.push({ id, on: id !== 'devtools' });
         return {
             bookmarks: Array.isArray(s.bookmarks) ? s.bookmarks : [],
+            bookmarkFolders: Array.isArray(s.bookmarkFolders) ? s.bookmarkFolders : [],
             groups: Array.isArray(s.groups) ? s.groups : [],
             tabGroups: s.tabGroups && typeof s.tabGroups === 'object' ? s.tabGroups : {},
             userscripts: Array.isArray(s.userscripts) ? s.userscripts : [],
@@ -151,7 +153,7 @@
         panel = name;
         PANELS.forEach(id => { $(id).hidden = true; });
         try { await plugin.setChromeExpanded({ expanded: true }); } catch {}
-        const map = { url: 'panelUrl', find: 'panelFind', tabs: 'panelTabs', marks: 'panelMarks', scripts: 'panelScripts', settings: 'panelSettings', menu: 'panelMenu' };
+        const map = { url: 'panelUrl', find: 'panelFind', tabs: 'panelTabs', marks: 'panelMarks', scripts: 'panelScripts', settings: 'panelSettings', menu: 'panelMenu', dash: 'panelDash' };
         $(map[name]).hidden = false;
         if (name === 'url') primeUrl();
         if (name === 'find') primeFind();
@@ -159,6 +161,7 @@
         if (name === 'marks') renderMarks();
         if (name === 'scripts') renderScripts();
         if (name === 'settings') renderSettings();
+        if (name === 'dash') renderDash();
     }
     async function closePanel() {
         const wasFind = panel === 'find';
@@ -233,17 +236,138 @@
     }
 
     // ---- bookmarks ----
+    const folderName = id => { const f = local.bookmarkFolders.find(x => x.id === id); return f ? f.name : ''; };
+    function markRow(b) {
+        const li = document.createElement('li'); li.className = 'row';
+        const dom = domainOf(b.url);
+        const tags = (b.tags || []).map(t => `<span class="tag">${esc(t)}</span>`).join('');
+        li.innerHTML =
+            `<span class="ricon">${esc((dom[0] || '?').toUpperCase())}</span>` +
+            `<span class="rtext"><b>${esc(b.title || dom)}</b><span>${esc(dom)}</span>${tags ? `<span class="tags">${tags}</span>` : ''}</span>`;
+        const edit = document.createElement('button'); edit.className = 'icon-btn'; edit.innerHTML = svg('pencil'); edit.setAttribute('aria-label', 'Bearbeiten');
+        edit.addEventListener('click', e => { e.stopPropagation(); openMarkEditor(b); });
+        li.appendChild(edit);
+        li.addEventListener('click', () => go(b.url));
+        return li;
+    }
     function renderMarks() {
-        const ul = $('markList'); ul.innerHTML = '';
+        $('markEditor').hidden = true; $('markIO').hidden = true; $('markGroups').hidden = false;
+        const box = $('markGroups'); box.innerHTML = '';
         $('marksEmpty').hidden = local.bookmarks.length > 0;
+        // group by folder: known folders in order, then the ungrouped rest
+        const buckets = new Map();
+        for (const b of local.bookmarks) { const g = b.folder || ''; if (!buckets.has(g)) buckets.set(g, []); buckets.get(g).push(b); }
+        const order = [...local.bookmarkFolders.map(f => f.id).filter(id => buckets.has(id)), ...(buckets.has('') ? [''] : [])];
+        for (const gid of order) {
+            const section = document.createElement('div'); section.className = 'group';
+            const name = gid ? folderName(gid) : (local.bookmarkFolders.length ? 'Ohne Ordner' : '');
+            if (name) section.innerHTML = `<div class="group-head"><span>${esc(name)}</span><span class="line"></span></div>`;
+            const ul = document.createElement('ul'); ul.className = 'rows';
+            for (const b of buckets.get(gid)) ul.appendChild(markRow(b));
+            section.appendChild(ul); box.appendChild(section);
+        }
+    }
+    function newFolder() {
+        const name = prompt('Ordnername:', 'Ordner'); if (name == null) return;
+        local.bookmarkFolders.push({ id: uid('f'), name: name.trim() || 'Ordner' }); saveLocal(); renderMarks();
+    }
+
+    // ---- bookmark editor (title / url / folder / tags) ----
+    let editingMark = null;
+    function openMarkEditor(b) {
+        editingMark = b;
+        $('markTitle').value = b.title || '';
+        $('markUrl').value = b.url || '';
+        $('markTags').value = (b.tags || []).join(' ');
+        $('markFolder').innerHTML = `<option value="">Ohne Ordner</option>` + local.bookmarkFolders.map(f => `<option value="${f.id}">${esc(f.name)}</option>`).join('');
+        $('markFolder').value = b.folder || '';
+        $('markGroups').hidden = true; $('marksEmpty').hidden = true; $('markIO').hidden = true; $('markEditor').hidden = false;
+    }
+    function saveMark() {
+        if (!editingMark) return;
+        editingMark.title = $('markTitle').value.trim();
+        editingMark.url = $('markUrl').value.trim();
+        editingMark.folder = $('markFolder').value || undefined;
+        editingMark.tags = $('markTags').value.split(/\s+/).filter(Boolean);
+        saveLocal(); renderMarks();
+    }
+    function deleteMark() {
+        if (!editingMark) return;
+        local.bookmarks = local.bookmarks.filter(b => b !== editingMark);
+        editingMark = null; saveLocal(); renderMarks();
+    }
+
+    // ---- import / export (json | netscape html), copy-paste ----
+    let ioFmt = 'json';
+    function openMarkIO() {
+        $('markGroups').hidden = true; $('marksEmpty').hidden = true; $('markEditor').hidden = true; $('markIO').hidden = false;
+        const draw = () => renderSeg('markIoFmt', [['json', 'JSON'], ['html', 'HTML']], ioFmt, v => { ioFmt = v; draw(); });
+        draw();
+        $('markIoText').value = '';
+    }
+    function exportMarks() {
+        $('markIoText').value = ioFmt === 'html'
+            ? toNetscape()
+            : JSON.stringify({ bookmarks: local.bookmarks, bookmarkFolders: local.bookmarkFolders }, null, 2);
+        $('markIoText').focus(); $('markIoText').select();
+    }
+    function importMarks() {
+        const text = $('markIoText').value.trim(); if (!text) return;
+        const added = ioFmt === 'html' ? fromNetscape(text) : fromJSON(text);
+        if (!added) return;
+        const have = new Set(local.bookmarks.map(b => b.url));
+        local.bookmarkFolders.push(...added.folders);
+        for (const b of added.bookmarks) if (b.url && !have.has(b.url)) { local.bookmarks.push(b); have.add(b.url); }
+        saveLocal(); renderMarks();
+    }
+    function toNetscape() {
+        const line = b => `    <DT><A HREF="${esc(b.url)}"${b.tags && b.tags.length ? ` TAGS="${esc(b.tags.join(','))}"` : ''}>${esc(b.title || domainOf(b.url))}</A>\n`;
+        let out = '<!DOCTYPE NETSCAPE-Bookmark-file-1>\n<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8">\n<TITLE>Bookmarks</TITLE>\n<H1>Bookmarks</H1>\n<DL><p>\n';
+        for (const f of local.bookmarkFolders) {
+            const items = local.bookmarks.filter(b => b.folder === f.id);
+            if (!items.length) continue;
+            out += `    <DT><H3>${esc(f.name)}</H3>\n    <DL><p>\n`;
+            for (const b of items) out += '    ' + line(b);
+            out += '    </DL><p>\n';
+        }
+        for (const b of local.bookmarks.filter(b => !b.folder)) out += line(b);
+        return out + '</DL><p>\n';
+    }
+    // json keeps folders (ids remapped); html import is flat (folders as h3 are lost on re-import, standard interop tradeoff)
+    function fromJSON(text) {
+        let data; try { data = JSON.parse(text); } catch { return null; }
+        const idMap = {}; const folders = [];
+        for (const f of (Array.isArray(data.bookmarkFolders) ? data.bookmarkFolders : [])) {
+            if (!f || !f.name) continue; const nf = { id: uid('f'), name: String(f.name) }; idMap[f.id] = nf.id; folders.push(nf);
+        }
+        const src = Array.isArray(data.bookmarks) ? data.bookmarks : Array.isArray(data) ? data : [];
+        const bookmarks = src.filter(b => b && b.url).map(b => ({
+            id: uid('b'), url: b.url, title: b.title || domainOf(b.url), folder: idMap[b.folder], tags: Array.isArray(b.tags) ? b.tags : [],
+        }));
+        return { bookmarks, folders };
+    }
+    function fromNetscape(html) {
+        let doc; try { doc = new DOMParser().parseFromString(html, 'text/html'); } catch { return null; }
+        const anchors = [...doc.querySelectorAll('a[href]')];
+        if (!anchors.length) return null;
+        const bookmarks = anchors.map(a => {
+            const url = a.getAttribute('href'); if (!url || /^(javascript|place):/i.test(url)) return null;
+            const tags = (a.getAttribute('tags') || '').split(',').map(t => t.trim()).filter(Boolean);
+            return { id: uid('b'), url, title: (a.textContent || domainOf(url)).trim(), tags };
+        }).filter(Boolean);
+        return { bookmarks, folders: [] };
+    }
+
+    // ---- dashboard (new-tab start page: bookmarks grid) ----
+    function renderDash() {
+        const grid = $('dashGrid'); grid.innerHTML = '';
+        $('dashEmpty').hidden = local.bookmarks.length > 0;
         for (const b of local.bookmarks) {
-            const li = document.createElement('li'); li.className = 'row';
             const dom = domainOf(b.url);
-            li.innerHTML = `<span class="ricon">${esc((dom[0] || '?').toUpperCase())}</span><span class="rtext"><b>${esc(b.title || dom)}</b><span>${esc(dom)}</span></span>`;
-            const del = document.createElement('button'); del.className = 'icon-btn'; del.textContent = '×'; del.setAttribute('aria-label', 'Löschen');
-            del.addEventListener('click', e => { e.stopPropagation(); local.bookmarks = local.bookmarks.filter(x => x.id !== b.id); saveLocal(); renderMarks(); });
-            li.appendChild(del); li.addEventListener('click', () => go(b.url));
-            ul.appendChild(li);
+            const tile = document.createElement('div'); tile.className = 'tile';
+            tile.innerHTML = `<span class="fav">${esc((dom[0] || '?').toUpperCase())}</span><b>${esc(b.title || dom)}</b>`;
+            tile.addEventListener('click', () => go(b.url));
+            grid.appendChild(tile);
         }
     }
     function addCurrentBookmark() {
@@ -406,9 +530,18 @@
         $('findInput').addEventListener('input', () => plugin.findInPage({ query: $('findInput').value }));
         $('findPrev').addEventListener('click', () => plugin.findNext({ forward: false }));
 
-        $('newTabBtn').addEventListener('click', async () => { await plugin.newTab({}); openPanel('url'); });
+        $('newTabBtn').addEventListener('click', async () => { await plugin.newTab({}); openPanel('dash'); });
         $('newGroupBtn').addEventListener('click', () => { const name = prompt('Gruppenname:', 'Gruppe'); if (name == null) return; local.groups.push({ id: uid('g'), name: name.trim() || 'Gruppe' }); saveLocal(); renderTabs(); });
         $('addMarkBtn').addEventListener('click', addCurrentBookmark);
+        $('newFolderBtn').addEventListener('click', newFolder);
+        $('markIoBtn').addEventListener('click', openMarkIO);
+        $('markSave').addEventListener('click', saveMark);
+        $('markDelete').addEventListener('click', deleteMark);
+        $('markCancel').addEventListener('click', renderMarks);
+        $('markIoClose').addEventListener('click', renderMarks);
+        $('markIoExport').addEventListener('click', exportMarks);
+        $('markIoImport').addEventListener('click', importMarks);
+        $('dashSearch').addEventListener('click', () => openPanel('url'));
 
         $('newScriptBtn').addEventListener('click', () => openScriptEditor(null));
         $('scriptSave').addEventListener('click', saveScript);
