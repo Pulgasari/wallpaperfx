@@ -85,13 +85,17 @@
             </div>
         </div>
 
-        <!-- import / export via copy-paste (json or netscape html) -->
+        <!-- import / export: to/from a file (capacitor filesystem, download on web) or
+             via copy-paste in the textarea. json keeps folders; netscape html is flat. -->
         <div id="markIO" class="editor" hidden>
             <div id="markIoFmt" class="seg"></div>
-            <textarea id="markIoText" class="css-area" spellcheck="false" placeholder="Export: der Inhalt erscheint hier zum Kopieren. Import: hier einfügen und Import drücken."></textarea>
+            <textarea id="markIoText" class="css-area" spellcheck="false" placeholder="Speichern schreibt eine Datei und zeigt den Inhalt hier zum Kopieren. Zum Importieren eine Datei laden, oder Text hier einfügen und Import drücken."></textarea>
+            <p id="markIoStatus" class="io-status" hidden></p>
+            <input id="markIoFile" type="file" accept=".json,.html,.htm,application/json,text/html" hidden />
             <div class="editor-actions">
                 <button id="markIoClose" class="txt-btn">Schließen</button>
-                <button id="markIoExport" class="txt-btn">Export</button>
+                <button id="markIoLoad" class="txt-btn">Laden</button>
+                <button id="markIoExport" class="txt-btn">Speichern</button>
                 <button id="markIoImport" class="txt-btn primary">Import</button>
             </div>
         </div>

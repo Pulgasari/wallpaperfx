@@ -334,28 +334,75 @@
         editingMark = null; saveLocal(); renderMarks();
     }
 
-    // ---- import / export (json | netscape html), copy-paste ----
+    // ---- import / export (json | netscape html): file (capacitor fs) or copy-paste ----
     let ioFmt = 'json';
+    function drawIoSeg() { renderSeg('markIoFmt', [['json', 'JSON'], ['html', 'HTML']], ioFmt, v => { ioFmt = v; drawIoSeg(); }); }
+    function ioStatus(msg) { const el = $('markIoStatus'); el.textContent = msg || ''; el.hidden = !msg; }
     function openMarkIO() {
         $('markGroups').hidden = true; $('marksEmpty').hidden = true; $('markEditor').hidden = true; $('markIO').hidden = false;
-        const draw = () => renderSeg('markIoFmt', [['json', 'JSON'], ['html', 'HTML']], ioFmt, v => { ioFmt = v; draw(); });
-        draw();
-        $('markIoText').value = '';
+        drawIoSeg();
+        $('markIoText').value = ''; ioStatus('');
     }
-    function exportMarks() {
-        $('markIoText').value = ioFmt === 'html'
-            ? toNetscape()
-            : JSON.stringify({ bookmarks: local.bookmarks, bookmarkFolders: local.bookmarkFolders }, null, 2);
-        $('markIoText').focus(); $('markIoText').select();
+    const ioText = () => ioFmt === 'html'
+        ? toNetscape()
+        : JSON.stringify({ bookmarks: local.bookmarks, bookmarkFolders: local.bookmarkFolders }, null, 2);
+    // the native @capacitor/filesystem plugin, exposed on Capacitor.Plugins once cap sync
+    // registers it (same access path as the custom Browser plugin). null on web.
+    const fsPlugin = () => { const c = window.Capacitor; return c && c.Plugins && c.Plugins.Filesystem ? c.Plugins.Filesystem : null; };
+    // write text to a user-visible file. android: filesystem -> Documents, else app-external
+    // (scoped storage can reject Documents on some api levels). web: blob download. returns
+    // a short human location for the status line.
+    async function saveTextFile(name, text) {
+        const fs = fsPlugin();
+        if (fs) {
+            for (const dir of ['DOCUMENTS', 'EXTERNAL']) {
+                try {
+                    const res = await fs.writeFile({ path: name, data: text, directory: dir, encoding: 'utf8', recursive: true });
+                    return (res && res.uri) ? res.uri.replace(/^file:\/\//, '') : (dir.toLowerCase() + '/' + name);
+                } catch {}
+            }
+            return null; // both native writes failed
+        }
+        const blob = new Blob([text], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url; a.download = name; a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        return name;
     }
-    function importMarks() {
-        const text = $('markIoText').value.trim(); if (!text) return;
+    async function exportMarks() {
+        const text = ioText(); $('markIoText').value = text;
+        const name = 'bookmarks.' + (ioFmt === 'html' ? 'html' : 'json');
+        const where = await saveTextFile(name, text);
+        ioStatus(where ? ('gespeichert: ' + where) : 'speichern fehlgeschlagen — Inhalt kann kopiert werden');
+    }
+    // read a file the user picks (filesystem has no picker, so a file input drives import),
+    // autodetect json vs netscape html, then import.
+    function loadMarksFile() {
+        const inp = $('markIoFile'); inp.value = '';
+        inp.onchange = () => {
+            const f = inp.files && inp.files[0]; if (!f) return;
+            const r = new FileReader();
+            r.onload = () => {
+                const text = String(r.result || '');
+                ioFmt = (/\.html?$/i.test(f.name) || /^\s*</.test(text)) ? 'html' : 'json';
+                drawIoSeg(); $('markIoText').value = text;
+                importMarks(f.name);
+            };
+            r.onerror = () => ioStatus('datei konnte nicht gelesen werden');
+            r.readAsText(f);
+        };
+        inp.click();
+    }
+    function importMarks(fromName) {
+        const text = $('markIoText').value.trim(); if (!text) { ioStatus('nichts zu importieren'); return; }
         const added = ioFmt === 'html' ? fromNetscape(text) : fromJSON(text);
-        if (!added) return;
+        if (!added) { ioStatus('konnte nicht gelesen werden (' + ioFmt.toUpperCase() + '?)'); return; }
         const have = new Set(local.bookmarks.map(b => b.url));
         local.bookmarkFolders.push(...added.folders);
-        for (const b of added.bookmarks) if (b.url && !have.has(b.url)) { local.bookmarks.push(b); have.add(b.url); }
-        saveLocal(); renderMarks();
+        let n = 0;
+        for (const b of added.bookmarks) if (b.url && !have.has(b.url)) { local.bookmarks.push(b); have.add(b.url); n++; }
+        saveLocal();
+        ioStatus(n + ' importiert' + (n < added.bookmarks.length ? ' (' + (added.bookmarks.length - n) + ' schon vorhanden)' : '') + (fromName ? ' aus ' + fromName : ''));
     }
     function toNetscape() {
         const line = b => `    <DT><A HREF="${esc(b.url)}"${b.tags && b.tags.length ? ` TAGS="${esc(b.tags.join(','))}"` : ''}>${esc(b.title || domainOf(b.url))}</A>\n`;
@@ -619,8 +666,9 @@
         $('markDelete').addEventListener('click', deleteMark);
         $('markCancel').addEventListener('click', renderMarks);
         $('markIoClose').addEventListener('click', renderMarks);
+        $('markIoLoad').addEventListener('click', loadMarksFile);
         $('markIoExport').addEventListener('click', exportMarks);
-        $('markIoImport').addEventListener('click', importMarks);
+        $('markIoImport').addEventListener('click', () => importMarks());
         $('dashSearch').addEventListener('click', () => openPanel('url'));
         $('openEngines').addEventListener('click', () => openPanel('engines'));
         $('newEngineBtn').addEventListener('click', () => openEngineEditor(null));
