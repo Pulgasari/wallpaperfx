@@ -103,8 +103,23 @@ dev-tools, userscripts, settings.
   (`setUserscripts`) and injected at document-end into pages whose url matches a
   script's `matches` glob. No GM_* API yet.
 
+## Gestures + context menu
+
+Two things follow straight from the two-layer split:
+
+- **context menu** (chrome-side): an anchored floating list. Because the collapsed
+  chrome is only the strip, it must `setChromeExpanded(true)` to draw above it —
+  so the menu reuses the panel expand/collapse machinery (it is just another entry
+  in `PANELS`). `openMenu(items, anchor)` is generic; long-press the pill opens the
+  url-bar menu (bookmark toggle / reload / hard reload / close tab).
+- **pull-to-reload** (native): the gesture happens on the native content WebView,
+  which the chrome never sees — so it lives natively, not in a chrome-js gesture
+  lib. `PullRefreshLayout` wraps each content WebView, intercepts an at-top
+  downward drag, rubber-bands the page, and fires `reload` on release past the
+  trigger or `hardReload` (clear cache + reload) if the pull is held.
+
 ## Not yet
 
-full GM_* userscript api, auto tab-grouping, configurable pill gestures
-(long-press / hold-drag), per-tab back/forward ui, downloads, `window.open`/
-new-window handling, external-scheme (mailto/intent) handling.
+full GM_* userscript api, auto tab-grouping, hold-drag pill gestures, per-tab
+back/forward ui, downloads, `window.open`/new-window handling, external-scheme
+(mailto/intent) handling.
