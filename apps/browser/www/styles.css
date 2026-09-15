@@ -1,3 +1,38 @@
+/* reset */
+
+* {
+  box-sizing: border-box;
+  margin: 0; 
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* */
+
+[hidden] { display: none !important; }
+
+/* */
+
+@default color {
+  line  : var(--line);
+  faint : var(--faint);
+  dim   : var(--dim);
+  scrim : var(--scrim)
+}
+
+@default gap, margin, padding {
+  tiny   : 0.25rem 
+  small  : 0.50rem;
+  normal : 0.75rem;
+  large  : 1.25rem;
+  huge   : 2.00rem;
+
+  true   : 0.75rem;
+  false  : 0;
+}
+
+/* */
+
 :root {
   --bg: #0c0d10;
   --fg: #edeef0;
@@ -15,23 +50,26 @@
 }
 
 :root {
-  --line: color-mix(in srgb, var(--fg) 16%, transparent);
-  --faint: color-mix(in srgb, var(--fg) 8%, transparent);
-  --dim: color-mix(in srgb, var(--fg) 55%, transparent);
-  --scrim: color-mix(in srgb, var(--bg) 68%, transparent);
+  --line  : color-mix(in srgb, var(--fg) 16%, transparent);
+  --faint : color-mix(in srgb, var(--fg)  8%, transparent);
+  --dim   : color-mix(in srgb, var(--fg) 55%, transparent);
+  --scrim : color-mix(in srgb, var(--bg) 68%, transparent);
 }
 
-* {
-  box-sizing: border-box;
-  -webkit-tap-highlight-color: transparent;
+.flex-row {
+  display         : flex;
+  flex-direction  : row;
+  align-items     : center;
+  justify-content : center;
+}
+.flex-col
+  display        : flex;
+  flex-direction : column;
+  align-items    : center;
 }
 
-[hidden] {
-  display: none !important;
-}
 
 html, body {
-  margin: 0;
   height: 100%;
   background: transparent;
   color: var(--fg);
@@ -41,14 +79,14 @@ html, body {
 }
 
 .bar {
+  use: .flex;
+  
   position: fixed;
   left: 0;
   right: 0;
   bottom: 0;
   height: var(--strip);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  
   gap: var(--dock-gap);
   padding: 0 14px calc(env(safe-area-inset-bottom) + 14px);
   background: var(--bg);
@@ -282,7 +320,7 @@ body.dock-top .panel.dash {
 }
 
 .dash-body {
-  padding: 18px 16px calc(env(safe-area-inset-bottom) + 24px);
+  padding: large large calc(env(safe-area-inset-bottom) + large);
 }
 
 .dash-search {
@@ -307,11 +345,11 @@ body.dock-top .panel.dash {
 }
 
 .tile {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 7px;
-  cursor: pointer;
+  use: .flex-col;
+  
+  cursor : pointer;
+  gap    : small;
+  
 }
 
 .tile .fav {
@@ -610,8 +648,6 @@ body.dock-top .findbar {
 
 .rows {
   list-style: none;
-  margin: 0;
-  padding: 0;
 }
 
 .row {
@@ -683,22 +719,19 @@ body.dock-top .findbar {
   font-size: 18px;
   line-height: 1;
   cursor: pointer;
+
+  &:active   { background: var(--faint); }
+  &:disabled { opacity: .3; }
 }
 
-.icon-btn:active {
-  background: var(--faint);
-}
 
-.icon-btn:disabled {
-  opacity: .3;
-}
 
 .mini-select {
   border: 1px solid var(--line);
   background: var(--faint);
   color: var(--fg);
   border-radius: 8px;
-  padding: 6px 8px;
+  padding: small;
   font-size: 12px;
 }
 
