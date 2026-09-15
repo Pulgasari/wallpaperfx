@@ -36,8 +36,14 @@ public class MainActivity extends BridgeActivity {
 
         FrameLayout root = new FrameLayout(this);
         contentContainer = new FrameLayout(this);
-        root.addView(contentContainer, new FrameLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        // content is inset by the dock strip so the closed bar reserves its own
+        // space instead of overlapping the page. previously the content was
+        // full-screen behind a transparent strip, so the bottom collapsedPx of
+        // every page sat under the (touch-eating) chrome webview.
+        FrameLayout.LayoutParams contentLp = new FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+        applyContentInset(contentLp);
+        root.addView(contentContainer, contentLp);
 
         root.addView(chrome, new FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, collapsedPx, dockGravity));
@@ -46,6 +52,12 @@ public class MainActivity extends BridgeActivity {
     }
 
     public FrameLayout getContentContainer() { return contentContainer; }
+
+    // keeps a collapsedPx gap on whichever side the dock strip occupies
+    private void applyContentInset(FrameLayout.LayoutParams lp) {
+        lp.topMargin    = (dockGravity == Gravity.TOP)    ? collapsedPx : 0;
+        lp.bottomMargin = (dockGravity == Gravity.BOTTOM) ? collapsedPx : 0;
+    }
 
     private boolean chromeExpanded = false;
 
@@ -60,13 +72,17 @@ public class MainActivity extends BridgeActivity {
         });
     }
 
-    // move the collapsed dock strip to the top or bottom of the screen.
+    // move the collapsed dock strip to the top or bottom of the screen, and move
+    // the content inset with it so the bar keeps reserving its own space.
     public void setDockPosition(boolean top) {
         dockGravity = top ? Gravity.TOP : Gravity.BOTTOM;
         runOnUiThread(() -> {
             FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) chrome.getLayoutParams();
             lp.gravity = dockGravity;
             chrome.setLayoutParams(lp);
+            FrameLayout.LayoutParams cp = (FrameLayout.LayoutParams) contentContainer.getLayoutParams();
+            applyContentInset(cp);
+            contentContainer.setLayoutParams(cp);
         });
     }
 

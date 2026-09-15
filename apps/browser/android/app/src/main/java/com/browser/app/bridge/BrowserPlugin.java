@@ -38,6 +38,7 @@ public class BrowserPlugin extends Plugin {
     private static class Tab {
         String id;
         WebView view;
+        PullRefreshLayout holder; // wraps view; carries the pull-to-reload gesture
         String url = "";
         String title = "";
         boolean loading = false;
@@ -145,6 +146,18 @@ public class BrowserPlugin extends Plugin {
             call.resolve(state());
         });
     }
+
+    @PluginMethod
+    public void hardReload(PluginCall call) {
+        ui(() -> {
+            Tab t = active();
+            if (t != null) hardReloadWeb(t.view);
+            call.resolve(state());
+        });
+    }
+
+    // hard reload: drop the cache, then reload so the page is refetched from the net.
+    private void hardReloadWeb(WebView v) { v.clearCache(true); v.reload(); }
 
     @PluginMethod
     public void setChromeExpanded(PluginCall call) {
@@ -293,7 +306,11 @@ public class BrowserPlugin extends Plugin {
 
         t.view = wv;
         tabs.put(t.id, t);
-        container().addView(wv, new FrameLayout.LayoutParams(
+        // wrap the content webview so an at-top pull reloads (pull-and-hold = hard reload)
+        PullRefreshLayout holder = new PullRefreshLayout(getContext(), wv);
+        holder.setListeners(wv::reload, () -> hardReloadWeb(wv));
+        t.holder = holder;
+        container().addView(holder, new FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         if (url != null) wv.loadUrl(url);
         show(t.id);
@@ -303,7 +320,7 @@ public class BrowserPlugin extends Plugin {
     private void show(String id) {
         activeId = id;
         for (Map.Entry<String, Tab> e : tabs.entrySet()) {
-            e.getValue().view.setVisibility(e.getKey().equals(id) ? View.VISIBLE : View.GONE);
+            e.getValue().holder.setVisibility(e.getKey().equals(id) ? View.VISIBLE : View.GONE);
         }
         emit();
     }
@@ -311,7 +328,7 @@ public class BrowserPlugin extends Plugin {
     private void removeTab(String id) {
         Tab t = tabs.remove(id);
         if (t != null) {
-            container().removeView(t.view);
+            container().removeView(t.holder);
             t.view.destroy();
         }
         if (id.equals(activeId)) {
