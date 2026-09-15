@@ -79,12 +79,19 @@
         dockPos: 'bottom', loaderPos: 'bottom', dockSize: 46, dockGap: 12,
         dock: DOCK_DEFAULT.map(d => ({ ...d })),
     });
+    // search engines: name + url with %s (the search word) + optional icon url. not
+    // really "search" engines — anything with a query-param url works.
+    const DEFAULT_ENGINES = () => ([
+        { id: 'ddg', name: 'DuckDuckGo', url: 'https://duckduckgo.com/?q=%s', icon: '' },
+        { id: 'google', name: 'Google', url: 'https://www.google.com/search?q=%s', icon: '' },
+        { id: 'wikipedia', name: 'Wikipedia', url: 'https://de.wikipedia.org/w/index.php?search=%s', icon: '' },
+    ]);
 
     // ---- state ----
     let ns = { tabs: [], activeId: '', expanded: false };
     let local = loadLocal();
     let panel = null;
-    const PANELS = ['panelUrl', 'panelFind', 'panelTabs', 'panelMarks', 'panelScripts', 'panelSettings', 'panelMenu', 'panelDash'];
+    const PANELS = ['panelUrl', 'panelFind', 'panelTabs', 'panelMarks', 'panelScripts', 'panelSettings', 'panelMenu', 'panelDash', 'panelEngines'];
 
     function loadLocal() {
         let s = {};
@@ -96,12 +103,15 @@
         settings.dock = (Array.isArray(settings.dock) ? settings.dock : [])
             .filter(d => d && known.includes(d.id) && !seen.has(d.id) && seen.add(d.id));
         for (const id of known) if (!seen.has(id)) settings.dock.push({ id, on: id !== 'devtools' });
+        const engines = (Array.isArray(s.engines) && s.engines.length) ? s.engines : DEFAULT_ENGINES();
+        const defaultEngine = s.defaultEngine && engines.some(e => e.id === s.defaultEngine) ? s.defaultEngine : (engines[0] && engines[0].id);
         return {
             bookmarks: Array.isArray(s.bookmarks) ? s.bookmarks : [],
             bookmarkFolders: Array.isArray(s.bookmarkFolders) ? s.bookmarkFolders : [],
             groups: Array.isArray(s.groups) ? s.groups : [],
             tabGroups: s.tabGroups && typeof s.tabGroups === 'object' ? s.tabGroups : {},
             userscripts: Array.isArray(s.userscripts) ? s.userscripts : [],
+            engines, defaultEngine,
             settings,
         };
     }
@@ -153,7 +163,7 @@
         panel = name;
         PANELS.forEach(id => { $(id).hidden = true; });
         try { await plugin.setChromeExpanded({ expanded: true }); } catch {}
-        const map = { url: 'panelUrl', find: 'panelFind', tabs: 'panelTabs', marks: 'panelMarks', scripts: 'panelScripts', settings: 'panelSettings', menu: 'panelMenu', dash: 'panelDash' };
+        const map = { url: 'panelUrl', find: 'panelFind', tabs: 'panelTabs', marks: 'panelMarks', scripts: 'panelScripts', settings: 'panelSettings', menu: 'panelMenu', dash: 'panelDash', engines: 'panelEngines' };
         $(map[name]).hidden = false;
         if (name === 'url') primeUrl();
         if (name === 'find') primeFind();
@@ -162,6 +172,7 @@
         if (name === 'scripts') renderScripts();
         if (name === 'settings') renderSettings();
         if (name === 'dash') renderDash();
+        if (name === 'engines') renderEngines();
     }
     async function closePanel() {
         const wasFind = panel === 'find';
@@ -175,7 +186,7 @@
     function primeUrl() {
         const t = activeTab(); const input = $('urlInput');
         input.value = t && t.url ? t.url : '';
-        renderSuggest(input.value);
+        renderSuggest(input.value); renderEngineRow(input.value);
         setTimeout(() => { input.focus(); input.select(); }, 30);
     }
     function renderSuggest(q) {
@@ -194,7 +205,33 @@
         ul.innerHTML = items.map((it, i) => `<li data-i="${i}"><b>${esc(it.title)}</b><span>${esc(it.sub)}</span></li>`).join('');
         ul._items = items;
     }
-    function go(url) { const v = (url || '').trim(); if (!v) return; plugin.navigate({ url: v }); closePanel(); }
+    // treat input as a url if it has a scheme or looks like a domain; else it's a search
+    const isUrlLike = v => /^[a-z][a-z0-9+.-]*:\/\//i.test(v) || (v.includes('.') && !v.includes(' '));
+    const engineById = id => local.engines.find(e => e.id === id);
+    const searchUrl = (engine, q) => (engine.url.includes('%s') ? engine.url.replace(/%s/g, encodeURIComponent(q)) : engine.url + encodeURIComponent(q));
+    // navigate to a url, or run a search. engineId forces a specific engine; otherwise a
+    // non-url input searches with the default engine (a real url passes through as-is).
+    function go(input, engineId) {
+        const v = (input || '').trim(); if (!v) return;
+        let url = v;
+        if (engineId) { const e = engineById(engineId); if (e) url = searchUrl(e, v); }
+        else if (!isUrlLike(v)) { const e = engineById(local.defaultEngine) || local.engines[0]; if (e) url = searchUrl(e, v); }
+        plugin.navigate({ url }); closePanel();
+    }
+    // a horizontal row of engine icons shown while typing a search; tap to search there.
+    function renderEngineRow(q) {
+        const row = $('engineRow');
+        const query = (q || '').trim();
+        if (!query || isUrlLike(query)) { row.hidden = true; row.innerHTML = ''; return; }
+        row.hidden = false; row.innerHTML = '';
+        for (const e of local.engines) {
+            const b = document.createElement('button'); b.className = 'eng' + (e.id === local.defaultEngine ? ' default' : ''); b.title = e.name;
+            if (e.icon) { const img = document.createElement('img'); img.src = e.icon; img.alt = ''; img.addEventListener('error', () => { b.textContent = (e.name[0] || '?').toUpperCase(); }); b.appendChild(img); }
+            else b.textContent = (e.name[0] || '?').toUpperCase();
+            b.addEventListener('click', () => go($('urlInput').value, e.id));
+            row.appendChild(b);
+        }
+    }
 
     // ---- find in page ----
     function primeFind() {
@@ -515,6 +552,49 @@
         saveLocal(); applyDock(); renderDockList();
     }
 
+    // ---- search engines ----
+    let editingEngine = null;
+    function renderEngines() {
+        $('engineEditor').hidden = true; $('engineList').hidden = false;
+        const ul = $('engineList'); ul.innerHTML = '';
+        $('enginesEmpty').hidden = local.engines.length > 0;
+        for (const e of local.engines) {
+            const li = document.createElement('li'); li.className = 'row';
+            const badge = e.id === local.defaultEngine ? '<span class="tags"><span class="tag">Standard</span></span>' : '';
+            li.innerHTML = `<span class="ricon">${esc((e.name[0] || '?').toUpperCase())}</span><span class="rtext"><b>${esc(e.name)}</b><span>${esc(e.url)}</span>${badge}</span>`;
+            const edit = document.createElement('button'); edit.className = 'icon-btn'; edit.innerHTML = svg('pencil'); edit.setAttribute('aria-label', 'Bearbeiten');
+            edit.addEventListener('click', e2 => { e2.stopPropagation(); openEngineEditor(e); });
+            li.appendChild(edit);
+            li.addEventListener('click', () => openEngineEditor(e));
+            ul.appendChild(li);
+        }
+    }
+    function openEngineEditor(e) {
+        editingEngine = e || { id: uid('e'), name: '', url: '', icon: '' };
+        $('engName').value = editingEngine.name || '';
+        $('engUrl').value = editingEngine.url || '';
+        $('engIcon').value = editingEngine.icon || '';
+        $('engDefault').checked = editingEngine.id === local.defaultEngine;
+        $('engDelete').hidden = !local.engines.includes(editingEngine);
+        $('engineList').hidden = true; $('enginesEmpty').hidden = true; $('engineEditor').hidden = false;
+    }
+    function saveEngine() {
+        if (!editingEngine) return;
+        editingEngine.name = $('engName').value.trim() || 'Suche';
+        editingEngine.url = $('engUrl').value.trim();
+        editingEngine.icon = $('engIcon').value.trim();
+        if (!editingEngine.url) { renderEngines(); return; }
+        if (!local.engines.includes(editingEngine)) local.engines.push(editingEngine);
+        if ($('engDefault').checked) local.defaultEngine = editingEngine.id;
+        saveLocal(); renderEngines();
+    }
+    function deleteEngine() {
+        if (!editingEngine) return;
+        local.engines = local.engines.filter(e => e !== editingEngine);
+        if (local.defaultEngine === editingEngine.id) local.defaultEngine = local.engines[0] && local.engines[0].id;
+        editingEngine = null; saveLocal(); renderEngines();
+    }
+
     // ---- wiring ----
     function wire() {
         $('urlGo').innerHTML = svg('go');
@@ -523,7 +603,7 @@
         document.querySelectorAll('[data-close]').forEach(el => el.addEventListener('click', closePanel));
 
         $('urlForm').addEventListener('submit', e => { e.preventDefault(); go($('urlInput').value); });
-        $('urlInput').addEventListener('input', () => renderSuggest($('urlInput').value));
+        $('urlInput').addEventListener('input', () => { const v = $('urlInput').value; renderSuggest(v); renderEngineRow(v); });
         $('suggest').addEventListener('click', e => { const li = e.target.closest('li'); if (!li) return; const it = ($('suggest')._items || [])[+li.dataset.i]; if (it) go(it.url); });
 
         $('findForm').addEventListener('submit', e => { e.preventDefault(); plugin.findNext({ forward: true }); });
@@ -542,6 +622,11 @@
         $('markIoExport').addEventListener('click', exportMarks);
         $('markIoImport').addEventListener('click', importMarks);
         $('dashSearch').addEventListener('click', () => openPanel('url'));
+        $('openEngines').addEventListener('click', () => openPanel('engines'));
+        $('newEngineBtn').addEventListener('click', () => openEngineEditor(null));
+        $('engSave').addEventListener('click', saveEngine);
+        $('engCancel').addEventListener('click', renderEngines);
+        $('engDelete').addEventListener('click', deleteEngine);
 
         $('newScriptBtn').addEventListener('click', () => openScriptEditor(null));
         $('scriptSave').addEventListener('click', saveScript);

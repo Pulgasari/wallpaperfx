@@ -120,6 +120,17 @@ body.dock-top .panel.dash { top: calc(env(safe-area-inset-top) + var(--strip)); 
     overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
 }
 
+/* ===== search-engine row (url panel, above the input) + chips ===== */
+.engine-row { display: flex; gap: 8px; overflow-x: auto; padding: 8px 14px; background: var(--bg); border-top: 1px solid var(--line); }
+.engine-row::-webkit-scrollbar { display: none; }
+.eng {
+    flex: 0 0 auto; width: 38px; height: 38px; border-radius: 12px; border: 1px solid var(--line);
+    background: var(--faint); color: var(--fg); font-size: 15px; font-weight: 700; cursor: pointer; overflow: hidden;
+    display: inline-flex; align-items: center; justify-content: center;
+}
+.eng.default { border-color: var(--accent); }
+.eng img { width: 22px; height: 22px; object-fit: contain; }
+
 /* url / search */
 .panel-scroll { position: relative; flex: 1; overflow-y: auto; display: flex; flex-direction: column-reverse; }
 .suggest { list-style: none; margin: 0; padding: 8px 12px calc(env(safe-area-inset-bottom) + 76px); }

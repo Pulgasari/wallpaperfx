@@ -22,6 +22,8 @@
 <section id="panelUrl" class="panel" hidden aria-label="Adresse">
     <button class="backdrop" data-close aria-label="Schließen"></button>
     <div class="panel-scroll"><ul id="suggest" class="suggest"></ul></div>
+    <!-- engine row: icons of all search engines, tap to search the typed query there -->
+    <div id="engineRow" class="engine-row" hidden></div>
     <form id="urlForm" class="urlbar">
         <input id="urlInput" type="text" inputmode="url" autocapitalize="off" autocomplete="off" spellcheck="false" placeholder="Suchen oder URL eingeben" />
         <button type="submit" id="urlGo" class="go" aria-label="Los"></button>
@@ -140,6 +142,9 @@
         <div class="row-field"><label for="colFg">Vordergrund</label><input id="colFg" type="color" /></div>
         <div class="row-field"><label for="colAccent">Akzent</label><input id="colAccent" type="color" /></div>
 
+        <h3 class="grp">Suche</h3>
+        <div class="field"><button id="openEngines" class="txt-btn">Suchmaschinen verwalten</button></div>
+
         <h3 class="grp">Dock</h3>
         <div class="field"><label>Position</label><div id="dockPosSeg" class="seg"></div></div>
         <div class="field"><label>Ladeanzeige</label><div id="loaderPosSeg" class="seg"></div></div>
@@ -148,6 +153,30 @@
 
         <h3 class="grp">Dock-Elemente</h3>
         <ul id="dockList" class="rows"></ul>
+    </div>
+</section>
+
+<!-- ===== search engines (anything with a query-param url; %s = the search word) ===== -->
+<section id="panelEngines" class="panel sheet" hidden aria-label="Suchmaschinen">
+    <button class="backdrop" data-close aria-label="Schließen"></button>
+    <div class="sheet-body">
+        <div class="sheet-head">
+            <span class="sheet-title">Suchmaschinen</span>
+            <span class="sheet-actions"><button id="newEngineBtn" class="txt-btn">Hinzufügen</button></span>
+        </div>
+        <ul id="engineList" class="rows"></ul>
+        <p id="enginesEmpty" class="empty">noch keine Einträge</p>
+        <div id="engineEditor" class="editor" hidden>
+            <input id="engName" class="in" placeholder="Name" />
+            <input id="engUrl" class="in" placeholder="URL mit %s als Suchwort, z.B. https://example.com/?q=%s" inputmode="url" autocapitalize="off" spellcheck="false" />
+            <input id="engIcon" class="in" placeholder="Icon-URL (optional)" inputmode="url" autocapitalize="off" spellcheck="false" />
+            <label class="switch-row"><span>Als Standard</span><input id="engDefault" type="checkbox" /></label>
+            <div class="editor-actions">
+                <button id="engDelete" class="txt-btn danger">Löschen</button>
+                <button id="engCancel" class="txt-btn">Abbrechen</button>
+                <button id="engSave" class="txt-btn primary">Speichern</button>
+            </div>
+        </div>
     </div>
 </section>
 
