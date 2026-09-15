@@ -49,6 +49,10 @@ separate CI job; it is not a capacitor/android build.
 - Prefer JavaScript; the web side is intentionally bundler-free.
 - Do not hand-edit generated gradle files (`capacitor.build.gradle`, etc.).
 - After changing an app's `www/`, run `npx cap copy android` in that app dir.
+- `www/styles.css` is generated. edit `apps/<app>/styles.ass` (aufbau style
+  sheets, a css superset) and regenerate with `node tools/build-css.mjs`; ci
+  (`ass css` workflow) fails on drift. the `.ass` source sits at the app root so
+  it never ships in the apk. see `tools/README.md`.
 
 ## Build / verify
 
