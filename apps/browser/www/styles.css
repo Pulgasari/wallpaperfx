@@ -73,6 +73,26 @@ body.dock-top.loader-top .prog { top: var(--strip); bottom: auto; }   /* both at
     background: var(--scrim); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
 }
 
+/* ===== context menu: anchored floating list, no scrim (just a tap-catcher).
+   vertical position rides the strip (above the bottom bar / below a top bar);
+   horizontal left is set by js, centered on the trigger and clamped. ===== */
+.menu-panel .backdrop-clear { background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; }
+.menu {
+    position: absolute; z-index: 1; list-style: none; margin: 0; padding: 6px;
+    min-width: 208px; max-width: 78vw;
+    bottom: calc(env(safe-area-inset-bottom) + var(--strip) + 8px); left: 8px;
+    background: var(--bg); border: 1px solid var(--line); border-radius: 14px;
+    box-shadow: 0 10px 34px color-mix(in srgb, #000 42%, transparent);
+}
+body.dock-top .menu { bottom: auto; top: calc(env(safe-area-inset-top) + var(--strip) + 8px); }
+.menu li { display: flex; align-items: center; gap: 11px; padding: 11px 12px; border-radius: 10px; cursor: pointer; font-size: 14px; color: var(--fg); }
+.menu li:active { background: var(--faint); }
+.menu li.danger { color: color-mix(in srgb, #ff5a5a 82%, var(--fg)); }
+.menu li .mi { flex: 0 0 auto; width: 20px; height: 20px; display: inline-flex; color: var(--dim); }
+.menu li.danger .mi { color: inherit; }
+.menu li .mi svg { width: 20px; height: 20px; }
+.menu li.sep { height: 1px; margin: 5px 8px; padding: 0; background: var(--line); border-radius: 0; pointer-events: none; }
+
 /* url / search */
 .panel-scroll { position: relative; flex: 1; overflow-y: auto; display: flex; flex-direction: column-reverse; }
 .suggest { list-style: none; margin: 0; padding: 8px 12px calc(env(safe-area-inset-bottom) + 76px); }

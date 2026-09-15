@@ -31,7 +31,7 @@
             async newTab({ url }) { const id = 't' + (++n); tabs.push({ id, url: url || 'https://duckduckgo.com/', title: 'Neuer Tab', loading: false, progress: 100, canGoBack: false }); activeId = id; push(); return state(); },
             async closeTab({ id }) { tabs = tabs.filter(t => t.id !== id); if (activeId === id) activeId = tabs.length ? tabs[tabs.length - 1].id : ''; push(); return state(); },
             async activateTab({ id }) { activeId = id; push(); return state(); },
-            async goBack() { return state(); }, async goForward() { return state(); }, async reload() { return state(); },
+            async goBack() { return state(); }, async goForward() { return state(); }, async reload() { return state(); }, async hardReload() { return state(); },
             async setChromeExpanded({ expanded: e }) { expanded = e; push(); return state(); },
             async setDockPosition() {}, async findInPage() {}, async findNext() {}, async clearFind() {},
             async toggleDevtools() {}, async setUserscripts() {},
@@ -49,6 +49,9 @@
         console: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9l3 3-3 3"/><line x1="13" y1="15" x2="17" y2="15"/>',
         code: '<path d="M8 8l-4 4 4 4"/><path d="M16 8l4 4-4 4"/><line x1="13.5" y1="6" x2="10.5" y2="18"/>',
         gear: '<circle cx="12" cy="12" r="3.2"/><path d="M12 3.5v2.4M12 18.1v2.4M20.5 12h-2.4M5.9 12H3.5M18 6l-1.7 1.7M7.7 16.3L6 18M18 18l-1.7-1.7M7.7 7.7L6 6"/>',
+        reload: '<path d="M20 11a8 8 0 1 0-2.34 5.66"/><path d="M20 4v5h-5"/>',
+        bolt: '<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>',
+        x: '<line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/>',
     };
     const svg = name => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (ICONS[name] || '') + '</svg>';
 
@@ -80,7 +83,7 @@
     let ns = { tabs: [], activeId: '', expanded: false };
     let local = loadLocal();
     let panel = null;
-    const PANELS = ['panelUrl', 'panelFind', 'panelTabs', 'panelMarks', 'panelScripts', 'panelSettings'];
+    const PANELS = ['panelUrl', 'panelFind', 'panelTabs', 'panelMarks', 'panelScripts', 'panelSettings', 'panelMenu'];
 
     function loadLocal() {
         let s = {};
@@ -148,7 +151,7 @@
         panel = name;
         PANELS.forEach(id => { $(id).hidden = true; });
         try { await plugin.setChromeExpanded({ expanded: true }); } catch {}
-        const map = { url: 'panelUrl', find: 'panelFind', tabs: 'panelTabs', marks: 'panelMarks', scripts: 'panelScripts', settings: 'panelSettings' };
+        const map = { url: 'panelUrl', find: 'panelFind', tabs: 'panelTabs', marks: 'panelMarks', scripts: 'panelScripts', settings: 'panelSettings', menu: 'panelMenu' };
         $(map[name]).hidden = false;
         if (name === 'url') primeUrl();
         if (name === 'find') primeFind();
@@ -249,6 +252,62 @@
         local.bookmarks.unshift({ id: uid('b'), url: t.url, title: t.title || domainOf(t.url) });
         saveLocal(); renderMarks();
     }
+    function toggleBookmark() {
+        const t = activeTab(); if (!t || !t.url) return;
+        const existing = local.bookmarks.find(b => b.url === t.url);
+        if (existing) local.bookmarks = local.bookmarks.filter(b => b !== existing);
+        else local.bookmarks.unshift({ id: uid('b'), url: t.url, title: t.title || domainOf(t.url) });
+        saveLocal(); if (panel === 'marks') renderMarks();
+    }
+
+    // ---- context menu (reusable) ----
+    // items: [{ label, icon?, danger?, run } | { sep: true }]. anchor: an element
+    // (menu opens above/below the bar, horizontally centered on it) or {x}.
+    async function openMenu(items, anchor) {
+        const ul = $('menuList'); ul.innerHTML = '';
+        for (const it of items) {
+            const li = document.createElement('li');
+            if (it.sep) { li.className = 'sep'; li.setAttribute('role', 'separator'); ul.appendChild(li); continue; }
+            li.setAttribute('role', 'menuitem');
+            if (it.danger) li.className = 'danger';
+            li.innerHTML = `<span class="mi">${it.icon ? svg(it.icon) : ''}</span><span>${esc(it.label)}</span>`;
+            li.addEventListener('click', () => { closePanel(); it.run(); });
+            ul.appendChild(li);
+        }
+        await openPanel('menu');
+        requestAnimationFrame(() => positionMenu(anchor));
+    }
+    function positionMenu(anchor) {
+        const ul = $('menuList');
+        const cx = anchor && anchor.getBoundingClientRect ? (r => r.left + r.width / 2)(anchor.getBoundingClientRect()) : (anchor && anchor.x) || window.innerWidth / 2;
+        const left = Math.min(Math.max(8, cx - ul.offsetWidth / 2), window.innerWidth - ul.offsetWidth - 8);
+        ul.style.left = left + 'px';
+    }
+    // fires handler on a long press (and on right-click, for the desktop mock);
+    // suppresses the click that follows so a long-press does not also tap-through.
+    function onLongPress(el, handler, ms = 450) {
+        let timer = null, sx = 0, sy = 0, fired = false;
+        const clear = () => { if (timer) { clearTimeout(timer); timer = null; } };
+        el.addEventListener('pointerdown', e => { fired = false; sx = e.clientX; sy = e.clientY; clear(); timer = setTimeout(() => { fired = true; handler(e); }, ms); });
+        el.addEventListener('pointermove', e => { if (timer && Math.hypot(e.clientX - sx, e.clientY - sy) > 10) clear(); });
+        el.addEventListener('pointerup', clear);
+        el.addEventListener('pointercancel', clear);
+        el.addEventListener('click', e => { if (fired) { e.stopPropagation(); e.preventDefault(); fired = false; } }, true);
+        el.addEventListener('contextmenu', e => { e.preventDefault(); clear(); handler(e); });
+    }
+    // the url-bar test menu: bookmark toggle, reload / hard reload, close tab.
+    function openUrlBarMenu(anchor) {
+        const t = activeTab();
+        const marked = !!(t && local.bookmarks.some(b => b.url === t.url));
+        openMenu([
+            { label: marked ? 'Lesezeichen entfernen' : 'Zu Lesezeichen', icon: 'book', run: toggleBookmark },
+            { sep: true },
+            { label: 'Neu laden', icon: 'reload', run: () => plugin.reload({}) },
+            { label: 'Hard Reload', icon: 'bolt', run: () => plugin.hardReload({}) },
+            { sep: true },
+            { label: 'Tab schließen', icon: 'x', danger: true, run: () => { if (t) plugin.closeTab({ id: t.id }); } },
+        ], anchor);
+    }
 
     // ---- userscripts ----
     function pushUserscripts() {
@@ -336,6 +395,7 @@
     function wire() {
         $('urlGo').innerHTML = svg('go');
         $('pill').addEventListener('click', () => openPanel('url'));
+        onLongPress($('pill'), () => openUrlBarMenu($('pill')));
         document.querySelectorAll('[data-close]').forEach(el => el.addEventListener('click', closePanel));
 
         $('urlForm').addEventListener('submit', e => { e.preventDefault(); go($('urlInput').value); });
