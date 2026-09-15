@@ -1,5 +1,8 @@
 package com.browser.app.bridge;
 
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
+import android.animation.ValueAnimator;
 import android.content.Context;
 import android.graphics.drawable.GradientDrawable;
 import android.view.Gravity;
@@ -7,6 +10,7 @@ import android.view.HapticFeedbackConstants;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewConfiguration;
+import android.view.animation.LinearInterpolator;
 import android.webkit.WebView;
 import android.widget.FrameLayout;
 
@@ -16,7 +20,10 @@ import android.widget.FrameLayout;
 // side, not in a chrome-js gesture lib.
 //
 // feedback: the webview follows the finger (damped), a small dot rides the revealed
-// gap and switches color once the pull is armed, then again once hold arms hard.
+// gap and switches color once the pull is armed. once armed, a thin bar at the top
+// fills left-to-right over the hold window; when it reaches full, the hard reload
+// fires — so the bar is literally the hold timer, releasing before it fills does a
+// normal reload instead.
 public class PullRefreshLayout extends FrameLayout {
 
     public interface Action { void run(); }
@@ -27,6 +34,7 @@ public class PullRefreshLayout extends FrameLayout {
 
     private final WebView web;
     private final View dot;
+    private final View bar;          // top hold-timer bar (scaleX 0..1 from the left)
     private final int touchSlop;
     private final float triggerPx;   // pull distance that arms a reload
     private final float maxPullPx;   // rubber-band cap
@@ -34,18 +42,11 @@ public class PullRefreshLayout extends FrameLayout {
     private final int holdMs = 500;  // hold past the trigger -> hard reload
 
     private Action onReload, onHardReload;
+    private ValueAnimator holdAnim;  // drives the bar and fires hard reload on natural end
     private float startY;
     private boolean pulling;   // an overscroll drag is in progress
     private boolean armed;     // pulled past the trigger
     private boolean hardFired; // hard reload dispatched this gesture
-
-    private final Runnable holdRunnable = () -> {
-        if (!pulling || !armed || hardFired) return;
-        hardFired = true;
-        tint(COLOR_HARD);
-        performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
-        if (onHardReload != null) onHardReload.run();
-    };
 
     public PullRefreshLayout(Context context, WebView web) {
         super(context);
@@ -57,6 +58,16 @@ public class PullRefreshLayout extends FrameLayout {
         dotPx = Math.round(density * 26f);
 
         addView(web, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
+
+        // top hold-timer bar: full width, scaled from the left edge, hidden until armed.
+        bar = new View(context);
+        GradientDrawable barBg = new GradientDrawable();
+        barBg.setColor(COLOR_HARD);
+        bar.setBackground(barBg);
+        bar.setPivotX(0f);
+        bar.setScaleX(0f);
+        bar.setAlpha(0f);
+        addView(bar, new LayoutParams(LayoutParams.MATCH_PARENT, Math.round(density * 3f), Gravity.TOP));
 
         dot = new View(context);
         GradientDrawable bg = new GradientDrawable();
@@ -112,18 +123,18 @@ public class PullRefreshLayout extends FrameLayout {
                     armed = true;
                     tint(COLOR_ARMED);
                     performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
-                    postDelayed(holdRunnable, holdMs);
+                    startHold();
                 } else if (!nowArmed && armed) {
                     armed = false;
                     hardFired = false;
                     tint(COLOR_IDLE);
-                    removeCallbacks(holdRunnable);
+                    cancelHold();
                 }
                 return true;
             }
             case MotionEvent.ACTION_UP:
             case MotionEvent.ACTION_CANCEL:
-                removeCallbacks(holdRunnable);
+                cancelHold();
                 if (armed && !hardFired && onReload != null) onReload.run();
                 release();
                 return true;
@@ -136,6 +147,35 @@ public class PullRefreshLayout extends FrameLayout {
 
     private void tint(int color) {
         ((GradientDrawable) dot.getBackground()).setColor(color);
+    }
+
+    // start (or restart) the hold timer: the bar fills over holdMs, and its natural
+    // end — not a cancel — is what fires the hard reload.
+    private void startHold() {
+        cancelHold();
+        bar.setScaleX(0f);
+        bar.setAlpha(1f);
+        holdAnim = ValueAnimator.ofFloat(0f, 1f);
+        holdAnim.setDuration(holdMs);
+        holdAnim.setInterpolator(new LinearInterpolator());
+        holdAnim.addUpdateListener(a -> bar.setScaleX((float) a.getAnimatedValue()));
+        holdAnim.addListener(new AnimatorListenerAdapter() {
+            private boolean cancelled;
+            @Override public void onAnimationCancel(Animator a) { cancelled = true; }
+            @Override public void onAnimationEnd(Animator a) {
+                if (cancelled || !pulling || !armed || hardFired) return;
+                hardFired = true;
+                tint(COLOR_HARD);
+                performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
+                if (onHardReload != null) onHardReload.run();
+            }
+        });
+        holdAnim.start();
+    }
+
+    private void cancelHold() {
+        if (holdAnim != null) { holdAnim.cancel(); holdAnim = null; }
+        bar.animate().alpha(0f).setDuration(150).withEndAction(() -> bar.setScaleX(0f)).start();
     }
 
     private void release() {
