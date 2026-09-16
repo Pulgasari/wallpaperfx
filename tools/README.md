@@ -2,24 +2,24 @@
 
 repo-level build tools. not part of any app's `npm ci` / `cap sync` / gradle
 build — those stay self-contained per app (see the root `CLAUDE.md`). these run
-by hand (or in ci) and their output is committed.
+by hand and their output is committed.
 
 ## css: aufbau style sheets (`@aufbau/ass`)
 
-apps author css in `apps/<app>/styles.ass` and ship the compiled
-`apps/<app>/www/styles.css`. ass is a strict css superset — plain css compiles
+apps author css in `apps/<app>/styles.aufbau.css` and ship the compiled
+`apps/<app>/www/styles.css`. it is a strict css superset — plain css compiles
 unchanged — that adds `@default` / `@prop` / `@value` / `@mixin` sugar. see the
 package readme (aufbau repo, `ass/`) for the language.
 
-- edit `apps/<app>/styles.ass`
+- edit `apps/<app>/styles.aufbau.css`
 - regenerate: `node tools/build-css.mjs` (all apps) or `node tools/build-css.mjs <app>`
+- commit both the source and the regenerated `www/styles.css`
 - `cap copy`/`cap sync` then copies `www/` into the apk as usual
 
-the `.ass` source sits at the app root on purpose — not in `www/` — so it never
-ships in the apk; only the generated `www/styles.css` does.
-
-ci (`.github/workflows/ass.yml`) runs `node tools/build-css.mjs --check`, which
-fails if any committed `www/styles.css` is out of date with its `.ass` source.
+the source sits at the app root on purpose — not in `www/` — so it never ships
+in the apk; only the generated `www/styles.css` does. the `.aufbau.css`
+extension keeps editor css highlighting while marking the file as needing a
+compile.
 
 ### `ass/` is vendored
 

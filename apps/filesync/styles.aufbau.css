@@ -1,6 +1,6 @@
-/* aufbau style sheets (ass) source — compiled to www/styles.css.
-   edit here, then: node tools/build-css.mjs <app>  (see tools/README.md).
-   ass is a strict css superset: plain css is valid, plus @default/@prop/@value/@mixin. */
+/* aufbau style sheets source — compiled to www/styles.css.
+   edit here, then: node tools/build-css.mjs filesync  (see tools/README.md).
+   a strict css superset: plain css is valid, plus @default/@prop/@value/@mixin. */
 
 /* filesync sender ui. dark, minimal, plain css. */
 :root {

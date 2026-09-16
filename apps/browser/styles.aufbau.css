@@ -1,6 +1,6 @@
-/* aufbau style sheets (ass) source — compiled to www/styles.css.
-   edit here, then: node tools/build-css.mjs <app>  (see tools/README.md).
-   ass is a strict css superset: plain css is valid, plus @default/@prop/@value/@mixin. */
+/* aufbau style sheets source — compiled to www/styles.css.
+   edit here, then: node tools/build-css.mjs browser  (see tools/README.md).
+   a strict css superset: plain css is valid, plus @default/@prop/@value/@mixin. */
 
 /* minimalist browser chrome. palette is THREE tokens (--bg, --fg, --accent), set
    live from settings; every other shade is color-mix of --bg/--fg. the body is
