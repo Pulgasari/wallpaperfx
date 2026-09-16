@@ -12,9 +12,14 @@ unchanged — that adds `@default` / `@prop` / `@value` / `@mixin` sugar. see th
 package readme (aufbau repo, `ass/`) for the language.
 
 - edit `apps/<app>/styles.aufbau.css`
-- regenerate: `node tools/build-css.mjs` (all apps) or `node tools/build-css.mjs <app>`
+- recompile — either once (`node tools/build-css.mjs [app]`) or leave a watcher
+  running so every save rebuilds automatically: `node tools/build-css.mjs --watch`
 - commit both the source and the regenerated `www/styles.css`
 - `cap copy`/`cap sync` then copies `www/` into the apk as usual
+
+the watcher watches each app dir (not the file) so editor atomic saves keep
+firing, and debounces the event burst. nothing is shipped and there is no
+runtime cost — the compile happens at edit time, not on the device.
 
 the source sits at the app root on purpose — not in `www/` — so it never ships
 in the apk; only the generated `www/styles.css` does. the `.aufbau.css`
