@@ -1,0 +1,53 @@
+name: compile css
+
+# edit apps/<app>/styles.aufbau.css (on github.com or anywhere) and commit — this
+# recompiles it to apps/<app>/www/styles.css with the vendored @aufbau/ass compiler
+# and commits the result back to the same branch. no local tooling needed.
+#
+# the trigger paths deliberately exclude www/styles.css, and the bot commit only
+# touches www/styles.css, so the auto-commit never retriggers this workflow.
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "apps/**/styles.aufbau.css"
+      - "tools/ass/**"
+      - "tools/build-css.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: compile-css-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+
+      - name: setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: compile styles.aufbau.css -> www/styles.css
+        run: node tools/build-css.mjs
+
+      - name: commit regenerated css
+        run: |
+          if git diff --quiet -- 'apps/*/www/styles.css'; then
+            echo "styles.css already up to date, nothing to commit"
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/*/www/styles.css
+          git commit -m "chore: recompile styles.css from styles.aufbau.css [skip ci]"
+          git push
