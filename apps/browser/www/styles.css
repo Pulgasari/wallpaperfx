@@ -884,7 +884,3 @@ input[type=checkbox]:checked::after {
   justify-content: flex-end;
   gap: 8px;
 }
-
-.aufbau-ci-selftest {
-  color: red;
-}
