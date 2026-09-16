@@ -224,3 +224,6 @@ input[type=checkbox]:checked::after { left: 20px; }
 .css-area { width: 100%; min-height: 130px; resize: vertical; border: hairline; border-radius: 10px; background: var(--faint); color: var(--fg); padding: 10px 12px; font: 12px/1.5 ui-monospace, Menlo, Consolas, monospace; }
 .io-status { margin: 0; color: var(--dim); font-size: 12px; word-break: break-all; }
 .editor-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+
+/* ci self-test: this rule proves the compile-css action regenerates www/styles.css */
+.aufbau-ci-selftest { color: red; }
