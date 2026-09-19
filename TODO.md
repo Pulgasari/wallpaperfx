@@ -49,6 +49,10 @@ quasi die startseite oder bei leerer tab.
 
 Ich habe FileSync soeben getestet und konnte erfolgreich Dateien vom Smartphone an Desktop-PC schicken. Ich musste jedoch immer neu "bestätigen", als das scheint noch kein "dauerhaftes Pairing" (ich weiss den genauen/korrektenBegriff nicht).
 
+### localSend
+- [ ] kompatibel mit regulärer localSend-desktop-app
+- [ ] settings-option: wie viele files gleichzeitig "hochgeladen" werden
+
 - [x] "dauerhaftes Pairing" ermöglichen (desktop: vertraute geräte -> ohne nachfrage annehmen)
 - [x] fix: wenn der dateiname recht lang ist sprengt er das komplette layout -> muss umgebrochen werden (nicht gekürzt!!)
 - [x] generell fände ich ne Art History nice, wo ich sehen kann, was gesendet wurde und obs erfolgreich war usw.
