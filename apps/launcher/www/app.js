@@ -161,7 +161,8 @@
         folders: [],       // [{ id, name, apps: [packageName] }]
         home: null,        // [packageName] pinned to the home screen; null = not seeded yet
         barsPos: 'bottom', // drawer filter bars: top | bottom
-        barsOrder: ['cat', 'letter', 'search'] // top-to-bottom order of the drawer bars
+        barsOrder: ['cat', 'letter', 'search'], // top-to-bottom order of the drawer bars
+        letterTwoRows: false // letter bar wraps to 2 rows (bigger touch targets)
     });
 
     // drawer filter bars: state key -> element id + settings label
@@ -318,6 +319,7 @@
         document.body.classList.toggle('multiline', !state.cutLabel);
         $('customCssStyle').textContent = state.customCss || '';
         document.body.classList.toggle('drawer-bars-top', state.barsPos === 'top');
+        document.body.classList.toggle('letters-two-rows', !!state.letterTwoRows);
         state.barsOrder.forEach((k, i) => { $(BARS[k][0]).style.order = i; });
         // when the page bg is not fully opaque, ask native to show the wallpaper behind
         try { plugin.setShowWallpaper({ show: state.pageBgAlpha < 1 }); } catch (e) {}
@@ -426,7 +428,8 @@
         $('drawerToggle').addEventListener('click', openDrawer);
         $('drawerHandle').addEventListener('click', closeDrawer);
 
-        // letter bar: tap toggles a letter, dragging a finger along the bar scrubs.
+        // letter bar: tap toggles a letter, dragging a finger along the bar scrubs
+        // (hit-tested via elementFromPoint, so it also works across two rows).
         const bar = $('letterBar');
         bar.addEventListener('click', e => {
             const b = e.target.closest('.letter');
@@ -715,6 +718,7 @@
         wireToggle('toggleLabel', 'showLabel');
         wireToggle('toggleUppercase', 'uppercase');
         wireToggle('toggleMultiline', 'cutLabel'); // note: checked = cut (single line)
+        wireToggle('toggleLetterRows', 'letterTwoRows');
 
         const css = $('customCss');
         css.value = state.customCss || '';

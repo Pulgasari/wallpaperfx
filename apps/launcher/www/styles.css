@@ -304,6 +304,17 @@ body.drawer-bars-top .drawer-scroll {
   color: #fff;
 }
 
+body.letters-two-rows .letter-bar {
+  display: grid;
+  grid-template-columns: repeat(14, minmax(0, 1fr));
+  row-gap: 2px;
+}
+
+body.letters-two-rows .letter {
+  padding: 9px 0;
+  font-size: 13px;
+}
+
 .search-bar {
   display: flex;
   align-items: center;

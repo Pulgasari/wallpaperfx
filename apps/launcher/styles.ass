@@ -169,6 +169,10 @@ body.drawer-bars-top .drawer-scroll { padding-top: 12px; padding-bottom: max(12p
 .letter:disabled { color: var(--muted); opacity: 0.35; cursor: default; }
 .letter.active { background: var(--accent); color: #fff; }
 
+/* optional two-row layout: 27 letters as 14 + 13, larger targets */
+body.letters-two-rows .letter-bar { display: grid; grid-template-columns: repeat(14, minmax(0, 1fr)); row-gap: 2px; }
+body.letters-two-rows .letter { padding: 9px 0; font-size: 13px; }
+
 /* bar 3: search */
 .search-bar {
     display: flex; align-items: center; gap: 4px;
