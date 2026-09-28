@@ -69,6 +69,8 @@
         settings: '<circle cx="12" cy="12" r="3.2"/><path d="M12 3.5v2.4M12 18.1v2.4M20.5 12h-2.4M5.9 12H3.5M18 6l-1.7 1.7M7.7 16.3L6 18M18 18l-1.7-1.7M7.7 7.7L6 6"/>',
         folder: '<path d="M3 7.5a2 2 0 012-2h4l2 2h8a2 2 0 012 2v7a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>',
         add: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
+        up: '<path d="M6 15l6-6 6 6"/>',
+        down: '<path d="M6 9l6 6 6-6"/>',
         close: '<line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/>',
         back: '<path d="M15 5l-7 7 7 7"/>',
         trash: '<path d="M6 7.5h12l-1 12.5H7z"/><line x1="4.5" y1="7.5" x2="19.5" y2="7.5"/><path d="M9.5 7.5V4.5h5v3"/>',
@@ -157,8 +159,13 @@
         pageBg: '#0d0d10',
         pageBgAlpha: 1,    // < 1 lets the system wallpaper show through
         folders: [],       // [{ id, name, apps: [packageName] }]
-        home: null         // [packageName] pinned to the home screen; null = not seeded yet
+        home: null,        // [packageName] pinned to the home screen; null = not seeded yet
+        barsPos: 'bottom', // drawer filter bars: top | bottom
+        barsOrder: ['cat', 'letter', 'search'] // top-to-bottom order of the drawer bars
     });
+
+    // drawer filter bars: state key -> element id + settings label
+    const BARS = { cat: ['catBar', 'Kategorien'], letter: ['letterBar', 'Anfangsbuchstaben'], search: ['searchBar', 'Suchfeld'] };
 
     // first-run home: a few everyday apps, so the home screen is not empty
     const SEED_ICONS = ['phone', 'message', 'browser', 'camera', 'mail', 'photos'];
@@ -173,6 +180,10 @@
             s.cols = clamp(s.cols | 0 || 4, COLS_MIN, COLS_MAX);
             if (!Array.isArray(s.folders)) s.folders = [];
             if (s.home != null && !Array.isArray(s.home)) s.home = null;
+            if (s.barsPos !== 'top') s.barsPos = 'bottom';
+            // keep barsOrder a permutation of the known bars, whatever was stored
+            const order = Array.isArray(s.barsOrder) ? s.barsOrder.filter((k, i, a) => BARS[k] && a.indexOf(k) === i) : [];
+            s.barsOrder = order.concat(Object.keys(BARS).filter(k => !order.includes(k)));
             return s;
         } catch (e) { return defaults(); }
     }
@@ -306,6 +317,8 @@
         document.body.classList.toggle('uppercase', state.uppercase);
         document.body.classList.toggle('multiline', !state.cutLabel);
         $('customCssStyle').textContent = state.customCss || '';
+        document.body.classList.toggle('drawer-bars-top', state.barsPos === 'top');
+        state.barsOrder.forEach((k, i) => { $(BARS[k][0]).style.order = i; });
         // when the page bg is not fully opaque, ask native to show the wallpaper behind
         try { plugin.setShowWallpaper({ show: state.pageBgAlpha < 1 }); } catch (e) {}
     }
@@ -585,16 +598,46 @@
         }
     }
 
-    function renderShapeSeg() {
-        const box = $('shapeSeg');
+    // segmented control bound to a string state key
+    function renderSeg(boxId, key, options) {
+        const box = $(boxId);
         box.innerHTML = '';
-        for (const s of [['circle', 'Kreis'], ['squircle', 'Squircle'], ['square', 'Eckig']]) {
+        for (const [value, label] of options) {
             const b = document.createElement('button');
-            b.className = 'seg-btn' + (state.shape === s[0] ? ' active' : '');
-            b.textContent = s[1];
-            b.addEventListener('click', () => { state.shape = s[0]; save(); renderShapeSeg(); applyStyleVars(); });
+            b.className = 'seg-btn' + (state[key] === value ? ' active' : '');
+            b.textContent = label;
+            b.addEventListener('click', () => { state[key] = value; save(); renderSeg(boxId, key, options); applyStyleVars(); });
             box.appendChild(b);
         }
+    }
+    const renderShapeSeg = () => renderSeg('shapeSeg', 'shape', [['circle', 'Kreis'], ['squircle', 'Squircle'], ['square', 'Eckig']]);
+    const renderBarsPosSeg = () => renderSeg('barsPosSeg', 'barsPos', [['top', 'Oben'], ['bottom', 'Unten']]);
+
+    function moveBar(i, dir) {
+        const j = i + dir, o = state.barsOrder;
+        if (j < 0 || j >= o.length) return;
+        [o[i], o[j]] = [o[j], o[i]];
+        save(); applyStyleVars(); renderBarsOrder();
+    }
+    function renderBarsOrder() {
+        const ul = $('barsOrderList');
+        ul.innerHTML = '';
+        state.barsOrder.forEach((k, i) => {
+            const li = document.createElement('li');
+            li.className = 'order-row';
+            li.innerHTML = '<span>' + BARS[k][1] + '</span>';
+            const actions = document.createElement('span');
+            actions.className = 'folder-row-actions';
+            for (const [icon, dir, label] of [['up', -1, 'Nach oben'], ['down', 1, 'Nach unten']]) {
+                const b = document.createElement('button');
+                b.className = 'icon-btn'; b.innerHTML = svg(icon, 'icon-sm'); b.setAttribute('aria-label', label);
+                b.disabled = i + dir < 0 || i + dir >= state.barsOrder.length;
+                b.addEventListener('click', () => moveBar(i, dir));
+                actions.appendChild(b);
+            }
+            li.appendChild(actions);
+            ul.appendChild(li);
+        });
     }
 
     // wire a range input to a numeric state key, live-applying + showing its value
@@ -645,6 +688,8 @@
     function openSettings() {
         renderColorPresets();
         renderShapeSeg();
+        renderBarsPosSeg();
+        renderBarsOrder();
         renderFolderList();
         openOverlay('settingsPanel', false);
     }

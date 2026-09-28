@@ -228,6 +228,22 @@ body.multiline .tile-label {
   border-top: 1px solid var(--line);
 }
 
+body.drawer-bars-top .drawer-handle {
+  order: -2;
+}
+
+body.drawer-bars-top .drawer-bars {
+  order: -1;
+  padding: 4px 12px 10px;
+  border-top: 0;
+  border-bottom: 1px solid var(--line);
+}
+
+body.drawer-bars-top .drawer-scroll {
+  padding-top: 12px;
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+}
+
 .cat-bar {
   display: flex;
   gap: 6px;
@@ -575,6 +591,25 @@ input[type=checkbox]:checked::after {
   color: var(--fg);
   padding: 10px 12px;
   font: 12px/1.5 ui-monospace, Menlo, Consolas, monospace;
+}
+
+.order-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.order-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 4px;
+  border-bottom: 1px solid var(--line);
+}
+
+.order-row .icon-btn:disabled {
+  opacity: 0.25;
+  cursor: default;
 }
 
 .folder-list {

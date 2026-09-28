@@ -15,6 +15,9 @@ that bridges `PackageManager`; there is no custom rendering engine.
     bottom bars that combine as filters: categories (derived from the guessed
     glyph via `CATEGORIES`), first letters (tap toggles, drag scrubs), search
     (enter launches the first hit). filters reset on each open.
+    bar position (`state.barsPos`: top|bottom) and top-to-bottom order
+    (`state.barsOrder`, a permutation of `BARS` keys) are settings; applied via
+    a body class + inline flex `order`, the dom order never changes.
   long-press any app for pin/unpin + folder actions. preferences persist in
   `localStorage` under key `launcher`.
 - Native = `android/app/src/main/java/com/launcher/app/`:
