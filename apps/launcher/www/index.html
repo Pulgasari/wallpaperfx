@@ -14,10 +14,27 @@
 <div id="status" class="status-toast" role="status"></div>
 
 <main id="home" class="home">
-    <div id="grid" class="grid" aria-label="Apps"></div>
+    <div id="grid" class="grid" aria-label="Homescreen"></div>
 </main>
 
+<button id="drawerToggle" class="fab fab-drawer" data-icon="grid" aria-label="Alle Apps"></button>
 <button id="settingsToggle" class="fab" data-icon="settings" aria-label="Einstellungen"></button>
+
+<!-- ===== app drawer: all apps, separate from the home screen ===== -->
+<section id="drawer" class="drawer" hidden aria-label="Alle Apps">
+    <button id="drawerHandle" class="drawer-handle" aria-label="Schließen"><span></span></button>
+    <div id="drawerScroll" class="drawer-scroll">
+        <div id="drawerGrid" class="grid" aria-label="Apps"></div>
+    </div>
+    <div class="drawer-bars">
+        <div id="catBar" class="cat-bar" role="group" aria-label="Kategorien"></div>
+        <div id="letterBar" class="letter-bar" role="group" aria-label="Anfangsbuchstaben"></div>
+        <div id="searchBar" class="search-bar">
+            <input id="drawerSearch" type="search" placeholder="Apps suchen" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="go" />
+            <button id="searchClear" class="icon-btn" data-icon="close" aria-label="Suche leeren" hidden></button>
+        </div>
+    </div>
+</section>
 
 <div id="backdrop" class="backdrop" hidden></div>
 
@@ -95,6 +112,17 @@
         <input id="rangePageAlpha" type="range" min="0" max="1" step="0.05" />
     </div>
     <p class="hint">Deckkraft &lt; 1 lässt das System-Wallpaper durchscheinen.</p>
+
+    <h3 class="group-title">App-Drawer</h3>
+    <div class="field">
+        <label>Position der Leisten</label>
+        <div id="barsPosSeg" class="seg" role="group" aria-label="Position der Leisten"></div>
+    </div>
+    <div class="field">
+        <label>Reihenfolge der Leisten (von oben nach unten)</label>
+        <ul id="barsOrderList" class="order-list"></ul>
+    </div>
+    <label class="switch-row"><span>Anfangsbuchstaben zweizeilig</span><input id="toggleLetterRows" type="checkbox" /></label>
 
     <h3 class="group-title">Eigenes CSS</h3>
     <textarea id="customCss" class="css-area" spellcheck="false" placeholder=".tile-label { letter-spacing: .04em }"></textarea>

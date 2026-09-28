@@ -1,4 +1,5 @@
-// launcher home ui. plain js, bundler-free. talks to the native Launcher
+// launcher ui: home screen (pinned apps + folders) and a separate app drawer
+// (all apps, filterable by category / first letter / search). plain js, bundler-free. talks to the native Launcher
 // capacitor plugin (getApps/launchApp). in a plain browser (no capacitor) a
 // mock keeps the ui usable for layout work. most appearance settings are driven
 // by css custom properties + body classes so changes preview live without
@@ -68,10 +69,14 @@
         settings: '<circle cx="12" cy="12" r="3.2"/><path d="M12 3.5v2.4M12 18.1v2.4M20.5 12h-2.4M5.9 12H3.5M18 6l-1.7 1.7M7.7 16.3L6 18M18 18l-1.7-1.7M7.7 7.7L6 6"/>',
         folder: '<path d="M3 7.5a2 2 0 012-2h4l2 2h8a2 2 0 012 2v7a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>',
         add: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
+        up: '<path d="M6 15l6-6 6 6"/>',
+        down: '<path d="M6 9l6 6 6-6"/>',
         close: '<line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/>',
         back: '<path d="M15 5l-7 7 7 7"/>',
         trash: '<path d="M6 7.5h12l-1 12.5H7z"/><line x1="4.5" y1="7.5" x2="19.5" y2="7.5"/><path d="M9.5 7.5V4.5h5v3"/>',
         edit: '<path d="M4 20h4L18 10l-4-4L4 16z"/><line x1="13" y1="7" x2="17" y2="11"/>',
+        grid: '<rect x="4.5" y="4.5" width="6" height="6" rx="1.5"/><rect x="13.5" y="4.5" width="6" height="6" rx="1.5"/><rect x="4.5" y="13.5" width="6" height="6" rx="1.5"/><rect x="13.5" y="13.5" width="6" height="6" rx="1.5"/>',
+        pin: '<path d="M9 4h6l-1 6 3 3H7l3-3z"/><line x1="12" y1="13" x2="12" y2="20"/>',
         open: '<path d="M14 4h6v6"/><line x1="20" y1="4" x2="11" y2="13"/><path d="M18 14v4a2 2 0 01-2 2H6a2 2 0 01-2-2V8a2 2 0 012-2h4"/>'
     };
     function svg(name, cls) {
@@ -97,13 +102,38 @@
         [/bank|wallet|pay|finance|geld|karte|card/, 'bank'],
         [/note|memo|keep|todo|task|notiz/, 'notes'],
         [/file|explorer|manager|drive|dokument|datei/, 'files'],
+        [/browser|chrome|firefox|brave|opera|vivaldi|internet/, 'browser'],
         [/weather|wetter|climate/, 'weather'],
         [/setting|config|einstell/, 'settings']
     ];
     function guessIcon(app) {
+        if (app._icon) return app._icon;
         const hay = ((app.label || '') + ' ' + (app.packageName || '')).toLowerCase();
-        for (const [re, name] of ICON_RULES) if (re.test(hay)) return name;
-        return 'app';
+        for (const [re, name] of ICON_RULES) if (re.test(hay)) return (app._icon = name);
+        return (app._icon = 'app');
+    }
+
+    // drawer categories derive from the guessed glyph (same keyword rules), so
+    // there is no second classifier to keep in sync. order = chip order.
+    const CATEGORIES = [
+        ['comm', 'Kommunikation', ['phone', 'message', 'mail', 'browser']],
+        ['media', 'Medien', ['camera', 'photos', 'music', 'video']],
+        ['org', 'Organisation', ['clock', 'calendar', 'notes', 'calculator', 'files']],
+        ['travel', 'Unterwegs', ['maps', 'weather']],
+        ['money', 'Shop & Geld', ['store', 'bank']],
+        ['games', 'Spiele', ['game']],
+        ['system', 'System', ['settings']],
+        ['other', 'Sonstige', ['app']]
+    ];
+    const CAT_OF_ICON = new Map(CATEGORIES.flatMap(([id, , icons]) => icons.map(i => [i, id])));
+    const categoryOf = app => CAT_OF_ICON.get(guessIcon(app)) || 'other';
+
+    // diacritic-insensitive lowercase, used for search and first-letter bucketing
+    const norm = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ#'.split('');
+    function letterOf(app) {
+        const c = norm(app.label).trim().charAt(0).toUpperCase();
+        return c >= 'A' && c <= 'Z' ? c : '#';
     }
 
     // ---- state ----
@@ -128,8 +158,18 @@
         customCss: '',
         pageBg: '#0d0d10',
         pageBgAlpha: 1,    // < 1 lets the system wallpaper show through
-        folders: []        // [{ id, name, apps: [packageName] }]
+        folders: [],       // [{ id, name, apps: [packageName] }]
+        home: null,        // [packageName] pinned to the home screen; null = not seeded yet
+        barsPos: 'bottom', // drawer filter bars: top | bottom
+        barsOrder: ['cat', 'letter', 'search'], // top-to-bottom order of the drawer bars
+        letterTwoRows: false // letter bar wraps to 2 rows (bigger touch targets)
     });
+
+    // drawer filter bars: state key -> element id + settings label
+    const BARS = { cat: ['catBar', 'Kategorien'], letter: ['letterBar', 'Anfangsbuchstaben'], search: ['searchBar', 'Suchfeld'] };
+
+    // first-run home: a few everyday apps, so the home screen is not empty
+    const SEED_ICONS = ['phone', 'message', 'browser', 'camera', 'mail', 'photos'];
 
     let state = load();
     let apps = [];
@@ -140,6 +180,11 @@
             const s = Object.assign(defaults(), JSON.parse(localStorage.getItem(STORE_KEY) || '{}'));
             s.cols = clamp(s.cols | 0 || 4, COLS_MIN, COLS_MAX);
             if (!Array.isArray(s.folders)) s.folders = [];
+            if (s.home != null && !Array.isArray(s.home)) s.home = null;
+            if (s.barsPos !== 'top') s.barsPos = 'bottom';
+            // keep barsOrder a permutation of the known bars, whatever was stored
+            const order = Array.isArray(s.barsOrder) ? s.barsOrder.filter((k, i, a) => BARS[k] && a.indexOf(k) === i) : [];
+            s.barsOrder = order.concat(Object.keys(BARS).filter(k => !order.includes(k)));
             return s;
         } catch (e) { return defaults(); }
     }
@@ -150,12 +195,37 @@
     const uid = () => 'f' + Math.random().toString(36).slice(2, 9);
     const folderOf = pkg => state.folders.find(f => f.apps.includes(pkg)) || null;
     function createFolder(name) { const f = { id: uid(), name: name || 'Ordner', apps: [] }; state.folders.push(f); save(); return f; }
-    function deleteFolder(id) { state.folders = state.folders.filter(f => f.id !== id); save(); }
+    // deleting a folder keeps its apps on the home screen as plain pins
+    function deleteFolder(id) {
+        const f = state.folders.find(x => x.id === id);
+        if (f && state.home) for (const p of f.apps) if (!state.home.includes(p)) state.home.push(p);
+        state.folders = state.folders.filter(x => x.id !== id); save();
+    }
     function renameFolder(id, name) { const f = state.folders.find(x => x.id === id); if (f) { f.name = name || f.name; save(); } }
     function moveToFolder(pkg, folderId) { removeFromFolder(pkg); const f = state.folders.find(x => x.id === folderId); if (f && !f.apps.includes(pkg)) f.apps.push(pkg); save(); }
     function removeFromFolder(pkg) { for (const f of state.folders) { const i = f.apps.indexOf(pkg); if (i >= 0) f.apps.splice(i, 1); } save(); }
-    function topLevelApps() { const inFolder = new Set(state.folders.flatMap(f => f.apps)); return apps.filter(a => !inFolder.has(a.packageName)); }
     function folderApps(folder) { return folder.apps.map(p => appByPkg.get(p)).filter(Boolean); }
+
+    // ---- home pins ----
+    // an app is on the home screen when it is pinned OR inside a folder (folders
+    // live on the home screen). a foldered app is not also listed as a pin.
+
+    const isPinned = pkg => state.home.includes(pkg);
+    function pin(pkg) { if (!isPinned(pkg)) state.home.push(pkg); save(); }
+    function unpin(pkg) { state.home = state.home.filter(p => p !== pkg); save(); }
+    function homeApps() {
+        const inFolder = new Set(state.folders.flatMap(f => f.apps));
+        return state.home.filter(p => !inFolder.has(p)).map(p => appByPkg.get(p)).filter(Boolean);
+    }
+    function seedHome() {
+        if (state.home) return;
+        const picked = [];
+        for (const icon of SEED_ICONS) {
+            const a = apps.find(x => guessIcon(x) === icon && !picked.includes(x.packageName));
+            if (a) picked.push(a.packageName);
+        }
+        state.home = picked; save();
+    }
 
     // ---- dom helpers ----
 
@@ -217,7 +287,7 @@
         el.className = 'tile';
         el.innerHTML = '<span class="tile-icon">' + svg(guessIcon(app)) + '</span>' +
             '<span class="tile-label">' + escapeHtml(app.label) + '</span>';
-        bindTile(el, () => launch(app.packageName), () => openAppActions(app));
+        bindTile(el, () => { launch(app.packageName); closeDrawer(); }, () => openAppActions(app));
         return el;
     }
     function folderTile(folder) {
@@ -248,6 +318,9 @@
         document.body.classList.toggle('uppercase', state.uppercase);
         document.body.classList.toggle('multiline', !state.cutLabel);
         $('customCssStyle').textContent = state.customCss || '';
+        document.body.classList.toggle('drawer-bars-top', state.barsPos === 'top');
+        document.body.classList.toggle('letters-two-rows', !!state.letterTwoRows);
+        state.barsOrder.forEach((k, i) => { $(BARS[k][0]).style.order = i; });
         // when the page bg is not fully opaque, ask native to show the wallpaper behind
         try { plugin.setShowWallpaper({ show: state.pageBgAlpha < 1 }); } catch (e) {}
     }
@@ -256,8 +329,160 @@
         const grid = $('grid');
         grid.innerHTML = '';
         for (const f of state.folders) grid.appendChild(folderTile(f));
-        for (const a of topLevelApps()) grid.appendChild(appTile(a));
-        if (!state.folders.length && !apps.length) grid.innerHTML = '<p class="empty">keine apps gefunden</p>';
+        for (const a of homeApps()) grid.appendChild(appTile(a));
+        if (!grid.children.length) {
+            grid.innerHTML = '<p class="empty">' + (apps.length
+                ? 'homescreen ist leer. im app-drawer eine app lange drücken und anheften.'
+                : 'keine apps gefunden') + '</p>';
+        }
+    }
+    function renderAll() { renderHome(); if (!$('drawer').hidden) renderDrawer(); }
+
+    // ---- app drawer ----
+    // three stacked bars at the bottom (categories, first letters, search). all
+    // three filters combine (and). they reset whenever the drawer opens.
+
+    const drawerFilter = { cat: null, letter: null, query: '' };
+
+    function matchesQuery(app, q) {
+        return !q || norm(app.label).includes(q) || app.packageName.toLowerCase().includes(q);
+    }
+    function drawerApps(skipLetter) {
+        const q = norm(drawerFilter.query).trim();
+        return apps.filter(a =>
+            (!drawerFilter.cat || categoryOf(a) === drawerFilter.cat) &&
+            (skipLetter || !drawerFilter.letter || letterOf(a) === drawerFilter.letter) &&
+            matchesQuery(a, q));
+    }
+
+    function renderCatBar() {
+        const bar = $('catBar');
+        bar.innerHTML = '';
+        const present = new Set(apps.map(categoryOf));
+        const chips = [[null, 'Alle']].concat(CATEGORIES.filter(c => present.has(c[0])).map(c => [c[0], c[1]]));
+        for (const [id, label] of chips) {
+            const b = document.createElement('button');
+            b.className = 'cat-chip' + (drawerFilter.cat === id ? ' active' : '');
+            b.textContent = label;
+            b.addEventListener('click', () => { drawerFilter.cat = id; renderDrawer(); });
+            bar.appendChild(b);
+        }
+    }
+
+    function renderLetterBar() {
+        const bar = $('letterBar');
+        bar.innerHTML = '';
+        // letters are enabled relative to the other two filters
+        const present = new Set(drawerApps(true).map(letterOf));
+        if (drawerFilter.letter && !present.has(drawerFilter.letter)) drawerFilter.letter = null;
+        for (const l of LETTERS) {
+            const b = document.createElement('button');
+            b.className = 'letter' + (drawerFilter.letter === l ? ' active' : '');
+            b.textContent = l;
+            b.dataset.letter = l;
+            b.disabled = !present.has(l);
+            bar.appendChild(b);
+        }
+    }
+
+    function renderDrawerGrid() {
+        const grid = $('drawerGrid');
+        grid.innerHTML = '';
+        const list = drawerApps(false);
+        if (!list.length) grid.innerHTML = '<p class="empty">keine treffer</p>';
+        else for (const a of list) grid.appendChild(appTile(a));
+    }
+
+    function renderDrawer() {
+        renderCatBar();
+        renderLetterBar();
+        renderDrawerGrid();
+        $('searchClear').hidden = !drawerFilter.query;
+    }
+
+    function openDrawer() {
+        drawerFilter.cat = null; drawerFilter.letter = null; drawerFilter.query = '';
+        $('drawerSearch').value = '';
+        renderDrawer();
+        $('drawer').hidden = false;
+        $('drawerScroll').scrollTop = 0;
+        const cat = $('catBar').querySelector('.active');
+        if (cat) cat.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+    }
+    function closeDrawer() {
+        if ($('drawer').hidden) return;
+        $('drawerSearch').blur();
+        $('drawer').hidden = true;
+    }
+
+    function setLetter(l, toggle) {
+        const next = toggle && drawerFilter.letter === l ? null : l;
+        if (next === drawerFilter.letter) return;
+        drawerFilter.letter = next;
+        renderLetterBar();
+        renderDrawerGrid();
+        $('drawerScroll').scrollTop = 0;
+    }
+
+    function wireDrawer() {
+        $('drawerToggle').addEventListener('click', openDrawer);
+        $('drawerHandle').addEventListener('click', closeDrawer);
+
+        // letter bar: tap toggles a letter, dragging a finger along the bar scrubs
+        // (hit-tested via elementFromPoint, so it also works across two rows).
+        const bar = $('letterBar');
+        bar.addEventListener('click', e => {
+            const b = e.target.closest('.letter');
+            if (b && !b.disabled) setLetter(b.dataset.letter, true);
+        });
+        bar.addEventListener('touchmove', e => {
+            const t = e.touches[0];
+            const b = document.elementFromPoint(t.clientX, t.clientY);
+            if (b && b.classList && b.classList.contains('letter') && !b.disabled) { setLetter(b.dataset.letter, false); }
+            e.preventDefault();
+        }, { passive: false });
+
+        const input = $('drawerSearch');
+        input.addEventListener('input', () => {
+            drawerFilter.query = input.value;
+            renderLetterBar();
+            renderDrawerGrid();
+            $('searchClear').hidden = !input.value;
+            $('drawerScroll').scrollTop = 0;
+        });
+        input.addEventListener('keydown', e => {
+            if (e.key !== 'Enter') return;
+            const first = drawerApps(false)[0];
+            if (first) { launch(first.packageName); closeDrawer(); }
+        });
+        $('searchClear').addEventListener('click', () => {
+            input.value = ''; input.dispatchEvent(new Event('input')); input.focus();
+        });
+
+        // swipe up on the home screen opens the drawer, swipe down at the top of
+        // the drawer list closes it.
+        swipe($('home'), dy => dy < -70, openDrawer);
+        swipe($('drawerScroll'), dy => dy > 90, closeDrawer);
+    }
+
+    function atBottom(el) { return el.scrollTop + el.clientHeight >= el.scrollHeight - 2; }
+    // vertical swipe detector. `accept(dy)` is checked on touchend. the scroll
+    // edge is captured at touchstart, so a scroll that merely ends at an edge
+    // is not a swipe; only a gesture that starts there counts.
+    function swipe(el, accept, onSwipe) {
+        let sx = 0, sy = 0, edge = null, active = false;
+        el.addEventListener('touchstart', e => {
+            const t = e.touches[0]; sx = t.clientX; sy = t.clientY; active = true;
+            edge = { top: el.scrollTop <= 0, bottom: atBottom(el) };
+        }, { passive: true });
+        el.addEventListener('touchend', e => {
+            if (!active) return; active = false;
+            const t = e.changedTouches[0];
+            const dx = t.clientX - sx, dy = t.clientY - sy;
+            if (Math.abs(dy) < Math.abs(dx) * 1.5) return;
+            if ((dy < 0 && !edge.bottom) || (dy > 0 && !edge.top)) return;
+            if (accept(dy)) onSwipe();
+        });
     }
 
     // ---- launch ----
@@ -277,6 +502,11 @@
         $(id).hidden = true;
         const anyOpen = ['folderView'].some(x => !$(x).hidden);
         if (!anyOpen) $('backdrop').hidden = true;
+    }
+    // back closes the top-most layer: sheets/overlays first, then the drawer
+    function goBack() {
+        const anySheet = ['folderView', 'settingsPanel', 'actionSheet'].some(x => !$(x).hidden);
+        if (anySheet) closeAll(); else closeDrawer();
     }
     function closeAll() {
         ['folderView', 'settingsPanel', 'actionSheet'].forEach(x => { $(x).hidden = true; });
@@ -310,23 +540,34 @@
         $('sheetTitle').textContent = app.label;
         const box = $('sheetActions');
         box.innerHTML = '';
-        box.appendChild(sheetButton('open', 'Öffnen', () => launch(app.packageName)));
-        const current = folderOf(app.packageName);
+        const pkg = app.packageName;
+        box.appendChild(sheetButton('open', 'Öffnen', () => { launch(pkg); closeDrawer(); }));
+        const current = folderOf(pkg);
+        const pinned = isPinned(pkg);
+        if (!current && !pinned) {
+            box.appendChild(sheetButton('pin', 'Zum Homescreen hinzufügen', () => { pin(pkg); renderAll(); toast('zum homescreen hinzugefügt'); }));
+        }
+        // moving into a folder puts the app on the home screen via that folder
         for (const f of state.folders) {
             if (current && f.id === current.id) continue;
             box.appendChild(sheetButton('folder', 'In "' + f.name + '" verschieben', () => {
-                moveToFolder(app.packageName, f.id); renderHome(); toast('in ' + f.name + ' verschoben');
+                moveToFolder(pkg, f.id); unpin(pkg); renderAll(); toast('in ' + f.name + ' verschoben');
             }));
         }
         box.appendChild(sheetButton('add', 'Neuer Ordner mit App', () => {
             const name = prompt('Ordnername:', 'Ordner'); if (name == null) return;
-            const f = createFolder(name.trim() || 'Ordner'); moveToFolder(app.packageName, f.id); renderHome();
+            const f = createFolder(name.trim() || 'Ordner'); moveToFolder(pkg, f.id); unpin(pkg); renderAll();
         }));
         if (current) {
+            // leaving a folder keeps the app on the home screen as a plain pin
             box.appendChild(sheetButton('back', 'Aus "' + current.name + '" entfernen', () => {
-                removeFromFolder(app.packageName); renderHome();
-                if (!$('folderView').hidden) { const f = state.folders.find(x => x.id === openFolderId); if (f) openFolder(f); }
+                removeFromFolder(pkg); pin(pkg); renderAll();
             }));
+        }
+        if (current || pinned) {
+            box.appendChild(sheetButton('close', 'Vom Homescreen entfernen', () => {
+                removeFromFolder(pkg); unpin(pkg); renderAll(); toast('vom homescreen entfernt');
+            }, true));
         }
         $('actionSheet').hidden = false;
         $('backdrop').hidden = false;
@@ -360,16 +601,46 @@
         }
     }
 
-    function renderShapeSeg() {
-        const box = $('shapeSeg');
+    // segmented control bound to a string state key
+    function renderSeg(boxId, key, options) {
+        const box = $(boxId);
         box.innerHTML = '';
-        for (const s of [['circle', 'Kreis'], ['squircle', 'Squircle'], ['square', 'Eckig']]) {
+        for (const [value, label] of options) {
             const b = document.createElement('button');
-            b.className = 'seg-btn' + (state.shape === s[0] ? ' active' : '');
-            b.textContent = s[1];
-            b.addEventListener('click', () => { state.shape = s[0]; save(); renderShapeSeg(); applyStyleVars(); });
+            b.className = 'seg-btn' + (state[key] === value ? ' active' : '');
+            b.textContent = label;
+            b.addEventListener('click', () => { state[key] = value; save(); renderSeg(boxId, key, options); applyStyleVars(); });
             box.appendChild(b);
         }
+    }
+    const renderShapeSeg = () => renderSeg('shapeSeg', 'shape', [['circle', 'Kreis'], ['squircle', 'Squircle'], ['square', 'Eckig']]);
+    const renderBarsPosSeg = () => renderSeg('barsPosSeg', 'barsPos', [['top', 'Oben'], ['bottom', 'Unten']]);
+
+    function moveBar(i, dir) {
+        const j = i + dir, o = state.barsOrder;
+        if (j < 0 || j >= o.length) return;
+        [o[i], o[j]] = [o[j], o[i]];
+        save(); applyStyleVars(); renderBarsOrder();
+    }
+    function renderBarsOrder() {
+        const ul = $('barsOrderList');
+        ul.innerHTML = '';
+        state.barsOrder.forEach((k, i) => {
+            const li = document.createElement('li');
+            li.className = 'order-row';
+            li.innerHTML = '<span>' + BARS[k][1] + '</span>';
+            const actions = document.createElement('span');
+            actions.className = 'folder-row-actions';
+            for (const [icon, dir, label] of [['up', -1, 'Nach oben'], ['down', 1, 'Nach unten']]) {
+                const b = document.createElement('button');
+                b.className = 'icon-btn'; b.innerHTML = svg(icon, 'icon-sm'); b.setAttribute('aria-label', label);
+                b.disabled = i + dir < 0 || i + dir >= state.barsOrder.length;
+                b.addEventListener('click', () => moveBar(i, dir));
+                actions.appendChild(b);
+            }
+            li.appendChild(actions);
+            ul.appendChild(li);
+        });
     }
 
     // wire a range input to a numeric state key, live-applying + showing its value
@@ -420,6 +691,8 @@
     function openSettings() {
         renderColorPresets();
         renderShapeSeg();
+        renderBarsPosSeg();
+        renderBarsOrder();
         renderFolderList();
         openOverlay('settingsPanel', false);
     }
@@ -445,6 +718,7 @@
         wireToggle('toggleLabel', 'showLabel');
         wireToggle('toggleUppercase', 'uppercase');
         wireToggle('toggleMultiline', 'cutLabel'); // note: checked = cut (single line)
+        wireToggle('toggleLetterRows', 'letterTwoRows');
 
         const css = $('customCss');
         css.value = state.customCss || '';
@@ -454,7 +728,12 @@
             const name = prompt('Ordnername:', 'Ordner'); if (name == null) return;
             createFolder(name.trim() || 'Ordner'); renderFolderList(); renderHome();
         });
-        document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAll(); });
+        document.addEventListener('keydown', e => { if (e.key === 'Escape') goBack(); });
+        // native events from MainActivity: hardware back, and home pressed while
+        // already on the launcher (singleTask -> onNewIntent).
+        window.addEventListener('launcherback', goBack);
+        window.addEventListener('launcherhome', () => { closeAll(); closeDrawer(); });
+        wireDrawer();
     }
 
     function renderStaticIcons() {
@@ -468,6 +747,7 @@
         try { const res = await plugin.getApps(); apps = (res && res.apps) || []; }
         catch (e) { apps = []; toast('konnte apps nicht laden'); }
         appByPkg = new Map(apps.map(a => [a.packageName, a]));
+        if (apps.length) seedHome(); else if (!state.home) state.home = [];
         renderHome();
     }
 

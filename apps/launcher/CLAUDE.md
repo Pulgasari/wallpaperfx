@@ -9,11 +9,22 @@ allowed to be a WebView**, so the whole home screen is the Capacitor web layer
 (`www/`, plain JS, no bundler). The native side is a single Capacitor plugin
 that bridges `PackageManager`; there is no custom rendering engine.
 
-- UI = `www/` (`index.html`, `app.js`, `styles.css`). Renders the app grid,
-  folders, settings; persists preferences in `localStorage` under key
-  `launcher`.
+- UI = `www/` (`index.html`, `app.js`, `styles.css`). Two layers:
+  - **home screen**: only pinned apps (`state.home`) + folders.
+  - **app drawer** (`#drawer`, swipe up / center button): all apps, with three
+    bottom bars that combine as filters: categories (derived from the guessed
+    glyph via `CATEGORIES`), first letters (tap toggles, drag scrubs), search
+    (enter launches the first hit). filters reset on each open.
+    bar position (`state.barsPos`: top|bottom) and top-to-bottom order
+    (`state.barsOrder`, a permutation of `BARS` keys) are settings; applied via
+    a body class + inline flex `order`, the dom order never changes.
+    `state.letterTwoRows` switches the letter bar to a 14-column grid (2 rows).
+  long-press any app for pin/unpin + folder actions. preferences persist in
+  `localStorage` under key `launcher`.
 - Native = `android/app/src/main/java/com/launcher/app/`:
-  - `MainActivity` registers the `Launcher` plugin.
+  - `MainActivity` registers the `Launcher` plugin, swallows back (never
+    finishes the home activity) and forwards it as window event
+    `launcherback`; home pressed while in front fires `launcherhome`.
   - `bridge/LauncherPlugin.java` — `getApps()` returns `{apps:[{packageName,
     label}]}` (action.MAIN + category.LAUNCHER, minus ourselves, label-sorted);
     `launchApp({packageName})` starts an app via its launch intent.
@@ -39,8 +50,10 @@ a glyph by keyword (`ICON_RULES`, first match wins) with an `app` fallback.
 
 ## Config / state
 
-`state` = `{ cols, iconColor, folders:[{id,name,apps:[packageName]}] }` in
-`localStorage`. Apps are queried live each launch; only preferences and folder
+`state` = `{ cols, iconColor, …appearance, folders:[{id,name,apps:[packageName]}],
+home:[packageName] }` in `localStorage`. an app is on the home screen if it is in
+`home` or in a folder (never both). `home: null` means not seeded yet; the first
+run pins a few everyday apps (`SEED_ICONS`). Apps are queried live each launch; only preferences and folder
 membership (by package name) are stored, so uninstalled packages just drop out
 of the grid. There is no native config file (the wallpaper app's json bridge has
 no analog here).
