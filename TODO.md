@@ -14,6 +14,8 @@
 - [ ] tags
 - [ ] export/import as/from html (zumindest bild ich mir ein dass das typischer mechanismus ist?)
 - [ ] export/import as/from json
+- [ ] erst so mechanismus für url-leiste das man quasi `<string>:` tippt um irgendne sonderfunktion zu aktivieren ...
+- [ ] ... dann erste sonderfunktion: eingabe von `tl:` aktiviert translate-modus und wenn man dann `tl: katze` eingibt nutzt das entweder irgendne api (google translate? yandex? deepl?) oder leitet wenigstens zu ner url von denen für übersetzung
 
 ### context-menu
 - [ ] grundsätzlich den mechanismus bauen
