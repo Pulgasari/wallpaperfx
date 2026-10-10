@@ -10,10 +10,10 @@
 - [x] add button to dock: userscripts (violentmonkey o.ä.)
 - [x] add button to dock: search in page
 - [x] add button to dock: settings
-- [ ] `@aufbau/css/aufbau.css` als grundlage einbinden
+- [x] `@aufbau/css/aufbau.css` als grundlage einbinden
 
 ## bugs
-- [ ] das blur-overlay verdeckt die zusätzlichen icons wenn man in url-leiste was eingibt
+- [x] das blur-overlay verdeckt die zusätzlichen icons wenn man in url-leiste was eingibt
 
 ## features
 
@@ -26,20 +26,20 @@
 
 ## part: bookmarks
 - [x] folders
-- [ ] tags
+- [x] tags
 - [x] export/import as/from html
 - [x] export/import as/from json
-- [ ] erst so mechanismus für url-leiste das man quasi `<string>:` tippt um irgendne sonderfunktion zu aktivieren ...
-- [ ] ... dann erste sonderfunktion: eingabe von `tl:` aktiviert translate-modus und wenn man dann `tl: katze` eingibt nutzt das entweder irgendne api (google translate? yandex? deepl?) oder leitet wenigstens zu ner url von denen für übersetzung
+- [x] erst so mechanismus für url-leiste das man quasi `<string>:` tippt um irgendne sonderfunktion zu aktivieren ...
+- [x] ... dann erste sonderfunktion: eingabe von `tl:` aktiviert translate-modus und wenn man dann `tl: katze` eingibt nutzt das entweder irgendne api (google translate? yandex? deepl?) oder leitet wenigstens zu ner url von denen für übersetzung
 
 ## parts
 
 ### part: dashboard
 quasi die startseite oder bei leerer tab.
-- [ ] rendert zunächst erstmal die bookmarks als grid
+- [x] rendert zunächst erstmal die bookmarks als grid
 
 ### part: dock
-- [ ] das `padding` vom ist zu groß. wenn die `aufbau.css` eingebunden ist hier `padding: --space(small);` nutzen
+- [x] das `padding` vom ist zu groß. wenn die `aufbau.css` eingebunden ist hier `padding: --space(small);` nutzen
 
 ### settings-options
   - [x] colors: bg / fg / accent
@@ -49,7 +49,7 @@ quasi die startseite oder bei leerer tab.
   - [x] toggle on/off der einzelnen dock-elemente
   - [x] size der dock-elemente
   - [x] gap zwischenden dock-elementen
-  - [ ] overlay mit blur-effekt on/off
+  - [x] overlay mit blur-effekt on/off
 
 ### part: url-leiste
 - [x] `context-menu` einbauen:
@@ -58,7 +58,7 @@ quasi die startseite oder bei leerer tab.
   - [x] close
 
 ### part: userscripts
-- [ ] weiteres eingabefeld für css
+- [x] weiteres eingabefeld für css
 
 ---
 

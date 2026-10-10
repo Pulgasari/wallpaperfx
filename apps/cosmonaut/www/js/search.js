@@ -1,6 +1,8 @@
-// what the url field does with its input: a url opens as it is, anything else
-// is a search with the default engine, or with the engine picked explicitly
+// what the url field does with its input: a command (commands.js) opens its
+// url, a url opens as it is, anything else is a search with the default engine,
+// or with the engine picked explicitly
 
+import { commandUrl, parseCommand } from './commands.js';
 import { call } from './native.js';
 import { closePanel } from './panels.js';
 import { store } from './store.js';
@@ -20,7 +22,8 @@ export function go (input, engineId) {
   const value = (input || '').trim();
   if (!value) return;
 
-  const engine = engineId ? engineById(engineId) : isUrlLike(value) ? null : defaultEngine();
-  call('navigate', { url: engine ? searchUrl(engine, value) : value });
+  const command = !engineId && parseCommand(value);
+  const engine  = engineId ? engineById(engineId) : command || isUrlLike(value) ? null : defaultEngine();
+  call('navigate', { url: command ? commandUrl(command) : engine ? searchUrl(engine, value) : value });
   closePanel();
 }

@@ -4,7 +4,9 @@
 import {
   detectFormat, fromJson, fromNetscape, pickTextFile, saveTextFile, toJson, toNetscape,
 } from '../bookmarks-io.js';
-import { bucketsBy, byId, domainOf, group, h, initial, isolated, segmented, uid } from '../dom.js';
+import { html } from '@htx/js';
+
+import { bucketsBy, byId, domainOf, group, initial, isolated, segmented, uid } from '../dom.js';
 import { icon } from '../icons.js';
 import { activeTab } from '../native.js';
 import { definePanel, openPanelName } from '../panels.js';
@@ -12,7 +14,7 @@ import { go } from '../search.js';
 import { save, store } from '../store.js';
 
 const views = {
-  list   : [byId('markGroups'), byId('marksEmpty')],
+  list   : [byId('markTagBar'), byId('markGroups'), byId('marksEmpty')],
   editor : [byId('markEditor')],
   io     : [byId('markIO')],
 };
@@ -27,23 +29,39 @@ function showView (name) {
 
 const folderName = id => store.bookmarkFolders.find(folder => folder.id === id)?.name ?? '';
 
+// the tag the list is filtered by, null for all
+let tagFilter = null;
+
+const filterBy = tag => { tagFilter = tagFilter === tag ? null : tag; renderList(); };
+
+const tagChip = tag => html`<button.tag class=${{ active: tag === tagFilter }} onClick=${isolated(() => filterBy(tag))}>${tag}</button>`;
+
 function markRow (mark) {
   const domain = domainOf(mark.url);
-  const tags   = mark.tags?.length && h('span', { class: 'tags' }, mark.tags.map(tag => h('span', { class: 'tag', text: tag })));
-  return h('li', { class: 'row', on: { click: () => go(mark.url) } },
-    h('span', { class: 'ricon', text: initial(domain) }),
-    h('span', { class: 'rtext' }, h('b', { text: mark.title || domain }), h('span', { text: domain }), tags),
-    h('button', { class: 'icon-btn', 'aria-label': 'Edit', html: icon('pencil'), on: { click: isolated(() => openEditor(mark)) } }));
+  const tags   = mark.tags?.length && html`<span.tags>${mark.tags.map(tagChip)}</span>`;
+  return html`
+    <li.row onClick=${() => go(mark.url)}>
+      <span.ricon>${initial(domain)}</span>
+      <span.rtext><b>${mark.title || domain}</b><span>${domain}</span>${tags}</span>
+      <button.icon-btn aria-label="Edit" onClick=${isolated(() => openEditor(mark))} !html=${icon('pencil')} />
+    </li>`;
 }
 
-// the folders in their order, then the bookmarks in none
+// the folders in their order, then the bookmarks in none; with a tag filter
+// only the bookmarks that carry it
 function renderList () {
-  const buckets = bucketsBy(store.bookmarks, mark => mark.folder || '');
+  const tags = [...new Set(store.bookmarks.flatMap(mark => mark.tags ?? []))].sort();
+  if (!tags.includes(tagFilter)) tagFilter = null;
+
+  const shown   = tagFilter ? store.bookmarks.filter(mark => mark.tags?.includes(tagFilter)) : store.bookmarks;
+  const buckets = bucketsBy(shown, mark => mark.folder || '');
   const order   = [...store.bookmarkFolders.map(folder => folder.id).filter(id => buckets.has(id)), ...(buckets.has('') ? [''] : [])];
   const titleOf = id => id ? folderName(id) : store.bookmarkFolders.length ? 'No folder' : '';
 
   byId('markGroups').replaceChildren(...order.map(id => group(titleOf(id), buckets.get(id).map(markRow))));
+  byId('markTagBar').replaceChildren(...tags.map(tagChip));
   showView('list');
+  byId('markTagBar').hidden = tags.length === 0;
   byId('marksEmpty').hidden = store.bookmarks.length > 0;
 }
 
@@ -93,8 +111,8 @@ function openEditor (mark) {
   editor.url.value   = mark.url || '';
   editor.tags.value  = (mark.tags || []).join(' ');
   editor.folder.replaceChildren(
-    h('option', { value: '', text: 'No folder' }),
-    ...store.bookmarkFolders.map(folder => h('option', { value: folder.id, text: folder.name })));
+    html`<option value="">No folder</option>`,
+    ...store.bookmarkFolders.map(folder => html`<option value=${folder.id}>${folder.name}</option>`));
   editor.folder.value = mark.folder || '';
   showView('editor');
 }

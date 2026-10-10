@@ -1,7 +1,9 @@
 // the tabs overview. the tabs are native (session), their grouping is chrome
 // side: store.groups in order, store.tabGroups maps a tab id to a group id
 
-import { bucketsBy, byId, domainOf, group, h, initial, isolated, uid } from '../dom.js';
+import { html } from '@htx/js';
+
+import { bucketsBy, byId, domainOf, group, initial, isolated, uid } from '../dom.js';
 import { call, session } from '../native.js';
 import { closePanel, definePanel, openPanel } from '../panels.js';
 import { save, store } from '../store.js';
@@ -15,21 +17,27 @@ function setGroup (tabId, groupId) {
   render();
 }
 
-function groupSelect (tab) {
-  const select = h('select', { class: 'mini-select', on: { click: event => event.stopPropagation(), change: () => setGroup(tab.id, select.value) } },
-    h('option', { value: '', text: '—' }),
-    store.groups.map(item => h('option', { value: item.id, text: item.name })));
-  select.value = store.tabGroups[tab.id] ?? '';
-  return select;
-}
+// the value is set by ref: props are written before the options exist
+const groupSelect = tab => html`
+  <select.mini-select
+    onClick=${event => event.stopPropagation()}
+    onChange=${event => setGroup(tab.id, event.target.value)}
+    ref=${select => { select.value = store.tabGroups[tab.id] ?? ''; }}>
+    <option value="">—</option>
+    ${store.groups.map(item => html`<option value=${item.id}>${item.name}</option>`)}
+  </select>`;
+
+const activate = tab => () => { call('activateTab', { id: tab.id }); closePanel(); };
 
 function tabRow (tab) {
   const domain = domainOf(tab.url);
-  return h('li', { class: 'row' + (tab.id === session.activeId ? ' active' : ''), on: { click: () => { call('activateTab', { id: tab.id }); closePanel(); } } },
-    h('span', { class: 'ricon', text: initial(domain) }),
-    h('span', { class: 'rtext' }, h('b', { text: tab.title || domain || 'New tab' }), h('span', { text: domain })),
-    groupSelect(tab),
-    h('button', { class: 'icon-btn', text: '×', 'aria-label': 'Close tab', on: { click: isolated(() => call('closeTab', { id: tab.id })) } }));
+  return html`
+    <li.row class=${{ active: tab.id === session.activeId }} onClick=${activate(tab)}>
+      <span.ricon>${initial(domain)}</span>
+      <span.rtext><b>${tab.title || domain || 'New tab'}</b><span>${domain}</span></span>
+      ${groupSelect(tab)}
+      <button.icon-btn aria-label="Close tab" onClick=${isolated(() => call('closeTab', { id: tab.id }))}>×</button>
+    </li>`;
 }
 
 // the named groups in their order, then the tabs in none

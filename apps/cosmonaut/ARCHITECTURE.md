@@ -78,19 +78,21 @@ the hardware back button and tapping the backdrop stay in sync.
 
 ## Theme
 
-Exactly **two css tokens** (`--bg`, `--fg`); every other shade is `color-mix` of
-them. Retheming = change two values. Keep it that way.
+The chrome sits on `@aufbau/css` (`aufbau.css`, staged by the bundle). Its colors
+are aufbau's three palette tokens (`--color-bg`, `--color-fg`, `--color-ink`), set
+on `body`; every other shade is `color-mix` of them. Retheming = change three
+values. Keep it that way.
 
 ## Dock + settings
 
-The dock is a **closed bar** (opaque `--bg` surface, bottom-anchored by default),
+The dock is a **closed bar** (opaque `--color-bg` surface, bottom-anchored by default),
 not floating chips — buttons sit flat on it and it reserves its own space via the
 content inset above. It is configurable (chrome-side, `localStorage`
 `browser.settings`): which buttons show, their order (they split evenly around the
 pill), size, gap, and the dock/loader position (top or bottom — dock position also
 calls `BrowserPlugin.setDockPosition`, which re-anchors the native strip and moves
 the content inset with it). Colors are
-three tokens `--bg/--fg/--accent`. Buttons: tabs, bookmarks, find-in-page,
+the three palette tokens, plus blur behind panels on / off. Buttons: tabs, bookmarks, find-in-page,
 dev-tools, userscripts, settings.
 
 - **find**: `findInPage/findNext/clearFind` drive the native `WebView.findAllAsync`;

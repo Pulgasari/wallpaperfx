@@ -22,6 +22,7 @@ const defaultSettings = () => ({
   loaderPos : 'bottom',
   dockSize  : 46,
   dockGap   : 12,
+  blur      : true,
   dock      : DOCK_IDS.map(id => ({ id, on: id !== 'devtools' })),
 });
 

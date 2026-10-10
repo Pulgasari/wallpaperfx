@@ -1,7 +1,9 @@
 // the dock bar: buttons split evenly around the pill, the load progress on the
 // content seam, and the appearance settings that drive both
 
-import { byId, domainOf, h } from './dom.js';
+import { html } from '@htx/js';
+
+import { byId, domainOf } from './dom.js';
 import { icon } from './icons.js';
 import { activeTab, call } from './native.js';
 import { closePanel, openPanel } from './panels.js';
@@ -17,22 +19,19 @@ export const DOCK = {
   settings    : { icon: 'gear',    label: 'Settings',     run: () => openPanel('settings') },
 };
 
-const dockButton = id => h('button', {
-  class        : 'trig',
-  title        : DOCK[id].label,
-  'aria-label' : DOCK[id].label,
-  html         : icon(DOCK[id].icon),
-  on           : { click: DOCK[id].run },
-});
+const dockButton = id => html`
+  <button.trig title|aria-label=${DOCK[id].label} onClick=${DOCK[id].run} !html=${icon(DOCK[id].icon)} />`;
 
+// the palette goes on body, where aufbau's palette sets it (see styles.css)
 export function applyTheme () {
-  const style = document.documentElement.style;
-  const { accent, bg, dockGap, dockSize, fg } = store.settings;
-  style.setProperty('--bg', bg);
-  style.setProperty('--fg', fg);
-  style.setProperty('--accent', accent);
-  style.setProperty('--dock-size', dockSize + 'px');
-  style.setProperty('--dock-gap', dockGap + 'px');
+  const { accent, bg, blur, dockGap, dockSize, fg } = store.settings;
+  const body = document.body.style;
+  body.setProperty('--color-bg', bg);
+  body.setProperty('--color-fg', fg);
+  body.setProperty('--color-ink', accent);
+  document.documentElement.style.setProperty('--dock-size', dockSize + 'px');
+  document.documentElement.style.setProperty('--dock-gap', dockGap + 'px');
+  document.body.classList.toggle('no-blur', !blur);
 }
 
 export function applyLoader () {

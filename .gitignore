@@ -2,6 +2,9 @@
 node_modules/
 npm-debug.log*
 
+# bundled webDir (apps with a bundler.config.js) and the checkouts it is built from
+apps/*/build/
+
 # capacitor / android build outputs (per app under apps/*/android)
 **/android/app/build/
 **/android/build/

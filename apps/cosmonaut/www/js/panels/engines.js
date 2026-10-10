@@ -1,7 +1,9 @@
 // search engines: a name, a url with %s for the query and an optional icon url.
 // anything with a query parameter works, not only search engines
 
-import { byId, h, initial, isolated, uid } from '../dom.js';
+import { html } from '@htx/js';
+
+import { byId, initial, isolated, uid } from '../dom.js';
 import { icon } from '../icons.js';
 import { definePanel } from '../panels.js';
 import { save, store } from '../store.js';
@@ -19,11 +21,13 @@ const form  = {
 let editing = null;
 
 function engineRow (engine) {
-  const badge = engine.id === store.defaultEngine && h('span', { class: 'tags' }, h('span', { class: 'tag', text: 'Default' }));
-  return h('li', { class: 'row', on: { click: () => openEditor(engine) } },
-    h('span', { class: 'ricon', text: initial(engine.name) }),
-    h('span', { class: 'rtext' }, h('b', { text: engine.name }), h('span', { text: engine.url }), badge),
-    h('button', { class: 'icon-btn', 'aria-label': 'Edit', html: icon('pencil'), on: { click: isolated(() => openEditor(engine)) } }));
+  const badge = engine.id === store.defaultEngine && html`<span.tags><span.tag>Default</span></span>`;
+  return html`
+    <li.row onClick=${() => openEditor(engine)}>
+      <span.ricon>${initial(engine.name)}</span>
+      <span.rtext><b>${engine.name}</b><span>${engine.url}</span>${badge}</span>
+      <button.icon-btn aria-label="Edit" onClick=${isolated(() => openEditor(engine))} !html=${icon('pencil')} />
+    </li>`;
 }
 
 function render () {
