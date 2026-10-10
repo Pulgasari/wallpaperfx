@@ -1,0 +1,9 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Subotnik Wallpapers</string>
+    <string name="title_activity_main">Subotnik Wallpapers</string>
+    <string name="package_name">dev.subotnik.wallpapers</string>
+    <string name="custom_url_scheme">dev.subotnik.wallpapers</string>
+    <string name="wallpaper_label">Subotnik Wallpapers</string>
+    <string name="wallpaper_description">video and image live wallpaper with gl filters</string>
+</resources>

@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        app: [wallpapers, launcher, filesync, browser]
+        app: [cosmonaut, subotnik, subotnik-wallpapers]
     defaults:
       run:
         working-directory: apps/${{ matrix.app }}
