@@ -32,8 +32,12 @@ A transparent full-screen WebView on top would still eat every touch, so the
 content below would be dead. Rather than punching touch-through holes, we size the
 chrome WebView to exactly the region it needs:
 
-- **collapsed**: chrome WebView = a **strip** (~104dp = `collapsedPx`) holding the
-  dock bar (pill + buttons), anchored top or bottom. The `contentContainer` carries
+- **collapsed**: chrome WebView = a **strip** (`collapsedPx`) holding the dock bar
+  (pill + buttons), anchored top or bottom. Its height is the bar's: the chrome
+  measures the bar (buttons + `--space(small)` on every side + the safe area on
+  its edge) and reports it with `Browser.setStripHeight({height})` (css px = dp),
+  whenever it changes (dock size, dock position); native resizes the strip and
+  the content inset to it. There is no fixed strip height to keep in sync. The `contentContainer` carries
   a `collapsedPx` margin on that same side, so the content WebView sits *beside* the
   strip, not behind it — the dock is a closed bar that reserves its own space and
   the rest of the screen is fully interactive content. (Without the inset a
@@ -57,7 +61,8 @@ underneath it.
 
 Plugin methods (all marshalled onto the ui thread; webview calls must be):
 `ready`, `getState`, `navigate({url})`, `newTab({url?})`, `closeTab({id})`,
-`activateTab({id})`, `goBack`, `goForward`, `reload`, `setChromeExpanded({expanded})`.
+`activateTab({id})`, `goBack`, `goForward`, `reload`, `setChromeExpanded({expanded})`,
+`setStripHeight({height})`.
 
 The plugin emits a **`state`** event on every change:
 `{ tabs: [{id,url,title,loading,progress,canGoBack}], activeId, expanded }`.
