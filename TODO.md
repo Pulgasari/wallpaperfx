@@ -2,7 +2,9 @@
 
 - [x] die apps haben/zeigen aktuell nur das default capacitor icon. die sollten alle n eigenes icon bekommen. für den anfang würde jeweils einfach n dicker anfangsbuchstabe reichen also: B, L, WP
 
-## Cosmonaut (Browser)
+---
+
+# Cosmonaut (Browser)
 
 - [x] add button to dock: dev-tools
 - [x] add button to dock: userscripts (violentmonkey o.ä.)
@@ -10,7 +12,19 @@
 - [x] add button to dock: settings
 - [ ] `@aufbau/css/aufbau.css` als grundlage einbinden
 
-### bookmarks
+## bugs
+- [ ] das blur-overlay verdeckt die zusätzlichen icons wenn man in url-leiste was eingibt
+
+## features
+
+### feature: context-menu
+- [x] grundsätzlich den mechanismus bauen
+
+### feature: gestures (via `@aufbau/gestures`)
+- [x] reload = webview nach unten ziehen
+- [x] hard reload = webview nach unten ziehen und halten
+
+## part: bookmarks
 - [x] folders
 - [ ] tags
 - [x] export/import as/from html
@@ -18,25 +32,16 @@
 - [ ] erst so mechanismus für url-leiste das man quasi `<string>:` tippt um irgendne sonderfunktion zu aktivieren ...
 - [ ] ... dann erste sonderfunktion: eingabe von `tl:` aktiviert translate-modus und wenn man dann `tl: katze` eingibt nutzt das entweder irgendne api (google translate? yandex? deepl?) oder leitet wenigstens zu ner url von denen für übersetzung
 
-### context-menu
-- [x] grundsätzlich den mechanismus bauen
-- [x] bei der url-leise testweise einbauen
-  - [x] add to bookmarks
-  - [x] reload / hard reload
-  - [x] close
+## parts
 
-### dashboard
+### part: dashboard
 quasi die startseite oder bei leerer tab.
 - [ ] rendert zunächst erstmal die bookmarks als grid
 
-### dock:
+### part: dock
 - [ ] das `padding` vom ist zu groß. wenn die `aufbau.css` eingebunden ist hier `padding: --space(small);` nutzen
 
-### gestures (via `@aufbau/gestures`)
-- [x] reload = webview nach unten ziehen
-- [x] hard reload = webview nach unten ziehen und halten
-
-### settings-options:
+### settings-options
   - [x] colors: bg / fg / accent
   - [x] position dock: top : bottom
   - [x] position lade-anzeiger: top | bottom
@@ -44,8 +49,15 @@ quasi die startseite oder bei leerer tab.
   - [x] toggle on/off der einzelnen dock-elemente
   - [x] size der dock-elemente
   - [x] gap zwischenden dock-elementen
+  - [ ] overlay mit blur-effekt on/off
 
-### userscripts
+### part: url-leiste
+- [x] `context-menu` einbauen:
+  - [x] add to bookmarks
+  - [x] reload / hard reload
+  - [x] close
+
+### part: userscripts
 - [ ] weiteres eingabefeld für css
 
 ---
