@@ -1,8 +1,8 @@
 # TODO
 
-- [x] die apps haben/zeigen aktuell nur das default capacitor icon. die sollten alle n eigenes icon bekommen. für den anfang würde jeweils einfach n dicker anfangsbuchstabe reichen also: B, FS, L, WP
+- [x] die apps haben/zeigen aktuell nur das default capacitor icon. die sollten alle n eigenes icon bekommen. für den anfang würde jeweils einfach n dicker anfangsbuchstabe reichen also: B, L, WP
 
-## Browser
+## Cosmonaut (Browser)
 
 - [x] add button to dock: dev-tools
 - [x] add button to dock: userscripts (violentmonkey o.ä.)
@@ -47,29 +47,7 @@ quasi die startseite oder bei leerer tab.
   - [x] size der dock-elemente
   - [x] gap zwischenden dock-elementen
 
-## Filesync
-
-Ich habe FileSync soeben getestet und konnte erfolgreich Dateien vom Smartphone an Desktop-PC schicken. Ich musste jedoch immer neu "bestätigen", als das scheint noch kein "dauerhaftes Pairing" (ich weiss den genauen/korrektenBegriff nicht).
-
-### localSend
-- [ ] kompatibel mit regulärer localSend-desktop-app
-- [ ] settings-option: wie viele files gleichzeitig "hochgeladen" werden
-
-- [x] "dauerhaftes Pairing" ermöglichen (desktop: vertraute geräte -> ohne nachfrage annehmen)
-- [x] fix: wenn der dateiname recht lang ist sprengt er das komplette layout -> muss umgebrochen werden (nicht gekürzt!!)
-- [x] generell fände ich ne Art History nice, wo ich sehen kann, was gesendet wurde und obs erfolgreich war usw.
-  - [x] Einträge einzeln löschbar
-  - [x] alles löschbar
-  - [x] History selbst aktivierbar/deaktivierbar
-- [x] und ich glaube wir müssen auch noch machen, dass die app im hintergrund nich gekillt wird, wenn iwas läuft? (foreground-service während dem senden)
-- [x] ich würde mal anfangen dass noch in abschnitte zu unterteilen (später vielleicht tabs aber das brauchs erstmal noch garnich). und die bisherigen panel bilden quasi den abschnitt "LocalSend".
-- [ ] neuer abschnitt: WebDAV (platzhalter-abschnitt angelegt; umsetzung offen -> siehe vorschlag im chat)
-- [ ] neuer abschnitt: Cloud (platzhalter-abschnitt angelegt; braucht anbieter-auswahl + oauth -> siehe vorschlag im chat) (Haben die bekannten Cloud-Provider evtl. schon fertige APIs parat? Ich denke z.b. an nextcloud, mega, dropbox, google drive usw. ). also mir gehts dabeivorallem drum dass ich zb meinen ebook-folder auf smartphone mit folder bei cloud-provider automatisch syncen kann, im beide richtungen oder 2-wege/dings)
-
-da ich mich hier thematisch nicht so megagut auskenne, kannst du mir auch gerne mal noch features und teiö-aspekte vorschlagen, die sinnvoll/nützlich/üblich sind, ich aber noch gar nich aufm schirm habe. ich bilde mir auch ein im verlauf erwähntest du auch mal irgendwie QR-Codes und fingerprint.
-
-
-## Launcher
+## Subotnik (Launcher)
 
 - [x] fix: das is alles zu sensibel. selbst wenn man nur scrollt und irgendwas berührt, wirddas sofort gestartet/getriggert
 - [x] fix: wenn das settings-panel angezeigt wird, sollt kein blur-effekt das app-grid überlagern, weil man so ja nix chillig einstellen kann
@@ -85,7 +63,7 @@ da ich mich hier thematisch nicht so megagut auskenne, kannst du mir auch gerne 
 - [x] feld für custom-css
 - [x] gesamthintergrund einstellbar: farbe, transparenz (sodass zb der wallpapers-bg durchscheinen könnte oder whatever) oder kann man nich sogar den bg live abgreifen direkt?
 
-## Wallpapers
+## Subotnik Wallpapers
 
 ---
 

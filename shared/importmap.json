@@ -1,18 +1,14 @@
 {
   "imports": {
-    "@aufbau/ass"       : "./vendor/@aufbau/ass/index.js",
-    "@aufbau/ass/"      : "./vendor/@aufbau/ass/",
     "@aufbau/filters"   : "./vendor/@aufbau/filters/index.js",
     "@aufbau/filters/"  : "./vendor/@aufbau/filters/",
     "@aufbau/gestures"  : "./vendor/@aufbau/gestures/index.js",
     "@aufbau/gestures/" : "./vendor/@aufbau/gestures/",
     "@aufbau/patterns"  : "./vendor/@aufbau/patterns/index.js",
     "@aufbau/patterns/" : "./vendor/@aufbau/patterns/",
-    "@domina/methods"   : "./vendor/@domina/methods/index.js",
-    "@domina/methods/"  : "./vendor/@domina/methods/",
+    "@aufbau/webfonts"  : "./vendor/@aufbau/webfonts/index.js",
+    "@domina/prototype" : "./vendor/@domina/prototype/index.js",
     "@pulgasari/is"     : "./vendor/@pulgasari/is/index.js",
-    "@pulgasari/is/"    : "./vendor/@pulgasari/is/",
-    "@pulgasari/str"    : "./vendor/@pulgasari/str/index.js",
-    "@pulgasari/str/"   : "./vendor/@pulgasari/str/"
+    "@pulgasari/is/"    : "./vendor/@pulgasari/is/"
   }
 }

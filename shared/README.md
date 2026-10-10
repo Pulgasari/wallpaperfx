@@ -9,15 +9,50 @@ and no app is wired to it yet.
 
 | specifier | package | graph |
 |---|---|---|
+| `@domina/prototype` | the domina dom verbs on the dom prototypes | self-contained, side-effect import |
 | `@aufbau/filters` | aufbau live filters (canvas/webgl) | self-contained, no external deps |
 | `@aufbau/gestures` | pointer gestures (core) | self-contained; the `/preact` adapter needs preact and is out of scope |
 | `@aufbau/patterns` | svg pattern generators | self-contained, no external deps |
-| `@domina/methods` | dom mutation helpers | pulls `@pulgasari/is` and `@pulgasari/str` transitively |
+| `@aufbau/webfonts` | the handpicked font catalogue, loaded via `FontFace` | pulls `@pulgasari/is`; font files from `baseUrl` (see below) |
 
-`@pulgasari/is` and `@pulgasari/str` are in the map because `@domina/methods`
-imports them (see `domina/packages/methods/deno.json` -> `imports`). without
-them mapped, `@domina/methods` will not resolve offline. their files land when
-the `@pulgasari/*` utils get vendored (separate step).
+`@pulgasari/is` is in the map because `@aufbau/webfonts` imports it. without it
+mapped, `@aufbau/webfonts` will not resolve offline.
+
+### `@domina/prototype`
+
+replaces `@domina/methods` for the apps. it installs the verbs on the dom
+prototypes once, so an app imports it for its side effect and never by name:
+
+```js
+import '@domina/prototype';
+
+document.getElement('#apply').onEvent('click', apply);
+```
+
+it changes the dom of the whole realm, which is fine for an app that owns its
+webview. a package must not import it (see its readme).
+
+### `@aufbau/webfonts`
+
+the catalogue (`data.js`) ships with the package, the font files do not resolve
+offline by default: `baseUrl` points to `code.pulgasari.dev`. an app points it
+to its own copy before the first `apply`/`load`, and only the fonts it uses get
+vendored (the full set is ~23 mb):
+
+```js
+import { configure, apply } from '@aufbau/webfonts';
+
+configure({ baseUrl: './vendor/@aufbau/webfonts' });   // -> vendor/@aufbau/webfonts/files/<font>.ttf
+await apply('manrope');
+```
+
+### not mapped (yet)
+
+- `@aufbau/elements`, `@aufbau/gui`, `@aufbau/svg` (formerly `@aufbau/icons`):
+  their graph pulls `@aufbau/element`, `@aufbau/import`, `@domina/methods`,
+  `@domina/observer`, `@pulgasari/{is,str,timing,shift}`, and `<svg-icon>`
+  resolves iconify ids over the network. not offline-capable as a raw map.
+- `@aufbau/bundler`: a build-time node tool, not a runtime module.
 
 ## path convention
 
@@ -57,10 +92,9 @@ package's `package.json`/`deno.json` `exports`. consequences:
   `lib/blur.js`. same for `@aufbau/gestures/preact` (real file `adapters/preact.js`).
   these mismatches do not resolve through the map; add an explicit per-subpath
   entry when a subpath is actually needed, or import from the bare specifier.
-- **extensions are literal.** `@domina/methods/addClass` (no extension) will
-  404; write `@domina/methods/addClass.js`. the bare `@domina/methods` entry
-  (its `index.js` re-exports everything) avoids the issue.
+- **extensions are literal.** a subpath without `.js` will 404. `@domina/prototype`
+  and `@aufbau/webfonts` have no subpath entries on purpose: the bare specifier
+  is their whole api (`@aufbau/webfonts/google` gets an entry once it is needed).
 
-when the packages are on jsr and an app uses a bundler, the bundler reads
-`exports` and all of the above goes away. until then, this map is the offline
-contract.
+when an app uses a bundler, the bundler reads `exports` and all of the above
+goes away. until then, this map is the offline contract.
