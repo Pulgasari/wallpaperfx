@@ -10,7 +10,7 @@ package files are not vendored into the apps yet, and no app is wired to it yet
 the packages the apps use, and everything they pull in transitively. the graph
 was walked over the sources (static and literal dynamic imports) and the map was
 checked in chromium: every entry and every `@aufbau/elements/webcomponents/*`
-module imports from a local `vendor/` copy with no network.
+module (153) imports from a local `vendor/` copy with no network.
 
 | specifier | role | pulls in |
 |---|---|---|
@@ -31,21 +31,11 @@ side effect). the libraries keep using `@domina/methods` internally, which is
 why `methods` is in the map too: a package must not import `prototype`, it
 changes the dom of the whole realm.
 
-## known blockers in the packages
+### aliases
 
-two specifiers in the sources do not resolve through any import map. the chromium
-check passes only with both fixed in the source (they are fixes in aufbau, not
-entries to add here):
-
-- `@aufbau/element` (`lib/schema.js`, `lib/config.js`) imports
-  `@pulgasari/canonicalmap`. that package does not exist; `CanonicalMap` lives in
-  `@pulgasari/obj/CanonicalMap.js`.
-- `@aufbau/import` imports `https://code.pulgasari.dev/bunker/db/index.js` and
-  `.../bunker/policy/index.js` as urls, although its package.json declares
-  `@bunker/db` and `@bunker/policy`. offline this fails, and with it every module
-  that imports `@aufbau/import`: `aufbau-input` (`webcomponents/input/*`),
-  `data-list`, `data-table`, `data-tree`, `data-filter`, `media-json`,
-  `output-md`, `write-md`, `pop-prompt`, `input-address`.
+`@pulgasari/canonicalmap` is not a package: `@aufbau/element` imports
+`CanonicalMap` under that name, and the central map (`code.pulgasari.dev/importmap.js`)
+points it at `@pulgasari/obj/CanonicalMap.js`. this map does the same.
 
 ## runtime network, beyond module resolution
 
@@ -65,10 +55,6 @@ root. vendored files live under:
 ```
 apps/<app>/www/vendor/<scope>/<package>/   e.g. www/vendor/@aufbau/filters/index.js
 ```
-
-the `@bunker/*` packages import their siblings by relative path
-(`../core/index.js`), so `@bunker/core` and `@bunker/utils` have to sit next to
-them under `vendor/@bunker/`; they are mapped too.
 
 everything is app-local: no `code.pulgasari.dev`, no `esm.sh`, no network at
 runtime. that is the whole point (offline in the apk).

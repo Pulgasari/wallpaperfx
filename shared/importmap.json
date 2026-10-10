@@ -29,6 +29,7 @@
     "@domina/observer"        : "./vendor/@domina/observer/index.js",
     "@domina/prototype"       : "./vendor/@domina/prototype/index.js",
 
+    "@pulgasari/canonicalmap" : "./vendor/@pulgasari/obj/CanonicalMap.js",
     "@pulgasari/coerce"       : "./vendor/@pulgasari/coerce/index.js",
     "@pulgasari/is"           : "./vendor/@pulgasari/is/index.js",
     "@pulgasari/is/"          : "./vendor/@pulgasari/is/",
