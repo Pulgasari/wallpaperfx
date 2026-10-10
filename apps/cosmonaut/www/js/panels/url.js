@@ -3,6 +3,7 @@
 
 import { html } from '@htx/js';
 
+import { describeCommand, parseCommand } from '../commands.js';
 import { byId, domainOf, initial } from '../dom.js';
 import { activeTab, session } from '../native.js';
 import { definePanel } from '../panels.js';
@@ -21,19 +22,23 @@ function suggestions (raw) {
   const query = typed.toLowerCase();
   const items = [];
 
+  // a command takes the whole row: it is what enter does
+  const command = parseCommand(typed);
+  if (command) return [{ title: command.text, sub: describeCommand(command), url: typed }];
+
   // the input itself first, once it reads as a url or a phrase
   if (query && (query.includes('.') || query.includes(' ') || SCHEME.test(query))) {
     items.push({ title: typed, sub: isUrlLike(typed) ? 'open' : 'search', url: typed });
   }
 
   const pool = [
-    ...store.bookmarks.map(mark => ({ title: mark.title || domainOf(mark.url), sub: domainOf(mark.url), url: mark.url })),
+    ...store.bookmarks.map(mark => ({ title: mark.title || domainOf(mark.url), sub: domainOf(mark.url), url: mark.url, tags: mark.tags?.join(' ') })),
     ...session.tabs.filter(tab => tab.id !== session.activeId)
       .map(tab => ({ title: tab.title || domainOf(tab.url), sub: domainOf(tab.url) + ' · tab', url: tab.url })),
   ];
   for (const item of pool) {
     if (items.length >= MAX_SUGGESTIONS) break;
-    if (!query || `${item.title} ${item.url}`.toLowerCase().includes(query)) items.push(item);
+    if (!query || `${item.title} ${item.url} ${item.tags ?? ''}`.toLowerCase().includes(query)) items.push(item);
   }
   return items;
 }
@@ -54,7 +59,7 @@ const engineButton = engine => {
 
 function renderEngines () {
   const query  = input.value.trim();
-  const search = Boolean(query) && !isUrlLike(query);
+  const search = Boolean(query) && !isUrlLike(query) && !parseCommand(query);
   engines.hidden = !search;
   engines.replaceChildren(...(search ? store.engines.map(engineButton) : []));
 }

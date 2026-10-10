@@ -41,6 +41,7 @@ function render () {
   byId('colBg').value     = bg;
   byId('colFg').value     = fg;
   byId('colAccent').value = accent;
+  byId('blurToggle').checked = settings().blur;
   segmented(byId('dockPosSeg'),   SIDES, dockPos,   value => { change(applyDock,   s => { s.dockPos = value; });   render(); });
   segmented(byId('loaderPosSeg'), SIDES, loaderPos, value => { change(applyLoader, s => { s.loaderPos = value; }); render(); });
   byId('rangeDockSize').value      = dockSize;
@@ -54,6 +55,8 @@ const color = (id, key) => byId(id).addEventListener('input', event => change(ap
 color('colBg', 'bg');
 color('colFg', 'fg');
 color('colAccent', 'accent');
+
+byId('blurToggle').addEventListener('change', event => change(applyTheme, s => { s.blur = event.target.checked; }));
 
 const range = (id, valueId, key) => byId(id).addEventListener('input', event => {
   change(applyTheme, s => { s[key] = Number(event.target.value); });

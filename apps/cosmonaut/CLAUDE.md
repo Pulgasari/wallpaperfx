@@ -23,7 +23,13 @@ App id/name: `dev.cosmonaut.browser` / "Cosmonaut".
   chrome `localStorage` (key `browser`), keyed by native tab id.
 - **all webview calls on the ui thread**: `BrowserPlugin` wraps every method body
   in `activity.runOnUiThread(...)`.
-- **two color tokens only** (`--bg`, `--fg`); other shades are `color-mix`.
+- **on @aufbau/css, three palette tokens**: `aufbau.css` is linked before
+  `styles.css` (its rules sit in layers, the app's win). the colors are aufbau's
+  `--color-bg` / `--color-fg` / `--color-ink`, set on `body` (where aufbau's palette
+  sets them); other shades are `color-mix` of them. do not use `--bg` / `--fg` /
+  `--ink` as theme variables: aufbau registers them as non-inheriting shorthands
+  for an element's own background / color / accent. spacing is `--space()`.
+- **html and body stay transparent** (the content webview shows through).
 
 ## Files
 
@@ -40,6 +46,7 @@ App id/name: `dev.cosmonaut.browser` / "Cosmonaut".
   - `panels.js` — the panel registry: `definePanel(name, el, { render, update, close })`,
     `openPanel` / `closePanel` expand and collapse the chrome webview.
   - `bar.js` — dock, pill, load progress, theme. `search.js` — url vs search, engines.
+  - `commands.js` — url field commands (`tl: text` translates), a registry.
   - `panels/*.js` — one module per panel, each registers itself on import.
   - `dom.js` — small helpers (`byId`, `segmented`, `group`, long press).
     elements are built with htx (`import { html } from '@htx/js'`), a dom

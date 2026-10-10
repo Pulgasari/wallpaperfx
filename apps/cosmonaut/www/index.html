@@ -4,6 +4,8 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Cosmonaut</title>
+    <!-- @aufbau/css, staged by the bundle (build/www/vendor), then the app sheet over it -->
+    <link rel="stylesheet" href="vendor/@aufbau/css/aufbau.css" />
     <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -68,6 +70,8 @@
                 <button id="addMarkBtn" class="txt-btn">This page</button>
             </span>
         </div>
+        <!-- every tag in use, tap one to show only its bookmarks -->
+        <div id="markTagBar" class="tag-bar" hidden></div>
         <div id="markGroups"></div>
         <p id="marksEmpty" class="empty">no bookmarks yet</p>
 
@@ -126,6 +130,7 @@
             <input id="scriptName" class="in" placeholder="Name" />
             <input id="scriptMatches" class="in" placeholder="Match patterns, e.g. https://*.example.com/*  (space separated)" />
             <textarea id="scriptCode" class="css-area" spellcheck="false" placeholder="// javascript, runs once the page has loaded"></textarea>
+            <textarea id="scriptCss" class="css-area" spellcheck="false" placeholder="/* css, added to the page */"></textarea>
             <label class="switch-row"><span>Enabled</span><input id="scriptEnabled" type="checkbox" checked /></label>
             <div class="editor-actions">
                 <button id="scriptCancel" class="txt-btn">Cancel</button>
@@ -145,6 +150,7 @@
         <div class="row-field"><label for="colBg">Background</label><input id="colBg" type="color" /></div>
         <div class="row-field"><label for="colFg">Foreground</label><input id="colFg" type="color" /></div>
         <div class="row-field"><label for="colAccent">Accent</label><input id="colAccent" type="color" /></div>
+        <label class="switch-row"><span>Blur behind panels</span><input id="blurToggle" type="checkbox" /></label>
 
         <h3 class="grp">Search</h3>
         <div class="field"><button id="openEngines" class="txt-btn">Manage search engines</button></div>
