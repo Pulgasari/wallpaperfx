@@ -1,14 +1,42 @@
 {
   "imports": {
-    "@aufbau/filters"   : "./vendor/@aufbau/filters/index.js",
-    "@aufbau/filters/"  : "./vendor/@aufbau/filters/",
-    "@aufbau/gestures"  : "./vendor/@aufbau/gestures/index.js",
-    "@aufbau/gestures/" : "./vendor/@aufbau/gestures/",
-    "@aufbau/patterns"  : "./vendor/@aufbau/patterns/index.js",
-    "@aufbau/patterns/" : "./vendor/@aufbau/patterns/",
-    "@aufbau/webfonts"  : "./vendor/@aufbau/webfonts/index.js",
-    "@domina/prototype" : "./vendor/@domina/prototype/index.js",
-    "@pulgasari/is"     : "./vendor/@pulgasari/is/index.js",
-    "@pulgasari/is/"    : "./vendor/@pulgasari/is/"
+    "@aufbau/element"         : "./vendor/@aufbau/element/index.js",
+    "@aufbau/element/"        : "./vendor/@aufbau/element/",
+    "@aufbau/elements"        : "./vendor/@aufbau/elements/index.js",
+    "@aufbau/elements/"       : "./vendor/@aufbau/elements/",
+    "@aufbau/filters"         : "./vendor/@aufbau/filters/index.js",
+    "@aufbau/filters/"        : "./vendor/@aufbau/filters/",
+    "@aufbau/gestures"        : "./vendor/@aufbau/gestures/index.js",
+    "@aufbau/gestures/"       : "./vendor/@aufbau/gestures/",
+    "@aufbau/gui"             : "./vendor/@aufbau/gui/index.js",
+    "@aufbau/gui/"            : "./vendor/@aufbau/gui/",
+    "@aufbau/import"          : "./vendor/@aufbau/import/index.js",
+    "@aufbau/patterns"        : "./vendor/@aufbau/patterns/index.js",
+    "@aufbau/patterns/"       : "./vendor/@aufbau/patterns/",
+    "@aufbau/svg"             : "./vendor/@aufbau/svg/index.js",
+    "@aufbau/svg/"            : "./vendor/@aufbau/svg/",
+    "@aufbau/webfonts"        : "./vendor/@aufbau/webfonts/index.js",
+    "@aufbau/webfonts/"       : "./vendor/@aufbau/webfonts/",
+
+    "@bunker/core"            : "./vendor/@bunker/core/index.js",
+    "@bunker/db"              : "./vendor/@bunker/db/index.js",
+    "@bunker/policy"          : "./vendor/@bunker/policy/index.js",
+    "@bunker/storage"         : "./vendor/@bunker/storage/index.js",
+    "@bunker/utils/"          : "./vendor/@bunker/utils/",
+
+    "@domina/methods"         : "./vendor/@domina/methods/index.js",
+    "@domina/methods/"        : "./vendor/@domina/methods/",
+    "@domina/observer"        : "./vendor/@domina/observer/index.js",
+    "@domina/prototype"       : "./vendor/@domina/prototype/index.js",
+
+    "@pulgasari/coerce"       : "./vendor/@pulgasari/coerce/index.js",
+    "@pulgasari/is"           : "./vendor/@pulgasari/is/index.js",
+    "@pulgasari/is/"          : "./vendor/@pulgasari/is/",
+    "@pulgasari/logger"       : "./vendor/@pulgasari/logger/index.js",
+    "@pulgasari/obj"          : "./vendor/@pulgasari/obj/index.js",
+    "@pulgasari/obj/"         : "./vendor/@pulgasari/obj/",
+    "@pulgasari/shift"        : "./vendor/@pulgasari/shift/index.js",
+    "@pulgasari/str"          : "./vendor/@pulgasari/str/index.js",
+    "@pulgasari/timing"       : "./vendor/@pulgasari/timing/index.js"
   }
 }

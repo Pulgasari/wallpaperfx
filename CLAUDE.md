@@ -23,9 +23,9 @@ project under `apps/`:
   OpenGL wallpaper engine, bridged by the `Wallpaper` plugin. Its own invariants
   live in `apps/subotnik-wallpapers/CLAUDE.md` — read that before touching it.
 
-`shared/importmap.json` is the offline import map frame for the shared frontend
-packages (`@domina/prototype`, `@aufbau/*`); see `shared/README.md`. no app is
-wired to it yet.
+`shared/importmap.json` is the offline import map for the shared frontend
+packages (`@domina/prototype`, `@aufbau/{elements,gui,svg,webfonts,filters,gestures,patterns}`
+and their transitive deps); see `shared/README.md`. no app is wired to it yet.
 
 ## Layout invariant: apps are self-contained, not a workspace
 
