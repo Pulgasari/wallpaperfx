@@ -8,35 +8,33 @@
 - [x] add button to dock: userscripts (violentmonkey o.ä.)
 - [x] add button to dock: search in page
 - [x] add button to dock: settings
+- [ ] `@aufbau/css/aufbau.css` als grundlage einbinden
 
 ### bookmarks
-- [ ] folders
+- [x] folders
 - [ ] tags
-- [ ] export/import as/from html (zumindest bild ich mir ein dass das typischer mechanismus ist?)
-- [ ] export/import as/from json
+- [x] export/import as/from html
+- [x] export/import as/from json
 - [ ] erst so mechanismus für url-leiste das man quasi `<string>:` tippt um irgendne sonderfunktion zu aktivieren ...
 - [ ] ... dann erste sonderfunktion: eingabe von `tl:` aktiviert translate-modus und wenn man dann `tl: katze` eingibt nutzt das entweder irgendne api (google translate? yandex? deepl?) oder leitet wenigstens zu ner url von denen für übersetzung
 
 ### context-menu
-- [ ] grundsätzlich den mechanismus bauen
-- [ ] bei der url-leise testweise einbauen
-  - [ ] add to bookmarks
-  - [ ] reload / hard reload
-  - [ ] close
+- [x] grundsätzlich den mechanismus bauen
+- [x] bei der url-leise testweise einbauen
+  - [x] add to bookmarks
+  - [x] reload / hard reload
+  - [x] close
 
 ### dashboard
 quasi die startseite oder bei leerer tab.
-
 - [ ] rendert zunächst erstmal die bookmarks als grid
 
 ### dock:
-- [ ] der dock darf doch nicht aus freischwebenden buttons bestehen, der den webview überlagert, weil das für ux-probleme sorgt. daher sollte er eine geschlossene leisten werden. default unter dem webview positioniert, in den settings aber als oben drüber einstellbar
+- [ ] das `padding` vom ist zu groß. wenn die `aufbau.css` eingebunden ist hier `padding: --space(small);` nutzen
 
-### gestures
-(auf basis von `@aufbau/gestures` ?)
-
-- [ ] reload = webview nach unten ziehen
-- [ ] hard reload = webview nach unten ziehen und halten
+### gestures (via `@aufbau/gestures`)
+- [x] reload = webview nach unten ziehen
+- [x] hard reload = webview nach unten ziehen und halten
 
 ### settings-options:
   - [x] colors: bg / fg / accent
@@ -46,6 +44,11 @@ quasi die startseite oder bei leerer tab.
   - [x] toggle on/off der einzelnen dock-elemente
   - [x] size der dock-elemente
   - [x] gap zwischenden dock-elementen
+
+### userscripts
+- [ ] weiteres eingabefeld für css
+
+---
 
 ## Subotnik (Launcher)
 
