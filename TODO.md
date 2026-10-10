@@ -62,7 +62,7 @@ quasi die startseite oder bei leerer tab.
 
 ---
 
-## Subotnik (Launcher)
+# Subotnik (Launcher)
 
 - [x] fix: das is alles zu sensibel. selbst wenn man nur scrollt und irgendwas berührt, wirddas sofort gestartet/getriggert
 - [x] fix: wenn das settings-panel angezeigt wird, sollt kein blur-effekt das app-grid überlagern, weil man so ja nix chillig einstellen kann
@@ -78,7 +78,9 @@ quasi die startseite oder bei leerer tab.
 - [x] feld für custom-css
 - [x] gesamthintergrund einstellbar: farbe, transparenz (sodass zb der wallpapers-bg durchscheinen könnte oder whatever) oder kann man nich sogar den bg live abgreifen direkt?
 
-## Subotnik Wallpapers
+---
+
+# Subotnik Wallpapers
 
 ---
 
