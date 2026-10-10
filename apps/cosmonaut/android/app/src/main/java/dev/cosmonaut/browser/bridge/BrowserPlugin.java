@@ -174,6 +174,12 @@ public class BrowserPlugin extends Plugin {
     }
 
     @PluginMethod
+    public void setStripHeight(PluginCall call) {
+        final double height = call.getDouble("height", 62.0);
+        ui(() -> { activity().setStripHeight(height); call.resolve(); });
+    }
+
+    @PluginMethod
     public void findInPage(PluginCall call) {
         final String q = call.getString("query", "");
         ui(() -> {

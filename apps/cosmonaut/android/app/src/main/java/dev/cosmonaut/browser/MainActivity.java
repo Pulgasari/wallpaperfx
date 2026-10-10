@@ -27,7 +27,8 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(BrowserPlugin.class);
         super.onCreate(savedInstanceState);
 
-        collapsedPx = Math.round(getResources().getDisplayMetrics().density * 104);
+        // until the chrome reports its measured dock bar (setStripHeight)
+        collapsedPx = Math.round(getResources().getDisplayMetrics().density * 62);
 
         chrome = getBridge().getWebView();
         chrome.setBackgroundColor(Color.TRANSPARENT);
@@ -69,6 +70,25 @@ public class MainActivity extends BridgeActivity {
             lp.height = expanded ? ViewGroup.LayoutParams.MATCH_PARENT : collapsedPx;
             lp.gravity = dockGravity;
             chrome.setLayoutParams(lp);
+        });
+    }
+
+    // the chrome measures its dock bar and reports the height in css px, which is
+    // dp in the webview. the collapsed strip and the content inset follow it, so
+    // the bar is exactly as tall as its content, whatever the dock size
+    public void setStripHeight(double dp) {
+        int px = Math.round((float) (getResources().getDisplayMetrics().density * dp));
+        if (px <= 0 || px == collapsedPx) return;
+        collapsedPx = px;
+        runOnUiThread(() -> {
+            if (!chromeExpanded) {
+                FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) chrome.getLayoutParams();
+                lp.height = collapsedPx;
+                chrome.setLayoutParams(lp);
+            }
+            FrameLayout.LayoutParams cp = (FrameLayout.LayoutParams) contentContainer.getLayoutParams();
+            applyContentInset(cp);
+            contentContainer.setLayoutParams(cp);
         });
     }
 

@@ -49,7 +49,7 @@ export function createMock () {
     goBack : async () => state(), goForward : async () => state(),
     reload : async () => state(), hardReload : async () => state(),
 
-    setDockPosition : noop, findInPage : noop, findNext : noop, clearFind : noop,
+    setDockPosition : noop, setStripHeight : noop, findInPage : noop, findNext : noop, clearFind : noop,
     toggleDevtools  : noop, setUserscripts : noop,
 
     addListener (type, fn) {

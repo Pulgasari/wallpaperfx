@@ -58,6 +58,18 @@ export function renderBar () {
   byId('progFill').style.width = (loading ? tab.progress : 0) + '%';
 }
 
+// the native strip (the collapsed chrome webview) is exactly the dock bar: its
+// measured height, in css px (= dp in the webview), goes to native, which sizes
+// the strip and the content inset to it, and to --strip for what sits on the seam
+export function watchStrip () {
+  const bar = byId('bar');
+  new ResizeObserver(() => {
+    const height = Math.ceil(bar.getBoundingClientRect().height);
+    document.documentElement.style.setProperty('--strip', height + 'px');
+    call('setStripHeight', { height });
+  }).observe(bar, { box: 'border-box' });
+}
+
 export function applyAll () {
   applyTheme();
   applyDock();

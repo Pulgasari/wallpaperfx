@@ -7,7 +7,7 @@
 :root {
     --dock-size: 46px;
     --dock-gap: 12px;
-    --strip: 104px; /* dock bar height; MUST match MainActivity.collapsedPx (104dp) */
+    --strip: 62px; /* the dock bar's height, measured and set by bar.js (which also sizes the native strip) */
 }
 body {
     --color-bg: #0c0d10;
@@ -41,17 +41,18 @@ html, body {
 .flex-row { display: flex; flex-direction: row; align-items: center; justify-content: center; }
 .flex-col { display: flex; flex-direction: column; align-items: center; }
 
-/* ===== dock: a closed bar, not floating chips. the bar is the opaque surface
-   filling the reserved strip (content is inset by --strip natively, so the bar
-   owns its space instead of overlapping the page). buttons sit flat on it. ===== */
+/* ===== dock: a closed bar, not floating chips. its height is its content: the
+   buttons plus --space(small) on every side (and the safe area on its edge).
+   bar.js measures it and sizes the native strip and the content inset to it, so
+   the bar owns exactly its space instead of overlapping the page. ===== */
 .bar {
-    position: fixed; left: 0; right: 0; bottom: 0; height: var(--strip);
+    position: fixed; left: 0; right: 0; bottom: 0;
     display: flex; align-items: center; justify-content: center; gap: var(--dock-gap);
-    padding: 0 --space(small) calc(env(safe-area-inset-bottom) + --space(small));
+    padding: --space(small) --space(small) calc(env(safe-area-inset-bottom) + --space(small));
     background: var(--color-bg); border-top: var(--hairline);
     overflow: hidden;
 }
-body.dock-top .bar { top: 0; bottom: auto; padding: calc(env(safe-area-inset-top) + --space(small)) --space(small) 0; border-top: 0; border-bottom: var(--hairline); }
+body.dock-top .bar { top: 0; bottom: auto; padding: calc(env(safe-area-inset-top) + --space(small)) --space(small) --space(small); border-top: 0; border-bottom: var(--hairline); }
 .dock-group { display: flex; align-items: center; gap: var(--dock-gap); flex: 0 0 auto; }
 .pill {
     flex: 1 1 0; min-width: 40px; max-width: 62vw; height: var(--dock-size); padding: 0 20px;
@@ -95,11 +96,11 @@ body.no-blur .backdrop { backdrop-filter: none; -webkit-backdrop-filter: none; }
 .menu {
     position: absolute; z-index: 1; list-style: none; margin: 0; padding: 6px;
     min-width: 208px; max-width: 78vw;
-    bottom: calc(env(safe-area-inset-bottom) + var(--strip) + 8px); left: 8px;
+    bottom: calc(var(--strip) + 8px); left: 8px;
     background: var(--color-bg); border: var(--hairline); border-radius: 14px;
     box-shadow: 0 10px 34px color-mix(in srgb, #000 42%, transparent);
 }
-body.dock-top .menu { bottom: auto; top: calc(env(safe-area-inset-top) + var(--strip) + 8px); }
+body.dock-top .menu { bottom: auto; top: calc(var(--strip) + 8px); }
 .menu li { display: flex; align-items: center; gap: 11px; padding: 11px 12px; border-radius: 10px; cursor: pointer; font-size: 14px; color: var(--color-fg); }
 .menu li:active { background: var(--faint); }
 .menu li.danger { color: color-mix(in srgb, #ff5a5a 82%, var(--color-fg)); }
@@ -118,8 +119,8 @@ body.dock-top .menu { bottom: auto; top: calc(env(safe-area-inset-top) + var(--s
 select.in { appearance: none; -webkit-appearance: none; }
 
 /* ===== dashboard (start page): a bookmarks grid above the bar ===== */
-.panel.dash { bottom: calc(env(safe-area-inset-bottom) + var(--strip)); background: var(--color-bg); z-index: 15; overflow-y: auto; }
-body.dock-top .panel.dash { top: calc(env(safe-area-inset-top) + var(--strip)); bottom: 0; }
+.panel.dash { bottom: var(--strip); background: var(--color-bg); z-index: 15; overflow-y: auto; }
+body.dock-top .panel.dash { top: var(--strip); bottom: 0; }
 .dash-body { padding: --space(large) --space(large) calc(env(safe-area-inset-bottom) + --space(large)); }
 .dash-search {
     width: 100%; height: 46px; margin-bottom: 18px; padding: 0 18px; text-align: left;
