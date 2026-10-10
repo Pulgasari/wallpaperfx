@@ -1,0 +1,193 @@
+// the bookmarks panel, three views in one sheet: the list (by folder), the
+// editor of one bookmark, and import / export
+
+import {
+  detectFormat, fromJson, fromNetscape, pickTextFile, saveTextFile, toJson, toNetscape,
+} from '../bookmarks-io.js';
+import { bucketsBy, byId, domainOf, group, h, initial, isolated, segmented, uid } from '../dom.js';
+import { icon } from '../icons.js';
+import { activeTab } from '../native.js';
+import { definePanel, openPanelName } from '../panels.js';
+import { go } from '../search.js';
+import { save, store } from '../store.js';
+
+const views = {
+  list   : [byId('markGroups'), byId('marksEmpty')],
+  editor : [byId('markEditor')],
+  io     : [byId('markIO')],
+};
+
+function showView (name) {
+  for (const [view, elements] of Object.entries(views)) {
+    for (const el of elements) el.hidden = view !== name;
+  }
+}
+
+// :::::: LIST
+
+const folderName = id => store.bookmarkFolders.find(folder => folder.id === id)?.name ?? '';
+
+function markRow (mark) {
+  const domain = domainOf(mark.url);
+  const tags   = mark.tags?.length && h('span', { class: 'tags' }, mark.tags.map(tag => h('span', { class: 'tag', text: tag })));
+  return h('li', { class: 'row', on: { click: () => go(mark.url) } },
+    h('span', { class: 'ricon', text: initial(domain) }),
+    h('span', { class: 'rtext' }, h('b', { text: mark.title || domain }), h('span', { text: domain }), tags),
+    h('button', { class: 'icon-btn', 'aria-label': 'Edit', html: icon('pencil'), on: { click: isolated(() => openEditor(mark)) } }));
+}
+
+// the folders in their order, then the bookmarks in none
+function renderList () {
+  const buckets = bucketsBy(store.bookmarks, mark => mark.folder || '');
+  const order   = [...store.bookmarkFolders.map(folder => folder.id).filter(id => buckets.has(id)), ...(buckets.has('') ? [''] : [])];
+  const titleOf = id => id ? folderName(id) : store.bookmarkFolders.length ? 'No folder' : '';
+
+  byId('markGroups').replaceChildren(...order.map(id => group(titleOf(id), buckets.get(id).map(markRow))));
+  showView('list');
+  byId('marksEmpty').hidden = store.bookmarks.length > 0;
+}
+
+function newFolder () {
+  const name = prompt('Folder name:', 'Folder');
+  if (name == null) return;
+  store.bookmarkFolders.push({ id: uid('f'), name: name.trim() || 'Folder' });
+  save();
+  renderList();
+}
+
+const newMark = tab => ({ id: uid('b'), url: tab.url, title: tab.title || domainOf(tab.url) });
+
+function addCurrent () {
+  const tab = activeTab();
+  if (!tab?.url || store.bookmarks.some(mark => mark.url === tab.url)) return;
+  store.bookmarks.unshift(newMark(tab));
+  save();
+  renderList();
+}
+
+export const isBookmarked = url => store.bookmarks.some(mark => mark.url === url);
+
+export function toggleBookmark () {
+  const tab = activeTab();
+  if (!tab?.url) return;
+  store.bookmarks = isBookmarked(tab.url)
+    ? store.bookmarks.filter(mark => mark.url !== tab.url)
+    : [newMark(tab), ...store.bookmarks];
+  save();
+  if (openPanelName() === 'marks') renderList();
+}
+
+// :::::: EDITOR
+
+const editor = {
+  title  : byId('markTitle'),
+  url    : byId('markUrl'),
+  folder : byId('markFolder'),
+  tags   : byId('markTags'),
+};
+let editing = null;
+
+function openEditor (mark) {
+  editing = mark;
+  editor.title.value = mark.title || '';
+  editor.url.value   = mark.url || '';
+  editor.tags.value  = (mark.tags || []).join(' ');
+  editor.folder.replaceChildren(
+    h('option', { value: '', text: 'No folder' }),
+    ...store.bookmarkFolders.map(folder => h('option', { value: folder.id, text: folder.name })));
+  editor.folder.value = mark.folder || '';
+  showView('editor');
+}
+
+function saveEditor () {
+  if (!editing) return;
+  Object.assign(editing, {
+    title  : editor.title.value.trim(),
+    url    : editor.url.value.trim(),
+    folder : editor.folder.value || undefined,
+    tags   : editor.tags.value.split(/\s+/).filter(Boolean),
+  });
+  save();
+  renderList();
+}
+
+function deleteEdited () {
+  if (!editing) return;
+  store.bookmarks = store.bookmarks.filter(mark => mark !== editing);
+  editing = null;
+  save();
+  renderList();
+}
+
+// :::::: IMPORT / EXPORT
+
+const ioText   = byId('markIoText');
+const ioStatus = byId('markIoStatus');
+let format = 'json';
+
+const status = message => { ioStatus.textContent = message || ''; ioStatus.hidden = !message; };
+
+function drawFormat () {
+  segmented(byId('markIoFmt'), [['json', 'JSON'], ['html', 'HTML']], format, value => { format = value; drawFormat(); });
+}
+
+function openIo () {
+  drawFormat();
+  ioText.value = '';
+  status('');
+  showView('io');
+}
+
+async function exportMarks () {
+  const text = format === 'html' ? toNetscape(store) : toJson(store);
+  ioText.value = text;
+  const where = await saveTextFile(`bookmarks.${format}`, text);
+  status(where ? `saved: ${where}` : 'saving failed, the content above can be copied');
+}
+
+// merges by url: a bookmark whose url is already there is skipped
+function importMarks (source) {
+  const text = ioText.value.trim();
+  if (!text) return status('nothing to import');
+
+  const parsed = format === 'html' ? fromNetscape(text) : fromJson(text);
+  if (!parsed) return status(`could not read this as ${format.toUpperCase()}`);
+
+  const known = new Set(store.bookmarks.map(mark => mark.url));
+  const added = parsed.bookmarks.filter(mark => mark.url && !known.has(mark.url) && known.add(mark.url));
+  store.bookmarkFolders.push(...parsed.folders);
+  store.bookmarks.push(...added);
+  save();
+
+  const skipped = parsed.bookmarks.length - added.length;
+  status(`${added.length} imported` + (skipped ? ` (${skipped} already there)` : '') + (source ? ` from ${source}` : ''));
+}
+
+async function loadFile () {
+  try {
+    const { name, text } = await pickTextFile(byId('markIoFile'));
+    format = detectFormat(name, text);
+    drawFormat();
+    ioText.value = text;
+    importMarks(name);
+  } catch {
+    status('the file could not be read');
+  }
+}
+
+// :::::: WIRING
+
+byId('addMarkBtn').addEventListener('click', addCurrent);
+byId('newFolderBtn').addEventListener('click', newFolder);
+byId('markIoBtn').addEventListener('click', openIo);
+
+byId('markSave').addEventListener('click', saveEditor);
+byId('markDelete').addEventListener('click', deleteEdited);
+byId('markCancel').addEventListener('click', renderList);
+
+byId('markIoClose').addEventListener('click', renderList);
+byId('markIoLoad').addEventListener('click', loadFile);
+byId('markIoExport').addEventListener('click', exportMarks);
+byId('markIoImport').addEventListener('click', () => importMarks());
+
+definePanel('marks', byId('panelMarks'), { render: renderList });
