@@ -24,6 +24,10 @@
     "@bunker/storage"         : "./vendor/@bunker/storage/index.js",
     "@bunker/utils/"          : "./vendor/@bunker/utils/",
 
+    "@htx/htx"                : "./vendor/@htx/htx/index.js",
+    "@htx/htx/"               : "./vendor/@htx/htx/",
+    "@htx/js"                 : "./vendor/@htx/js/index.js",
+
     "@domina/methods"         : "./vendor/@domina/methods/index.js",
     "@domina/methods/"        : "./vendor/@domina/methods/",
     "@domina/observer"        : "./vendor/@domina/observer/index.js",

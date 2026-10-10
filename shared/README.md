@@ -2,8 +2,10 @@
 
 canonical import map for the frontend packages we use across the android apps,
 offline. it declares the bare specifiers and the local path convention. the
-package files are not vendored into the apps yet, and no app is wired to it yet
-(that is the job of `@aufbau/bundler`, see the concept in `aufbau/bundler/concept.md`).
+package files are not in the repo: an app with a `bundler.config.js` gets the
+packages its modules reach staged into `build/www/vendor/` by `@aufbau/bundler`
+(packages by specifier, see `aufbau/bundler/concept.md`), with this map inlined
+into its `index.html`. so far: `apps/cosmonaut`.
 
 ## what it maps
 

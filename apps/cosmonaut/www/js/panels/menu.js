@@ -5,7 +5,9 @@
 //
 // anchor is an element (the menu centers on it horizontally) or { x }
 
-import { byId, h } from '../dom.js';
+import { html } from '@htx/js';
+
+import { byId } from '../dom.js';
 import { icon } from '../icons.js';
 import { activeTab, call } from '../native.js';
 import { closePanel, definePanel, openPanel } from '../panels.js';
@@ -14,10 +16,12 @@ import { isBookmarked, toggleBookmark } from './bookmarks.js';
 const list = byId('menuList');
 
 const menuItem = item => item.separator
-  ? h('li', { class: 'sep', role: 'separator' })
-  : h('li', { class: item.danger ? 'danger' : null, role: 'menuitem', on: { click: () => { closePanel(); item.run(); } } },
-    h('span', { class: 'mi', html: item.icon ? icon(item.icon) : '' }),
-    h('span', { text: item.label }));
+  ? html`<li.sep role="separator" />`
+  : html`
+    <li role="menuitem" class=${{ danger: item.danger }} onClick=${() => { closePanel(); item.run(); }}>
+      <span.mi !html=${item.icon ? icon(item.icon) : ''} />
+      <span>${item.label}</span>
+    </li>`;
 
 function place (anchor) {
   const rect   = anchor?.getBoundingClientRect?.();

@@ -1,7 +1,9 @@
 // the url / search panel: the field, suggestions from bookmarks and open tabs,
 // and while a search is typed a row of engines to send it to
 
-import { byId, domainOf, h, initial } from '../dom.js';
+import { html } from '@htx/js';
+
+import { byId, domainOf, initial } from '../dom.js';
 import { activeTab, session } from '../native.js';
 import { definePanel } from '../panels.js';
 import { go, isUrlLike } from '../search.js';
@@ -38,15 +40,16 @@ function suggestions (raw) {
 
 function renderSuggestions () {
   suggest.replaceChildren(...suggestions(input.value).map(item =>
-    h('li', { on: { click: () => go(item.url) } }, h('b', { text: item.title }), h('span', { text: item.sub }))));
+    html`<li onClick=${() => go(item.url)}><b>${item.title}</b><span>${item.sub}</span></li>`));
 }
 
+// the engine's icon, or its initial when it has none or the icon fails to load
 const engineButton = engine => {
-  const button = h('button', { class: 'eng' + (engine.id === store.defaultEngine ? ' default' : ''), title: engine.name, on: { click: () => go(input.value, engine.id) } });
-  const letter = () => { button.textContent = initial(engine.name); };
-  if (engine.icon) button.append(h('img', { src: engine.icon, alt: '', on: { error: letter } }));
-  else letter();
-  return button;
+  const letter = initial(engine.name);
+  return html`
+    <button.eng class=${{ default: engine.id === store.defaultEngine }} title=${engine.name} onClick=${() => go(input.value, engine.id)}>
+      ${engine.icon ? html`<img src=${engine.icon} alt="" onError=${event => event.target.replaceWith(letter)} />` : letter}
+    </button>`;
 };
 
 function renderEngines () {

@@ -1,7 +1,9 @@
 // appearance and dock settings. every change is saved and applied live
 
+import { html } from '@htx/js';
+
 import { applyDock, applyLoader, applyTheme, DOCK } from '../bar.js';
-import { byId, h, segmented } from '../dom.js';
+import { byId, segmented } from '../dom.js';
 import { icon } from '../icons.js';
 import { definePanel, openPanel } from '../panels.js';
 import { save, store } from '../store.js';
@@ -23,15 +25,15 @@ function moveDockItem (index, step) {
 
 function renderDockList () {
   const dock = settings().dock;
-  byId('dockList').replaceChildren(...dock.map((item, index) => {
-    const toggle = h('input', { type: 'checkbox', checked: item.on, on: { change: () => change(applyDock, () => { item.on = toggle.checked; }) } });
-    return h('li', { class: 'row' },
-      h('span', { class: 'ricon', html: icon(DOCK[item.id].icon) }),
-      h('span', { class: 'rtext' }, h('b', { text: DOCK[item.id].label })),
-      h('button', { class: 'icon-btn', text: '↑', 'aria-label': 'Move up',   disabled: index === 0,               on: { click: () => moveDockItem(index, -1) } }),
-      h('button', { class: 'icon-btn', text: '↓', 'aria-label': 'Move down', disabled: index === dock.length - 1, on: { click: () => moveDockItem(index, 1) } }),
-      toggle);
-  }));
+  const toggle = item => event => change(applyDock, () => { item.on = event.target.checked; });
+  byId('dockList').replaceChildren(...dock.map((item, index) => html`
+    <li.row>
+      <span.ricon !html=${icon(DOCK[item.id].icon)} />
+      <span.rtext><b>${DOCK[item.id].label}</b></span>
+      <button.icon-btn aria-label="Move up"   disabled=${index === 0}               onClick=${() => moveDockItem(index, -1)}>↑</button>
+      <button.icon-btn aria-label="Move down" disabled=${index === dock.length - 1} onClick=${() => moveDockItem(index, 1)}>↓</button>
+      <input type="checkbox" checked=${item.on} onChange=${toggle(item)} />
+    </li>`));
 }
 
 function render () {

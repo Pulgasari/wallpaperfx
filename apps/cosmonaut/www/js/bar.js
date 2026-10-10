@@ -1,7 +1,9 @@
 // the dock bar: buttons split evenly around the pill, the load progress on the
 // content seam, and the appearance settings that drive both
 
-import { byId, domainOf, h } from './dom.js';
+import { html } from '@htx/js';
+
+import { byId, domainOf } from './dom.js';
 import { icon } from './icons.js';
 import { activeTab, call } from './native.js';
 import { closePanel, openPanel } from './panels.js';
@@ -17,13 +19,8 @@ export const DOCK = {
   settings    : { icon: 'gear',    label: 'Settings',     run: () => openPanel('settings') },
 };
 
-const dockButton = id => h('button', {
-  class        : 'trig',
-  title        : DOCK[id].label,
-  'aria-label' : DOCK[id].label,
-  html         : icon(DOCK[id].icon),
-  on           : { click: DOCK[id].run },
-});
+const dockButton = id => html`
+  <button.trig title|aria-label=${DOCK[id].label} onClick=${DOCK[id].run} !html=${icon(DOCK[id].icon)} />`;
 
 export function applyTheme () {
   const style = document.documentElement.style;

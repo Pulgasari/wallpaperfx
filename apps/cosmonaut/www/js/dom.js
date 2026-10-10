@@ -1,26 +1,10 @@
-// small dom helpers. the chrome has no framework: elements are built with h()
-// and every list is re-rendered whole from state, which is cheap at this size.
+// small dom helpers. the chrome has no framework: elements are built with htx
+// (@htx/js, a dom builder, no vdom) and every list is re-rendered whole from
+// state, which is cheap at this size.
+
+import { html } from '@htx/js';
 
 export const byId = id => document.getElementById(id);
-
-// h('button', { class: 'icon-btn', 'aria-label': 'close', on: { click } }, child, ...)
-// props: class, text, html (trusted markup only, i.e. icons), on (listeners),
-// dom properties (title, type, checked, value, disabled, hidden, ...), anything
-// else as an attribute. null / false props and null / false / '' children are skipped.
-export function h (tag, props = {}, ...children) {
-  const el = document.createElement(tag);
-  for (const [key, value] of Object.entries(props)) {
-    if (value == null || value === false) continue;
-    if      (key === 'class') el.className = value;
-    else if (key === 'text')  el.textContent = value;
-    else if (key === 'html')  el.innerHTML = value;
-    else if (key === 'on')    for (const [type, fn] of Object.entries(value)) el.addEventListener(type, fn);
-    else if (key in el && !key.includes('-')) el[key] = value;
-    else el.setAttribute(key, value === true ? '' : value);
-  }
-  el.append(...children.flat().filter(child => child != null && child !== false && child !== ''));
-  return el;
-}
 
 // a listener that does not let the click reach the row it sits in
 export const isolated = fn => event => { event.stopPropagation(); fn(event); };
@@ -38,7 +22,7 @@ export const initial = text => (String(text || '')[0] || '?').toUpperCase();
 // a row of mutually exclusive buttons. options: [[value, label], ...]
 export function segmented (box, options, current, onPick) {
   box.replaceChildren(...options.map(([value, label]) =>
-    h('button', { class: 'seg-btn' + (value === current ? ' active' : ''), text: label, on: { click: () => onPick(value) } })));
+    html`<button.seg-btn class=${{ active: value === current }} onClick=${() => onPick(value)}>${label}</button>`));
 }
 
 // items in buckets by key, in first-seen order
@@ -53,9 +37,11 @@ export function bucketsBy (items, keyOf) {
 }
 
 // a section of rows under an optional heading, used by tabs and bookmarks
-export const group = (title, rows) => h('div', { class: 'group' },
-  title && h('div', { class: 'group-head' }, h('span', { text: title }), h('span', { class: 'line' })),
-  h('ul', { class: 'rows' }, rows));
+export const group = (title, rows) => html`
+  <div.group>
+    ${title && html`<div.group-head><span>${title}</span><span.line /></div>`}
+    <ul.rows>${rows}</ul>
+  </div>`;
 
 // fires handler on a long press (and on right-click, for the desktop mock), and
 // swallows the click that follows so a long press does not also tap through

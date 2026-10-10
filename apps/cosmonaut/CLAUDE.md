@@ -31,7 +31,7 @@ App id/name: `dev.cosmonaut.browser` / "Cosmonaut".
   a content container behind; `setChromeExpanded` swaps its height; routes back.
 - `bridge/BrowserPlugin.java` — per-tab native WebViews, navigation, `state`
   events. url-vs-search normalization lives here.
-- `www/` — chrome ui (plain js, es modules, no bundler): `index.html`, `styles.css`,
+- `www/` — chrome ui (plain js, es modules, uncompiled): `index.html`, `styles.css`,
   `js/`:
   - `main.js` — entry: wires the pill, native `state` events, boot.
   - `native.js` — the `Browser` plugin (or `mock.js` outside capacitor), the
@@ -41,21 +41,34 @@ App id/name: `dev.cosmonaut.browser` / "Cosmonaut".
     `openPanel` / `closePanel` expand and collapse the chrome webview.
   - `bar.js` — dock, pill, load progress, theme. `search.js` — url vs search, engines.
   - `panels/*.js` — one module per panel, each registers itself on import.
-  - `dom.js` — `h()` element builder and small helpers. `icons.js` — svg icons.
+  - `dom.js` — small helpers (`byId`, `segmented`, `group`, long press).
+    elements are built with htx (`import { html } from '@htx/js'`), a dom
+    builder without vdom: lists re-render whole via `replaceChildren`.
+    `icons.js` — svg icons.
   - `bookmarks-io.js` — json / netscape html formats, file save and pick.
 
 ## Build / verify
 
 No local Android SDK; CI (`android build`) is the source of truth (the
 chrome/content layering and native webviews can only really be exercised on a
-device). Locally: `cd apps/cosmonaut && npm install && npx cap sync android &&
-(cd android && ./gradlew assembleDebug)`. After changing `www/`, run
-`npx cap copy android`. The chrome ui can be laid out / screenshotted in a plain
-browser via the mock in `js/mock.js` (serve `www/` over http, es modules do
-not load from `file://`).
+device). Locally: `cd apps/cosmonaut && npm install && npm run bundle &&
+npx cap sync android && (cd android && ./gradlew assembleDebug)`.
+
+`www/` is the source; capacitor ships `build/www` (`webDir`, gitignored), built by
+`npm run bundle` (`bundler.config.js`, @aufbau/bundler): `www/` plus the packages
+its modules import by bare specifier (`@htx/js` and what it pulls in), staged
+from sibling checkouts of the package repos through `../../shared/importmap.json`,
+the map inlined into `index.html`. strict: an import that would not load offline
+fails the bundle. `AUFBAU=<path>` points the script at another aufbau checkout,
+`source=<dir>` (cli arg) at another directory of repo checkouts. After changing
+`www/`, bundle again and `npx cap copy android`.
+
+The chrome ui can be laid out / screenshotted in a plain browser via the mock in
+`js/mock.js`: serve `build/www` over http (es modules do not load from `file://`,
+and `www/` alone has no importmap).
 
 ## Conventions
 
 - Code comments: english, all lowercase, technical, no emojis.
-- Prefer JavaScript; the web side is intentionally bundler-free.
+- Prefer JavaScript; the web side is not compiled (the bundle only stages packages).
 - Do not hand-edit generated gradle files (`capacitor.build.gradle`, etc.).

@@ -1,7 +1,9 @@
 // userscripts, managed here and pushed to native, which injects each enabled one
 // at document end into pages whose url matches one of its globs
 
-import { byId, h, isolated, uid } from '../dom.js';
+import { html } from '@htx/js';
+
+import { byId, isolated, uid } from '../dom.js';
 import { call } from '../native.js';
 import { definePanel } from '../panels.js';
 import { save, store } from '../store.js';
@@ -24,17 +26,15 @@ export function pushUserscripts () {
 const commit = () => { save(); pushUserscripts(); };
 
 function scriptRow (script) {
-  const toggle = h('input', {
-    type    : 'checkbox',
-    checked : script.enabled !== false,
-    on      : { click: event => event.stopPropagation(), change: () => { script.enabled = toggle.checked; commit(); } },
-  });
+  const toggle = event => { script.enabled = event.target.checked; commit(); };
   const remove = () => { store.userscripts = store.userscripts.filter(other => other.id !== script.id); commit(); render(); };
 
-  return h('li', { class: 'row', on: { click: () => openEditor(script) } },
-    h('span', { class: 'rtext' }, h('b', { text: script.name || 'Script' }), h('span', { text: script.matches?.join(' ') || 'all pages' })),
-    toggle,
-    h('button', { class: 'icon-btn', text: '×', 'aria-label': 'Delete', on: { click: isolated(remove) } }));
+  return html`
+    <li.row onClick=${() => openEditor(script)}>
+      <span.rtext><b>${script.name || 'Script'}</b><span>${script.matches?.join(' ') || 'all pages'}</span></span>
+      <input type="checkbox" checked=${script.enabled !== false} onClick=${event => event.stopPropagation()} onChange=${toggle} />
+      <button.icon-btn aria-label="Delete" onClick=${isolated(remove)}>×</button>
+    </li>`;
 }
 
 function render () {

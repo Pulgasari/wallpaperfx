@@ -49,6 +49,20 @@ jobs:
       - name: install js deps
         run: npm ci
 
+      # apps with a bundler.config.js ship build/www (webDir): www/ plus the
+      # packages it imports by specifier, staged by @aufbau/bundler from fresh
+      # checkouts of the package repos (cloned into build/_src as needed)
+      - name: bundle www
+        if: hashFiles(format('apps/{0}/bundler.config.js', matrix.app)) != ''
+        env:
+          # the bundler's packages-by-specifier mode is not on aufbau main yet.
+          # switch to main once claude/wallpaperfx-reorganization-4xj19p is merged there
+          AUFBAU_REF: claude/wallpaperfx-reorganization-4xj19p
+        run: |
+          git clone --quiet --depth 1 --branch "$AUFBAU_REF" https://github.com/Pulgasari/aufbau.git build/_src/aufbau
+          npm install --prefix build/_src/aufbau/bundler --no-audit --no-fund
+          node build/_src/aufbau/bundler/cli.js bundler.config.js source=build/_src
+
       - name: capacitor sync
         run: npx cap sync android
 

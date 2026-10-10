@@ -25,7 +25,9 @@ project under `apps/`:
 
 `shared/importmap.json` is the offline import map for the shared frontend
 packages (`@domina/prototype`, `@aufbau/{elements,gui,svg,webfonts,filters,gestures,patterns}`
-and their transitive deps); see `shared/README.md`. no app is wired to it yet.
+and their transitive deps); see `shared/README.md`. an app uses it through a
+`bundler.config.js`: `@aufbau/bundler` stages the packages its modules reach into
+`build/www` (its capacitor `webDir`) and inlines the map. so far: cosmonaut.
 
 ## Layout invariant: apps are self-contained, not a workspace
 
@@ -39,7 +41,9 @@ build. Run `npm ci` / `npx cap sync android` / gradle from inside the app dir.
 ## Conventions
 
 - Code comments: english, all lowercase, technical, no emojis.
-- Prefer JavaScript; the web side is intentionally bundler-free.
+- Prefer JavaScript; the web side is not compiled. an app with a `bundler.config.js`
+  gets its packages staged as plain es modules (no bundling, no transpiling) and
+  ships `build/www`, which is gitignored: run `npm run bundle` before `cap sync`.
 - Do not hand-edit generated gradle files (`capacitor.build.gradle`, etc.).
 - `www/styles.css` is plain, hand-edited css. there is no css build step.
 - After changing an app's `www/`, run `npx cap copy android` in that app dir.
