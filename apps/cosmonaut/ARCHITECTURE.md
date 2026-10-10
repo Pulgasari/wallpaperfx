@@ -109,9 +109,10 @@ Two things follow straight from the two-layer split:
 
 - **context menu** (chrome-side): an anchored floating list. Because the collapsed
   chrome is only the strip, it must `setChromeExpanded(true)` to draw above it —
-  so the menu reuses the panel expand/collapse machinery (it is just another entry
-  in `PANELS`). `openMenu(items, anchor)` is generic; long-press the pill opens the
-  url-bar menu (bookmark toggle / reload / hard reload / close tab).
+  so the menu reuses the panel expand/collapse machinery (it is just another panel
+  in the registry, `js/panels.js`). `openMenu(items, anchor)` is generic;
+  long-press the pill opens the url-bar menu (bookmark toggle / reload / hard
+  reload / close tab).
 - **pull-to-reload** (native): the gesture happens on the native content WebView,
   which the chrome never sees — so it lives natively, not in a chrome-js gesture
   lib. `PullRefreshLayout` wraps each content WebView, intercepts an at-top

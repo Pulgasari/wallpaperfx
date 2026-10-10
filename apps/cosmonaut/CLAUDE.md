@@ -31,7 +31,18 @@ App id/name: `dev.cosmonaut.browser` / "Cosmonaut".
   a content container behind; `setChromeExpanded` swaps its height; routes back.
 - `bridge/BrowserPlugin.java` — per-tab native WebViews, navigation, `state`
   events. url-vs-search normalization lives here.
-- `www/` — chrome ui (plain js): `index.html`, `styles.css`, `app.js`.
+- `www/` — chrome ui (plain js, es modules, no bundler): `index.html`, `styles.css`,
+  `js/`:
+  - `main.js` — entry: wires the pill, native `state` events, boot.
+  - `native.js` — the `Browser` plugin (or `mock.js` outside capacitor), the
+    session state it pushes, `call()` for fire-and-forget plugin calls.
+  - `store.js` — everything the chrome owns, persisted in `localStorage` (`browser`).
+  - `panels.js` — the panel registry: `definePanel(name, el, { render, update, close })`,
+    `openPanel` / `closePanel` expand and collapse the chrome webview.
+  - `bar.js` — dock, pill, load progress, theme. `search.js` — url vs search, engines.
+  - `panels/*.js` — one module per panel, each registers itself on import.
+  - `dom.js` — `h()` element builder and small helpers. `icons.js` — svg icons.
+  - `bookmarks-io.js` — json / netscape html formats, file save and pick.
 
 ## Build / verify
 
@@ -40,7 +51,8 @@ chrome/content layering and native webviews can only really be exercised on a
 device). Locally: `cd apps/cosmonaut && npm install && npx cap sync android &&
 (cd android && ./gradlew assembleDebug)`. After changing `www/`, run
 `npx cap copy android`. The chrome ui can be laid out / screenshotted in a plain
-browser via the mock in `app.js`.
+browser via the mock in `js/mock.js` (serve `www/` over http, es modules do
+not load from `file://`).
 
 ## Conventions
 
