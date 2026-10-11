@@ -1,0 +1,207 @@
+<script>
+
+</script>
+
+<$progress value='' />
+
+<!-- thin per-tab load progress (position configurable: top/bottom) -->
+<div id="prog" class="prog" hidden><span id="progFill"></span></div>
+
+<!-- ===== dock: [buttons] ( pill ) [buttons] ; contents built from settings ===== -->
+<div id="bar" class="bar">
+    <div id="dockLeft" class="dock-group"></div>
+    <button id="pill" class="pill"><span id="pillText">Search or URL</span></button>
+    <div id="dockRight" class="dock-group"></div>
+</div>
+
+<!-- ===== url / search ===== -->
+<section id="panelUrl" class="panel" hidden aria-label="Address">
+    <button class="backdrop" data-close aria-label="Close"></button>
+    <div class="panel-scroll"><ul id="suggest" class="suggest"></ul></div>
+    <!-- engine row: icons of all search engines, tap to search the typed query there -->
+    <div id="engineRow" class="engine-row" hidden></div>
+    <form id="urlForm" class="urlbar">
+        <input id="urlInput" type="text" inputmode="url" autocapitalize="off" autocomplete="off" spellcheck="false" placeholder="Search or enter URL" />
+        <button type="submit" id="urlGo" class="go" aria-label="Go"></button>
+    </form>
+</section>
+
+<!-- ===== find in page (bar, page stays visible behind) ===== -->
+<section id="panelFind" class="panel find" hidden aria-label="Find in page">
+    <form id="findForm" class="findbar">
+        <input id="findInput" type="text" autocapitalize="off" autocomplete="off" spellcheck="false" placeholder="Find in page" />
+        <span id="findCount" class="find-count"></span>
+        <button type="button" id="findPrev" class="ic" aria-label="Previous">‹</button>
+        <button type="submit" id="findNext" class="ic" aria-label="Next">›</button>
+        <button type="button" id="findClose" class="ic" data-close aria-label="Close">×</button>
+    </form>
+</section>
+
+<!-- ===== tabs overview ===== -->
+<section id="panelTabs" class="panel sheet" hidden aria-label="Tabs">
+    <button class="backdrop" data-close aria-label="Close"></button>
+    <div class="sheet-body">
+        <div class="sheet-head">
+            <span class="sheet-title">Tabs</span>
+            <span class="sheet-actions">
+                <button id="newGroupBtn" class="txt-btn">Group</button>
+                <button id="newTabBtn"   class="txt-btn">New tab</button>
+            </span>
+        </div>
+        <div id="tabGroups"></div>
+    </div>
+</section>
+
+<!-- ===== bookmarks ===== -->
+<section id="panelMarks" class="panel sheet" hidden aria-label="Bookmarks">
+    <button class="backdrop" data-close aria-label="Close"></button>
+    <div class="sheet-body">
+        <div class="sheet-head">
+            <span class="sheet-title">Bookmarks</span>
+            <span class="sheet-actions">
+                <button id="markIoBtn" class="txt-btn">Import/Export</button>
+                <button id="newFolderBtn" class="txt-btn">Folder</button>
+                <button id="addMarkBtn" class="txt-btn">This page</button>
+            </span>
+        </div>
+        <!-- every tag in use, tap one to show only its bookmarks -->
+        <div id="markTagBar" class="tag-bar" hidden></div>
+        <div id="markGroups"></div>
+        <p id="marksEmpty" class="empty">no bookmarks yet</p>
+
+        <!-- edit a bookmark (title / url / folder / tags) -->
+        <div id="markEditor" class="editor" hidden>
+            <input id="markTitle" class="in" placeholder="Title" />
+            <input id="markUrl" class="in" placeholder="URL" inputmode="url" autocapitalize="off" spellcheck="false" />
+            <label class="field-label" for="markFolder">Folder</label>
+            <select id="markFolder" class="in"></select>
+            <input id="markTags" class="in" placeholder="Tags (space separated)" autocapitalize="off" spellcheck="false" />
+            <div class="editor-actions">
+                <button id="markDelete" class="txt-btn danger">Delete</button>
+                <button id="markCancel" class="txt-btn">Cancel</button>
+                <button id="markSave"   class="txt-btn primary">Save</button>
+            </div>
+        </div>
+
+        <!-- import / export: to/from a file (capacitor filesystem, download on web) or
+             via copy-paste in the textarea. json keeps folders; netscape html is flat. -->
+        <div id="markIO" class="editor" hidden>
+            <div id="markIoFmt" class="seg"></div>
+            <textarea id="markIoText" class="css-area" spellcheck="false" placeholder="Export writes a file and shows its content here to copy. To import, load a file, or paste text here and press Import."></textarea>
+            <p id="markIoStatus" class="io-status" hidden></p>
+            <input id="markIoFile" type="file" accept=".json,.html,.htm,application/json,text/html" hidden />
+            <div class="editor-actions">
+                <button id="markIoClose"  class="txt-btn">Close</button>
+                <button id="markIoLoad"   class="txt-btn">Load file</button>
+                <button id="markIoExport" class="txt-btn">Export</button>
+                <button id="markIoImport" class="txt-btn primary">Import</button>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ===== dashboard: start page for a new tab (bookmarks grid) ===== -->
+<section id="panelDash" class="panel dash" hidden aria-label="Start">
+    <div class="dash-body">
+        <button id="dashSearch" class="dash-search">Search or URL</button>
+        <div id="dashGrid" class="dash-grid"></div>
+        <p id="dashEmpty" class="empty">no bookmarks yet</p>
+    </div>
+</section>
+
+<!-- ===== userscripts ===== -->
+<app-panel name='userscripts'>
+  <header>
+    userscripts
+    <div>
+      <btn-icon 'add' />
+    </div>
+  </header>
+  <main>
+    
+  </main>
+</app-panel>
+
+<section id="panelScripts" class="panel sheet" hidden aria-label="Userscripts">
+    <button class="backdrop" data-close aria-label="Close"></button>
+    <div class="sheet-body">
+        <div class="sheet-head">
+            <span class="sheet-title">Userscripts</span>
+            <span class="sheet-actions"><button id="newScriptBtn" class="txt-btn">New</button></span>
+        </div>
+        <ul id="scriptList" class="rows"></ul>
+        <p id="scriptsEmpty" class="empty">no userscripts yet</p>
+        <!-- editor (shown while adding/editing) -->
+        <div id="scriptEditor" class="editor" hidden>
+            <input    id="scriptName"    class="in" placeholder="Name" />
+            <input    id="scriptMatches" class="in" placeholder="Match patterns, e.g. https://*.example.com/*  (space separated)" />
+            <textarea id="scriptCode"    class="css-area" spellcheck="false" placeholder="// javascript, runs once the page has loaded"></textarea>
+            <textarea id="scriptCss"     class="css-area" spellcheck="false" placeholder="/* css, added to the page */"></textarea>
+            <label class="switch-row"><span>Enabled</span><input id="scriptEnabled" type="checkbox" checked /></label>
+            <div class="editor-actions">
+                <button id="scriptCancel" class="txt-btn">Cancel</button>
+                <button id="scriptSave" class="txt-btn primary">Save</button>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ===== settings ===== -->
+<section id="panelSettings" class="panel sheet" hidden aria-label="Settings">
+    <button class="backdrop" data-close aria-label="Close"></button>
+    <div class="sheet-body">
+        <div class="sheet-head"><span class="sheet-title">Settings</span></div>
+
+        <h3 class="grp">Colors</h3>
+        <div class="row-field"><label for="colBg">Background</label><input id="colBg" type="color" /></div>
+        <div class="row-field"><label for="colFg">Foreground</label><input id="colFg" type="color" /></div>
+        <div class="row-field"><label for="colAccent">Accent</label><input id="colAccent" type="color" /></div>
+        <label class="switch-row"><span>Blur behind panels</span><input id="blurToggle" type="checkbox" /></label>
+
+        <h3 class="grp">Search</h3>
+        <div class="field"><button id="openEngines" class="txt-btn">Manage search engines</button></div>
+
+        <h3 class="grp">Dock</h3>
+        <div class="field"><label>Position</label><div id="dockPosSeg" class="seg"></div></div>
+        <div class="field"><label>Loading bar</label><div id="loaderPosSeg" class="seg"></div></div>
+        <div class="range-field"><label for="rangeDockSize">Size <b id="valDockSize"></b></label><input id="rangeDockSize" type="range" min="36" max="60" step="1" /></div>
+        <div class="range-field"><label for="rangeDockGap">Gap <b id="valDockGap"></b></label><input id="rangeDockGap" type="range" min="4" max="28" step="1" /></div>
+
+        <h3 class="grp">Dock buttons</h3>
+        <ul id="dockList" class="rows"></ul>
+    </div>
+</section>
+
+<!-- ===== search engines (anything with a query-param url; %s = the search word) ===== -->
+<section id="panelEngines" class="panel sheet" hidden aria-label="Search engines">
+    <button class="backdrop" data-close aria-label="Close"></button>
+    <div class="sheet-body">
+        <div class="sheet-head">
+            <span class="sheet-title">Search engines</span>
+            <span class="sheet-actions"><button id="newEngineBtn" class="txt-btn">Add</button></span>
+        </div>
+        <ul id="engineList" class="rows"></ul>
+        <p id="enginesEmpty" class="empty">no entries yet</p>
+        <div id="engineEditor" class="editor" hidden>
+            <input id="engName" class="in" placeholder="Name" />
+            <input id="engUrl" class="in" placeholder="URL with %s for the query, e.g. https://example.com/?q=%s" inputmode="url" autocapitalize="off" spellcheck="false" />
+            <input id="engIcon" class="in" placeholder="Icon URL (optional)" inputmode="url" autocapitalize="off" spellcheck="false" />
+            <label class="switch-row"><span>Default</span><input id="engDefault" type="checkbox" /></label>
+            <div class="editor-actions">
+                <button id="engDelete" class="txt-btn danger">Delete</button>
+                <button id="engCancel" class="txt-btn">Cancel</button>
+                <button id="engSave" class="txt-btn primary">Save</button>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ===== context menu (anchored floating list, over the page) ===== -->
+<section id="panelMenu" class="panel menu-panel" hidden aria-label="Menu">
+    <button class="backdrop backdrop-clear" data-close aria-label="Close"></button>
+    <ul id="menuList" class="menu" role="menu"></ul>
+</section>
+
+<style>
+  
+</style>
