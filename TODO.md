@@ -31,6 +31,8 @@
 - [x] export/import as/from json
 - [x] erst so mechanismus für url-leiste das man quasi `<string>:` tippt um irgendne sonderfunktion zu aktivieren ...
 - [x] ... dann erste sonderfunktion: eingabe von `tl:` aktiviert translate-modus und wenn man dann `tl: katze` eingibt nutzt das entweder irgendne api (google translate? yandex? deepl?) oder leitet wenigstens zu ner url von denen für übersetzung
+- [ ] wenn seite/url gebookmarked ist, sollte bookmarks-icon `.active` sein
+- [ ] wenn auf seite/url userscript aktiv ist, sollte userscript-icon `.active` sein
 
 ## parts
 
@@ -60,6 +62,22 @@ quasi die startseite oder bei leerer tab.
 ### part: userscripts
 - [x] weiteres eingabefeld für css
 - [ ] `<write-code>` aus `@aufbau/elements` nutzen
+
+## sonstiges
+
+- [ ] generell mehr gebrauch von `@aufbau/elements` machen, wo es sinnvoll wäre (kannst auch stets vorschläge für neue elemente machen)
+
+das panel (wie für zb settings) sollte:
+- [ ] mitte: titel + über dem titel handle um höhe zu ändern
+- [ ] rechts: fullsize/expand-icon, close-icon
+- [ ] links: in manchem kontext braucht es zurück-button, der könnte dort hin
+
+und im anschluss noch konzept diesbzgl überlegen:
+
+langfristig will ich so n kleines system machen wo man gesten mit commands/actions verknüpfen könnte. zb
+- wenn man im dock nach links wischt
+- wenn man im dock nach rechts wischt
+könnte man das dann mit ner action/command verknüpfen wie zb "go back in history" oder "open tab left of the current" und sowas.
 
 ---
 
