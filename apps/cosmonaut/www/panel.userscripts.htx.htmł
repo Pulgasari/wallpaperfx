@@ -1,0 +1,132 @@
+<!--
+userscripts, managed here and pushed to native, which injects each enabled one
+at document end into pages whose url matches one of its globs. native only
+runs javascript, so a script's css goes along as a snippet that adds a <style>
+-->
+
+<script>
+  import { html }                from '@htx/js';
+  import { byId, isolated, uid } from '../dom.js';
+  import { call }                from '../native.js';
+  import { definePanel }         from '../panels.js';
+  import { save, store }         from '../store.js';
+  
+  const phCSS = `/* css, added to the page */`
+  const phJS  = `// javascript, runs once the page has loaded`;
+
+
+
+
+const list  = byId('scriptList');
+const empty = byId('scriptsEmpty');
+const form  = {
+  name    : byId('scriptName'),
+  matches : byId('scriptMatches'),
+  code    : byId('scriptCode'),
+  css     : byId('scriptCss'),
+  enabled : byId('scriptEnabled'),
+  box     : byId('scriptEditor'),
+};
+let editing = null;
+
+// the css as a statement that appends it to the page, once per load
+const styleSnippet = css => css?.trim()
+  ? `\n;(() => { const style = document.createElement('style'); style.textContent = ${JSON.stringify(css)}; (document.head || document.documentElement).append(style); })();`
+  : '';
+
+export function pushUserscripts () {
+  call('setUserscripts', { scripts: store.userscripts.map(({ code, css, enabled, matches, name }) => ({ code: (code || '') + styleSnippet(css), enabled, matches, name })) });
+}
+
+const commit = () => { save(); pushUserscripts(); };
+
+function scriptRow (script) {
+  const toggle = event => { script.enabled = event.target.checked; commit(); };
+  const remove = () => { store.userscripts = store.userscripts.filter(other => other.id !== script.id); commit(); render(); };
+
+  return html`
+    <li.row onClick=${() => openEditor(script)}>
+      <span.rtext><b>${script.name || 'Script'}</b><span>${script.matches?.join(' ') || 'all pages'}</span></span>
+      <input type="checkbox" checked=${script.enabled !== false} onClick=${event => event.stopPropagation()} onChange=${toggle} />
+      <button.icon-btn aria-label="Delete" onClick=${isolated(remove)}>×</button>
+    </li>`;
+}
+
+function render () {
+  form.box.hidden = true;
+  list.hidden     = false;
+  list.replaceChildren(...store.userscripts.map(scriptRow));
+  empty.hidden    = store.userscripts.length > 0;
+}
+
+function openEditor (script = null) {
+  editing = script ?? { id: uid('u'), name: '', matches: [], code: '', css: '', enabled: true };
+  form.name.value      = editing.name || '';
+  form.matches.value   = (editing.matches || []).join(' ');
+  form.code.value      = editing.code || '';
+  form.css.value       = editing.css || '';
+  form.enabled.checked = editing.enabled !== false;
+  form.box.hidden = false;
+  list.hidden     = true;
+  empty.hidden    = true;
+}
+
+function saveEditor () {
+  Object.assign(editing, {
+    name    : form.name.value.trim() || 'Script',
+    matches : form.matches.value.split(/\s+/).filter(Boolean),
+    code    : form.code.value,
+    css     : form.css.value,
+    enabled : form.enabled.checked,
+  });
+  if (!store.userscripts.includes(editing)) store.userscripts.push(editing);
+  commit();
+  render();
+}
+
+
+definePanel('scripts', byId('panelScripts'), { render });
+</script>
+
+<app-panel name='userscripts'>
+  
+  <header>
+    userscripts
+    <div>
+      <btn-icon 'add' on:click=${openEditor} />
+    </div>
+  </header>
+  
+  <main>
+    <!-- if editor === 'open' -->
+    <div id="scriptEditor" class="editor" hidden>
+      <input-text id="scriptName"    class="in" placeholder="Name" />
+      <input-text id="scriptMatches" class="in" placeholder="Match patterns, e.g. https://*.example.com/*  (space separated)" />
+      <write-code lang='js'  placeholder=${phJS}  />
+      <write-code lang='css' placeholder=${phCSS} />
+      <label class="switch-row"><span>Enabled</span><input id="scriptEnabled" type="checkbox" checked /></label>
+      <div-x class='actions'>
+        <btn-push 'save'   on:click=${saveEditor} />
+        <btn-push 'cancel' on:click=${render}     />
+      </div-x>
+    </div>
+    
+  </main>
+</app-panel>
+
+<section id="panelScripts" class="panel sheet" hidden aria-label="Userscripts">
+    <button class="backdrop" data-close aria-label="Close"></button>
+    <div class="sheet-body">
+        <div class="sheet-head">
+            <span class="sheet-title">Userscripts</span>
+            <span class="sheet-actions"><button id="newScriptBtn" class="txt-btn">New</button></span>
+        </div>
+              
+        <ul id="scriptList" class="rows"></ul>
+          
+        <p id="scriptsEmpty" class="empty">no userscripts yet</p>
+        
+
+              
+    </div>
+</section>
