@@ -6,17 +6,18 @@ Guidance for working in `apps/subotnik`.
 
 An Android home-screen launcher. Unlike the wallpaper app, a launcher UI **is
 allowed to be a WebView**, so the whole home screen is the Capacitor web layer
-(`www/`, plain JS, no bundler). The native side is a single Capacitor plugin
+(a rat app: sources in `rat/dev/android/subotnik/`, built into `www/`, never edit
+`www/`). The native side is a single Capacitor plugin
 that bridges `PackageManager`; there is no custom rendering engine.
 
-- UI = `www/` (`index.html`, `app.js`, `styles.css`). Two layers:
-  - **home screen**: only pinned apps (`state.home`) + folders.
-  - **app drawer** (`#drawer`, swipe up / center button): all apps, with three
+- UI = `app.rat.html`, `state.rat.js`, `components/`, `app.css`. Two layers:
+  - **home screen**: only pinned apps (`$home`) + folders.
+  - **app drawer** (`<Drawer>`, swipe up / center button): all apps, with three
     bottom bars that combine as filters: categories (derived from the guessed
     glyph via `CATEGORIES`), first letters (tap toggles, drag scrubs), search
     (enter launches the first hit). filters reset on each open.
-    bar position (`state.barsPos`: top|bottom) and top-to-bottom order
-    (`state.barsOrder`, a permutation of `BARS` keys) are settings; applied via
+    bar position (`$look.barsPos`: top|bottom) and top-to-bottom order
+    (`$look.barsOrder`, a permutation of `BARS` keys) are settings; applied via
     a body class + inline flex `order`, the dom order never changes.
     `state.letterTwoRows` switches the letter bar to a 14-column grid (2 rows).
   long-press any app for pin/unpin + folder actions. preferences persist in
@@ -41,19 +42,21 @@ App id/name: `dev.subotnik.launcher` / "Subotnik".
 
 ## Icons
 
-Icons are local monochrome line svgs defined in `app.js` `ICONS` (viewBox
+Icons are local monochrome line svgs defined in `modules/launcher.js` `GLYPHS` (viewBox
 `0 0 24 24`, drawn from basic shapes, `fill=none` + `currentColor` stroke), not
-the real app icons and not fetched from any network (offline launcher). A single
-global color (`state.iconColor`, applied via the `--icon-color` css var) tints
-them all; per-app icon overrides are a future step. `guessIcon()` maps an app to
-a glyph by keyword (`ICON_RULES`, first match wins) with an `app` fallback.
+the real app icons and not fetched from any network (offline launcher): they are
+handed to `<svg-icon>` at start (`provide`). A single global color (`$look.iconColor`,
+applied via the `--glyph-color` css var) tints them all; per-app icon overrides are a
+future step. `glyphOf()` maps an app to a glyph by keyword (`RULES`, first match wins)
+with an `app` fallback.
 
 ## Config / state
 
-`state` = `{ cols, iconColor, …appearance, folders:[{id,name,apps:[packageName]}],
-home:[packageName] }` in `localStorage`. an app is on the home screen if it is in
+`$look` (`{ cols, iconColor, …appearance }`), `$folders` (`[{id,name,apps:[packageName]}]`)
+and `$home` (`[packageName]`) are kept in `localStorage` (rat `stored`, keys
+`Subotnik:<name>`; the old single key `launcher` is taken over once). an app is on the home screen if it is in
 `home` or in a folder (never both). `home: null` means not seeded yet; the first
-run pins a few everyday apps (`SEED_ICONS`). Apps are queried live each launch; only preferences and folder
+run pins a few everyday apps (`SEED`). Apps are queried live each launch; only preferences and folder
 membership (by package name) are stored, so uninstalled packages just drop out
 of the grid. There is no native config file (the wallpaper app's json bridge has
 no analog here).
@@ -62,11 +65,11 @@ no analog here).
 
 Same as the repo: no local Android SDK assumed; CI (`android build`) is the
 source of truth. Locally:
-`cd apps/subotnik && npm install && npx cap sync android && (cd android && ./gradlew assembleDebug)`.
-After changing `www/`, run `npx cap copy android`.
+`cd ../rat && node packages/cli/index.js build dev/android/subotnik --target android` (into
+`www/`, then `cap sync`), then `cd apps/subotnik/android && ./gradlew assembleDebug`.
 
 ## Conventions
 
 - Code comments: english, all lowercase, technical, no emojis.
-- Prefer JavaScript; the web side is intentionally bundler-free.
+- Prefer JavaScript. the web side is a rat app, its sources are in the rat repo.
 - Do not hand-edit generated gradle files (`capacitor.build.gradle`, etc.).

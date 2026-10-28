@@ -20,7 +20,8 @@ in mind whenever you touch the native side or the chrome layout.
   `contentContainer` `FrameLayout`. Only the active tab's view is `VISIBLE`.
 - **chrome**: the Capacitor bridge WebView, made transparent and reparented (in
   `MainActivity`) into a root `FrameLayout` **above** the content container. It
-  renders the ui in `www/` (plain js) and drives the content via the plugin.
+  renders the ui in `www/` (a rat app, built from `rat/dev/android/cosmonaut/`) and
+  drives the content via the plugin.
 
 Capacitor's model is "one WebView = your app", so a browser (many content views +
 a ui overlay) does not fit out of the box. Reparenting the bridge WebView is how
@@ -117,7 +118,7 @@ Two things follow straight from the two-layer split:
 - **context menu** (chrome-side): an anchored floating list. Because the collapsed
   chrome is only the strip, it must `setChromeExpanded(true)` to draw above it —
   so the menu reuses the panel expand/collapse machinery (it is just another panel
-  in the registry, `js/panels.js`). `openMenu(items, anchor)` is generic;
+  driven by `$panel` in `state.rat.js`). `openMenu(items, anchor)` is generic;
   long-press the pill opens the url-bar menu (bookmark toggle / reload / hard
   reload / close tab).
 - **pull-to-reload** (native): the gesture happens on the native content WebView,

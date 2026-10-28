@@ -1,8 +1,8 @@
 # Cosmonaut
 
 Ein minimalistischer Android-Browser auf Basis der System-WebView (Chromium).
-Gleicher Stack wie der Rest: die Bedien-Oberfläche ist Web (Capacitor, reines JS
-unter `www/`), die eigentlichen Webseiten laufen in nativen Content-WebViews
+Gleicher Stack wie der Rest: die Bedien-Oberfläche ist Web (Capacitor, eine
+rat-App aus `rat/dev/android/cosmonaut/`, gebaut nach `www/`), die eigentlichen Webseiten laufen in nativen Content-WebViews
 dahinter. Details zur Architektur: `ARCHITECTURE.md`.
 
 App-ID/-Name: `dev.cosmonaut.browser`, "Cosmonaut".

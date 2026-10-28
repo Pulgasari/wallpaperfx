@@ -1,7 +1,7 @@
 {
   "appId": "dev.cosmonaut.browser",
   "appName": "Cosmonaut",
-  "webDir": "build/www",
+  "webDir": "www",
   "android": {
     "allowMixedContent": true,
     "backgroundColor": "#00000000"

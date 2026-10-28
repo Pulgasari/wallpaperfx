@@ -19,16 +19,16 @@ App id/name: `dev.cosmonaut.browser` / "Cosmonaut".
   panels must be `position:fixed` overlays — never depend on document-flow height.
 - **native owns tabs, chrome owns organization**: the plugin's `state` event
   (`tabs/activeId/expanded`) is the single source of truth for tabs; the chrome
-  re-renders from it and holds no separate tab list. bookmarks + groups live in
-  chrome `localStorage` (key `browser`), keyed by native tab id.
+  re-renders from it and holds no separate tab list (`$session` in `state.rat.js`).
+  bookmarks, groups (keyed by native tab id), userscripts, engines and the look
+  are kept in chrome `localStorage` (rat `stored`, keys `Cosmonaut:<name>`; the old
+  single key `browser` is taken over once).
 - **all webview calls on the ui thread**: `BrowserPlugin` wraps every method body
   in `activity.runOnUiThread(...)`.
-- **on @aufbau/css, three palette tokens**: `aufbau.css` is linked before
-  `styles.css` (its rules sit in layers, the app's win). the colors are aufbau's
-  `--color-bg` / `--color-fg` / `--color-ink`, set on `body` (where aufbau's palette
-  sets them); other shades are `color-mix` of them. do not use `--bg` / `--fg` /
-  `--ink` as theme variables: aufbau registers them as non-inheriting shorthands
-  for an element's own background / color / accent. spacing is `--space()`.
+- **three palette tokens**: `--color-bg` / `--color-fg` / `--color-ink`, set on
+  `body` from the settings; other shades are `color-mix` of them. do not use
+  `--bg` / `--fg` / `--ink` as theme variables: aufbau registers them as
+  non-inheriting shorthands for an element's own background / color / accent.
 - **html and body stay transparent** (the content webview shows through).
 
 ## Files
@@ -37,45 +37,28 @@ App id/name: `dev.cosmonaut.browser` / "Cosmonaut".
   a content container behind; `setChromeExpanded` swaps its height; routes back.
 - `bridge/BrowserPlugin.java` — per-tab native WebViews, navigation, `state`
   events. url-vs-search normalization lives here.
-- `www/` — chrome ui (plain js, es modules, uncompiled): `index.html`, `styles.css`,
-  `js/`:
-  - `main.js` — entry: wires the pill, native `state` events, boot.
-  - `native.js` — the `Browser` plugin (or `mock.js` outside capacitor), the
-    session state it pushes, `call()` for fire-and-forget plugin calls.
-  - `store.js` — everything the chrome owns, persisted in `localStorage` (`browser`).
-  - `panels.js` — the panel registry: `definePanel(name, el, { render, update, close })`,
-    `openPanel` / `closePanel` expand and collapse the chrome webview.
-  - `bar.js` — dock, pill, load progress, theme. `search.js` — url vs search, engines.
-  - `commands.js` — url field commands (`tl: text` translates), a registry.
-  - `panels/*.js` — one module per panel, each registers itself on import.
-  - `dom.js` — small helpers (`byId`, `segmented`, `group`, long press).
-    elements are built with htx (`import { html } from '@htx/js'`), a dom
-    builder without vdom: lists re-render whole via `replaceChildren`.
-    `icons.js` — svg icons.
-  - `bookmarks-io.js` — json / netscape html formats, file save and pick.
+- the chrome ui: sources in `rat/dev/android/cosmonaut/`, built into `www/` (never edit `www/`):
+  - `app.rat.html` — the bar and the open panel. `state.rat.js` — the session (last
+    native `state`), `$panel` (open/close call `setChromeExpanded`), everything kept.
+  - `modules/browser.js` — the `Browser` plugin (or `mock.js` outside capacitor),
+    `call()` for fire-and-forget plugin calls. `search.js`, `commands.js` (`tl: text`),
+    `bookmarks-io.js` (json / netscape html), `press.js` (long press), `glyphs.js`.
+  - `components/` — `Bar` (dock, pill, load progress, the strip height to native)
+    and one component per panel.
 
 ## Build / verify
 
 No local Android SDK; CI (`android build`) is the source of truth (the
 chrome/content layering and native webviews can only really be exercised on a
-device). Locally: `cd apps/cosmonaut && npm install && npm run bundle &&
-npx cap sync android && (cd android && ./gradlew assembleDebug)`.
+device). The web layer: `cd ../rat && node packages/cli/index.js build
+dev/android/cosmonaut --target android` (into `www/`, then `cap sync`). Then
+`(cd android && ./gradlew assembleDebug)`.
 
-`www/` is the source; capacitor ships `build/www` (`webDir`, gitignored), built by
-`npm run bundle` (`bundler.config.js`, @aufbau/bundler): `www/` plus the packages
-its modules import by bare specifier (`@htx/js` and what it pulls in), staged
-from sibling checkouts of the package repos through `../../shared/importmap.json`,
-the map inlined into `index.html`. strict: an import that would not load offline
-fails the bundle. `AUFBAU=<path>` points the script at another aufbau checkout,
-`source=<dir>` (cli arg) at another directory of repo checkouts. After changing
-`www/`, bundle again and `npx cap copy android`.
-
-The chrome ui can be laid out / screenshotted in a plain browser via the mock in
-`js/mock.js`: serve `build/www` over http (es modules do not load from `file://`,
-and `www/` alone has no importmap).
+The chrome ui can be laid out / screenshotted in a plain browser via the mock:
+serve `www/` over http.
 
 ## Conventions
 
 - Code comments: english, all lowercase, technical, no emojis.
-- Prefer JavaScript; the web side is not compiled (the bundle only stages packages).
+- Prefer JavaScript. the web side is a rat app, its sources are in the rat repo.
 - Do not hand-edit generated gradle files (`capacitor.build.gradle`, etc.).

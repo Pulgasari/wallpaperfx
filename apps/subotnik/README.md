@@ -1,7 +1,7 @@
 # Subotnik (Launcher)
 
 Ein Android-Home-Screen-Launcher. Gleicher Stack wie die Wallpaper-App:
-Web-UI (Capacitor, reines JS unter `www/`) plus ein kleiner nativer Teil. Da
+Web-UI (Capacitor, eine rat-App aus `rat/dev/android/subotnik/`, gebaut nach `www/`) plus ein kleiner nativer Teil. Da
 eine Launcher-UI eine WebView sein **darf**, ist der komplette Home-Screen die
 Web-Schicht; nativ ist nur die Brücke zum `PackageManager`.
 

@@ -11,7 +11,7 @@ Ein Android-Live-Wallpaper **muss** nativ sein: es läuft als `WallpaperService`
 kann kein Live-Wallpaper sein. Deshalb der Split:
 
 - **UI = Capacitor / Web (JS)** — Auswahl von Medien, Offsets, Dauer, Modi,
-  Filter. Kein Bundler, reines HTML/CSS/JS unter `www/`.
+  Filter. Eine rat-App aus `rat/dev/android/subotnik-wallpapers/`, gebaut nach `www/`.
 - **Engine = nativ (Java + GLSL)** — `WallpaperService` mit eigenem EGL-Kontext
   und Render-Thread. Video via `MediaPlayer` → `SurfaceTexture` → externe
   OES-Textur; Bilder als GL-Texturen mit Cross-Fade; Filter als Fragment-Shader.
@@ -36,7 +36,7 @@ kann kein Live-Wallpaper sein. Deshalb der Split:
    - animiert (brauchen `uTime`, rendern kontinuierlich solange sichtbar):
      `filmgrain`, `glitch`, `vhs`
    Die UI zeigt nur die Parameter des aktiven Filters. Die Filter-Shader liegen
-   doppelt (nativ in `FilterGlsl.java`, preview in `www/preview.js`) und müssen
+   doppelt (nativ in `FilterGlsl.java`, preview in `modules/preview.js` der rat-App) und müssen
    logisch identisch bleiben.
 4. **Parallax** — optionale Verschiebung beim Homescreen-Wischen
    (`onOffsetsChanged`), mit einstellbarer Stärke (cover-modus).
@@ -57,8 +57,7 @@ kann kein Live-Wallpaper sein. Deshalb der Split:
 ## Projektstruktur
 
 ```
-www/                              web-ui (html/css/js), kein bundler
-  index.html app.js styles.css
+www/                              web-ui, gebaut von rat (nicht von hand bearbeiten)
 android/app/src/main/
   java/dev/subotnik/wallpapers/
     MainActivity.java             registriert das Wallpaper-plugin
